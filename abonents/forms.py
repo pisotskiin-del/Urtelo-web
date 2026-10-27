@@ -35,7 +35,6 @@ class KartaForm(forms.ModelForm):
             if name in labels:
                 field.label = labels[name]
         lookups = {
-            "accept": lambda: Akcept.objects.order_by("id_akc").values_list("id_akc", "name_akc"),
             "id_kategor": lambda: Kategorpot.objects.order_by("id_kotegor").values_list("id_kotegor", "name_kateg"),
             "id_koteln": lambda: GvsKot.objects.filter(kod_gor=obj.cod_gor_id).order_by("name_kot")
                                                 .values_list("id_kot", "name_kot"),
@@ -45,6 +44,12 @@ class KartaForm(forms.ModelForm):
                 self.fields[name] = _choice_field(layout.CHOICES[name], getattr(obj, name), labels.get(name))
             elif name in lookups:
                 self.fields[name] = _choice_field(lookups[name](), getattr(obj, name), labels.get(name))
+        if "accept" in self.fields:
+            # Акцепт обязателен и только из справочника akcept: 0 и пусто не допускаются.
+            self.fields["accept"] = forms.TypedChoiceField(
+                label=labels.get("accept"), coerce=int,
+                choices=[(str(k), v) for k, v in Akcept.objects.order_by("id_akc").values_list("id_akc", "name_akc")],
+            )
         if "cod_minist" in self.fields:
             self.fields["cod_minist"].queryset = self.fields["cod_minist"].queryset.order_by("name_minis")
         for name, field in self.fields.items():

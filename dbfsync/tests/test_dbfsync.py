@@ -123,7 +123,16 @@ class DbfEdgeCaseTests(TestCase):
 
         Org.dbf_source = "DATA/org.dbf"
         self.addCleanup(setattr, Org, "dbf_source", "org.dbf")
-        source, loaded, bad = import_table(Org, self.tmp)
+        source, loaded, bad, fixed = import_table(Org, self.tmp)
         self.assertEqual((source, loaded), (3, 3))
         self.assertEqual(bad, {"DATA_DOG": 1})
         self.assertIsNone(Org.objects.get(kod=1).data_dog)
+
+    def test_fixes_replace_values_on_import(self):
+        fixes = {"objekt.dbf": {"KOD_ORG": {"from": [None], "to": 2}, "KOD": {"from": [20], "to": 21}}}
+        import_table(Org, DEMO)
+        source, loaded, bad, fixed = import_table(Objekt, DEMO, fixes=fixes)
+        self.assertEqual(fixed, {"KOD_ORG": 1, "KOD": 1})
+        self.assertEqual(Objekt.objects.get(naim__startswith="Котельная").kod_org_id, 2)
+        self.assertTrue(Objekt.objects.filter(kod=21).exists())
+        self.assertFalse(Objekt.objects.filter(kod=20).exists())

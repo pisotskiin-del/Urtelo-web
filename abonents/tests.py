@@ -22,6 +22,7 @@ class KartaTests(TestCase):
         Minist.objects.create(cod_minist=1, name_minis="Без министерства")
         Kategorpot.objects.create(id_kotegor=1, name_kateg="Хозрасчет")
         GvsKot.objects.create(id_kot=16, name_kot="(Р) Котельная №2", kod_gor=self.ryb)
+        Akcept.objects.create(id_akc=1, name_akc="БА")
         Akcept.objects.create(id_akc=3, name_akc="С")
         common = dict(cod_gor=self.ryb, cod_minist_id=1, id_kategor=1, id_koteln=16, accept=3, tip_rasot=1)
         self.a = Potreb.objects.create(potreb_id=5, nom_dog=6, name_potre='ООО "Крипс"', glav_potre="Магазин",
@@ -106,6 +107,17 @@ class KartaTests(TestCase):
         self.assertEqual(self.a.dn_pereras, 3)
         self.assertEqual(self.a.tkf_perer, 0)
         self.assertEqual(self.a.gkl_perer, 0)
+
+    def test_accept_zero_is_not_allowed(self):
+        self.login("Оператор")
+        Potreb.objects.filter(potreb_id=9).update(accept=0)
+        html = self.client.get("/abonents/9/edit/?tab=ishod").content.decode()
+        self.assertNotIn('<option value="0"', html)
+        self.assertNotIn('<option value=""', re.search(r'<select name="accept".*?</select>', html, re.S).group(0))
+        from abonents.forms import karta_form
+        form = karta_form("ishod", {"accept": "0"}, instance=Potreb.objects.get(potreb_id=9))
+        self.assertFalse(form.is_valid())
+        self.assertIn("accept", form.errors)
 
     def test_search(self):
         self.login("Наблюдатель")
