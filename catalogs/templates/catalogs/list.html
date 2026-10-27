@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ meta.verbose_name_plural }}{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{% url 'catalogs:index' %}">Справочники</a> /</p>
+<div class="head">
+  <h1>{{ meta.verbose_name_plural }}</h1>
+  {% if can_add %}<a class="button primary" href="{% url 'catalogs:create' slug %}">Добавить</a>{% endif %}
+</div>
+<form class="search" method="get">
+  <input name="q" value="{{ query }}" placeholder="Поиск по тексту">
+  {% if sort %}<input type="hidden" name="o" value="{{ sort }}">{% endif %}
+  <button>Найти</button>{% if query %} <a href="?">Сбросить</a>{% endif %}
+</form>
+<div class="scroll">
+<table class="grid">
+  <thead><tr>
+    {% for title, param, arrow in headers %}<th><a href="?o={{ param }}{% if query %}&q={{ query|urlencode }}{% endif %}">{{ title }}</a> {{ arrow }}</th>{% endfor %}
+  </tr></thead>
+  <tbody>
+  {% for obj, values in rows %}
+    <tr class="clickable" onclick="location.href='{% url 'catalogs:detail' slug obj.pk %}'">
+      {% for v in values %}<td>{% if v is None %}{% elif v is True %}да{% elif v is False %}нет{% else %}{{ v }}{% endif %}</td>{% endfor %}
+    </tr>
+  {% empty %}
+    <tr><td colspan="{{ headers|length }}" class="muted">Записей нет</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="pager">
+  {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if sort %}&o={{ sort }}{% endif %}">← Назад</a>{% endif %}
+  Страница {{ page.number }} из {{ page.paginator.num_pages }}, всего записей: {{ page.paginator.count }}
+  {% if page.has_next %}<a href="?page={{ page.next_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if sort %}&o={{ sort }}{% endif %}">Вперёд →</a>{% endif %}
+</p>
+{% endblock %}

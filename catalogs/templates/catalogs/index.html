@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Справочники{% endblock %}
+{% block content %}
+<h1>Справочники</h1>
+{% if items %}
+<table class="grid">
+  <thead><tr><th>Справочник</th><th>Файл DBF</th><th class="num">Записей</th></tr></thead>
+  <tbody>
+  {% for it in items %}
+    <tr><td><a href="{% url 'catalogs:list' it.slug %}">{{ it.title }}</a></td><td class="muted">{{ it.source }}</td><td class="num">{{ it.count }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">Нет доступных справочников. Обратитесь к администратору, чтобы вам назначили роль.</p>
+{% endif %}
+{% endblock %}
