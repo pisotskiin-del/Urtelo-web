@@ -31,13 +31,14 @@
 python migration/dbf2pg/dbf2pg.py all --src КОПИЯ_dbf --models catalogs/models.py ^
     --dbc КОПИЯ_dbf/ur_teplo.dbc --exclude sul.dbf,poisk_ab.dbf ^
     --link "*.cod_gor=danrasch.cod_gorod" --link "gvs_kot.kod_gor=danrasch.cod_gorod" ^
-    --fix "potreb.accept:0=1" --dsn "host=localhost dbname=teplo user=teplo password=..."
+    --fix "potreb.accept:0=1" --fix "potreb.accept:=1" --dsn "host=localhost dbname=teplo user=teplo password=..."
 ```
 
 - `--dbc` берёт ключи таблиц из словаря базы VFP;
 - `--link` задаёт связь вручную, `*.поле` значит во всех таблицах, где есть это поле;
 - `--exclude` пропускает файлы или папки;
-- `--fix` исправляет значение при переносе: в `potreb.accept` (поле «Акцепт») 0 недопустим, ставится 1.
+- `--fix` исправляет значение при переносе: в `potreb.accept` (поле «Акцепт») 0 и пустое значение
+  недопустимы, ставится 1 (так же делает импорт карточки абонента). `таблица.поле:=1` заменяет пустое.
   Сверка сравнивает с уже исправленными значениями, число исправлений печатается после загрузки.
 
 Кроме `report.md`, `analyze` пишет `relations.json` в формате dbfsync. Положите его в

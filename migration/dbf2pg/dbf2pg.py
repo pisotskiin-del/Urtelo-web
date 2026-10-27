@@ -467,9 +467,10 @@ fixed = defaultdict(int)
 
 
 def parse_fixes(specs, tables):
-    """--fix potreb.accept:0=1 -> tables["potreb"]["fixes"] = {"accept": {0: 1}}; "*." значит во всех таблицах."""
-    def value(text):
-        return int(text) if re.fullmatch(r"-?\d+", text) else text
+    """--fix potreb.accept:0=1 -> tables["potreb"]["fixes"] = {"accept": {0: 1}}; "*." значит во всех таблицах,
+    --fix potreb.accept:=1 заменяет пустое значение."""
+    def value(text):  # пустое значение: NULL в DBF (в VFP пустое число равно 0)
+        return None if text == "" else int(text) if re.fullmatch(r"-?\d+", text) else text
     for spec in specs:
         m = re.fullmatch(r"([\w*]+)\.(\w+):(.*)=(.*)", spec.strip())
         if not m:
@@ -612,7 +613,8 @@ def main(argv=None):
                     help="связь вручную, можно несколько раз: potreb.cod_gor=danrasch.cod_gorod; "
                          "*.cod_gor=danrasch.cod_gorod значит во всех таблицах с полем cod_gor")
     ap.add_argument("--fix", action="append", default=[],
-                    help="исправить значение при переносе, можно несколько раз: potreb.accept:0=1")
+                    help="исправить значение при переносе, можно несколько раз: potreb.accept:0=1; "
+                         "potreb.accept:=1 заменяет пустое")
     ap.add_argument("--dbc", help="словарь базы VFP (.dbc): из него берутся ключи таблиц")
     ap.add_argument("--report-dir", default=".", help="куда положить report.md и report.json")
     args = ap.parse_args(argv)
