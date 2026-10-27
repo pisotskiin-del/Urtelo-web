@@ -463,6 +463,24 @@ def plan(conn, tables):
 
 
 truncated = defaultdict(int)
+fixed = defaultdict(int)
+
+
+def parse_fixes(specs, tables):
+    """--fix potreb.accept:0=1 -> tables["potreb"]["fixes"] = {"accept": {0: 1}}; "*." значит во всех таблицах."""
+    def value(text):
+        return int(text) if re.fullmatch(r"-?\d+", text) else text
+    for spec in specs:
+        m = re.fullmatch(r"([\w*]+)\.(\w+):(.*)=(.*)", spec.strip())
+        if not m:
+            raise SystemExit(f"--fix {spec}: нужен вид таблица.поле:старое=новое")
+        table, field, old, new = m.group(1).lower(), m.group(2).lower(), value(m.group(3)), value(m.group(4))
+        targets = [n for n, t in tables.items() if any(f["dbf"].lower() == field for f in t["fields"])
+                   and (table == "*" or n == table)]
+        if not targets:
+            log.warning("--fix %s: поля нет ни в одной таблице", spec)
+        for n in targets:
+            tables[n].setdefault("fixes", {}).setdefault(field, {})[old] = new
 
 
 def rows(t):
@@ -470,6 +488,7 @@ def rows(t):
     dbf = open_dbf(t["file"], t["encoding"])
     spec = [(f["dbf"], t["pg"][f["column"]]["type"], t["pg"][f["column"]]["maxlen"], f["column"] in t["fk"])
             for f in t["fields"]]
+    fixes = t.get("fixes", {})
     for rec in dbf.records:
         out = []
         for dbf_name, pgtype, maxlen, is_fk in spec:
@@ -485,6 +504,9 @@ def rows(t):
                 if maxlen and len(v) > maxlen:
                     truncated[(Path(t["file"]).name, dbf_name)] += 1
                     v = v[:maxlen]
+            if dbf_name.lower() in fixes and v in fixes[dbf_name.lower()]:
+                fixed[(Path(t["file"]).name, dbf_name)] += 1
+                v = fixes[dbf_name.lower()][v]
             if is_fk and is_empty(v):  # в FoxPro 0 и пустая строка значат «нет ссылки»
                 v = None
             if pgtype.startswith("timestamp") and isinstance(v, dt.date) and not isinstance(v, dt.datetime):
@@ -496,6 +518,7 @@ def rows(t):
 def load(conn, p, order):
     TolerantParser.bad_values.clear()
     truncated.clear()
+    fixed.clear()
     with conn.transaction():
         conn.execute("TRUNCATE " + ", ".join(f'"{n}"' for n in order) + " RESTART IDENTITY CASCADE")
         for name in order:
@@ -508,7 +531,8 @@ def load(conn, p, order):
                     n += 1
             log.info("%-20s загружено %7d", name, n)
     for title, counter in (("битые значения заменены на NULL", TolerantParser.bad_values),
-                           ("текст обрезан по длине колонки", truncated)):
+                           ("текст обрезан по длине колонки", truncated),
+                           ("значения исправлены по --fix", fixed)):
         if counter:
             log.warning("%s:", title)
             for (f, col), cnt in sorted(counter.items()):
@@ -587,6 +611,8 @@ def main(argv=None):
     ap.add_argument("--link", action="append", default=[],
                     help="связь вручную, можно несколько раз: potreb.cod_gor=danrasch.cod_gorod; "
                          "*.cod_gor=danrasch.cod_gorod значит во всех таблицах с полем cod_gor")
+    ap.add_argument("--fix", action="append", default=[],
+                    help="исправить значение при переносе, можно несколько раз: potreb.accept:0=1")
     ap.add_argument("--dbc", help="словарь базы VFP (.dbc): из него берутся ключи таблиц")
     ap.add_argument("--report-dir", default=".", help="куда положить report.md и report.json")
     args = ap.parse_args(argv)
@@ -597,6 +623,7 @@ def main(argv=None):
     if not tables:
         log.error("в %s нет файлов .dbf", args.src)
         return 2
+    parse_fixes(args.fix, tables)
     if args.command in ("analyze", "all"):
         write_report(analyze(tables, read_dbc_keys(args.dbc) if args.dbc else None, args.link), args.report_dir)
         if args.command == "analyze":

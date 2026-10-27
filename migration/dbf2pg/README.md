@@ -30,12 +30,15 @@
 ```
 python migration/dbf2pg/dbf2pg.py all --src КОПИЯ_dbf --models catalogs/models.py ^
     --dbc КОПИЯ_dbf/ur_teplo.dbc --exclude sul.dbf,poisk_ab.dbf ^
-    --link "*.cod_gor=danrasch.cod_gorod" --link "gvs_kot.kod_gor=danrasch.cod_gorod" --dsn "host=localhost dbname=teplo user=teplo password=..."
+    --link "*.cod_gor=danrasch.cod_gorod" --link "gvs_kot.kod_gor=danrasch.cod_gorod" ^
+    --fix "potreb.accept:0=1" --dsn "host=localhost dbname=teplo user=teplo password=..."
 ```
 
 - `--dbc` берёт ключи таблиц из словаря базы VFP;
 - `--link` задаёт связь вручную, `*.поле` значит во всех таблицах, где есть это поле;
-- `--exclude` пропускает файлы или папки.
+- `--exclude` пропускает файлы или папки;
+- `--fix` исправляет значение при переносе: в `potreb.accept` (поле «Акцепт») 0 недопустим, ставится 1.
+  Сверка сравнивает с уже исправленными значениями, число исправлений печатается после загрузки.
 
 Кроме `report.md`, `analyze` пишет `relations.json` в формате dbfsync. Положите его в
 `dbfsync/labels/ur_teplo_relations.json`, и `manage.py dbf_inspect` сам проставит `unique` и `ForeignKey`.
