@@ -1,0 +1,302 @@
+{
+ "_comment": "Ключи, связи и исключённые таблицы для dbf_inspect (имена из заголовков DBF). Связи получены анализом ur_teplo.dbc и данных (migration/dbf2pg) и проверены загрузкой: у каждой ссылки есть пара, 0 и пустое значение означают «нет ссылки». Главная таблица городов — danrasch.cod_gorod (подтверждено 27.10.2026). Исключены неиспользуемые sul (улицы) и временная poisk_ab.",
+ "unique": {
+  "DANRASCH": [
+   "COD_GOROD"
+  ],
+  "POTREB": [
+   "POTREB_ID"
+  ],
+  "MINIST": [
+   "COD_MINIST"
+  ]
+ },
+ "foreign_keys": [
+  {
+   "table": "ABAV0812",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "ABONENT",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "ABONENT",
+   "field": "POTREB_ID",
+   "to_table": "POTREB",
+   "to_field": "POTREB_ID"
+  },
+  {
+   "table": "ABONENT",
+   "field": "COD_MINIST",
+   "to_table": "MINIST",
+   "to_field": "COD_MINIST"
+  },
+  {
+   "table": "ABOT0812",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "AKT_POTR",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "AKT_POTR",
+   "field": "POTREB_ID",
+   "to_table": "POTREB",
+   "to_field": "POTREB_ID"
+  },
+  {
+   "table": "DANRASCH_K",
+   "field": "COD_GOROD",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "DEVICE_POV",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "FAKTPOTREB",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "FAKTPOTREB",
+   "field": "COD_MINIST",
+   "to_table": "MINIST",
+   "to_field": "COD_MINIST"
+  },
+  {
+   "table": "GOROD",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "MINIST1",
+   "field": "COD_MINIST",
+   "to_table": "MINIST",
+   "to_field": "COD_MINIST"
+  },
+  {
+   "table": "NACH_MINIST",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "NACH_NUL",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "NACHS_PERIOD",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "NACHS_PERIOD",
+   "field": "POTREB_ID",
+   "to_table": "POTREB",
+   "to_field": "POTREB_ID"
+  },
+  {
+   "table": "NACHS_PERIOD",
+   "field": "COD_MINIST",
+   "to_table": "MINIST",
+   "to_field": "COD_MINIST"
+  },
+  {
+   "table": "NAG1_KOTELN",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "NAG1_KOTELN",
+   "field": "POTREB_ID",
+   "to_table": "POTREB",
+   "to_field": "POTREB_ID"
+  },
+  {
+   "table": "NAG2_KOTELN",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "NAG_KOTELN",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "NAG_MINIST",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "NAG_MINIST",
+   "field": "COD_MINIST",
+   "to_table": "MINIST",
+   "to_field": "COD_MINIST"
+  },
+  {
+   "table": "NAM1",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "NAM1",
+   "field": "COD_MINIST",
+   "to_table": "MINIST",
+   "to_field": "COD_MINIST"
+  },
+  {
+   "table": "OT_KATEG",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "OT_KATEG",
+   "field": "COD_MINIST",
+   "to_table": "MINIST",
+   "to_field": "COD_MINIST"
+  },
+  {
+   "table": "OT_KATEG",
+   "field": "POTREB_ID",
+   "to_table": "POTREB",
+   "to_field": "POTREB_ID"
+  },
+  {
+   "table": "POTREB",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "POTREB",
+   "field": "COD_MINIST",
+   "to_table": "MINIST",
+   "to_field": "COD_MINIST"
+  },
+  {
+   "table": "POTREB_KOTELN",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "POTREBV",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "POTREBV",
+   "field": "COD_MINIST",
+   "to_table": "MINIST",
+   "to_field": "COD_MINIST"
+  },
+  {
+   "table": "PROM_FAKTPOTREB",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "PROM_FAKTPOTREB",
+   "field": "COD_MINIST",
+   "to_table": "MINIST",
+   "to_field": "COD_MINIST"
+  },
+  {
+   "table": "REESTR_DOG",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "REESTR_DOG",
+   "field": "COD_MINIST",
+   "to_table": "MINIST",
+   "to_field": "COD_MINIST"
+  },
+  {
+   "table": "REESTR_MAIL",
+   "field": "POTREB_ID",
+   "to_table": "POTREB",
+   "to_field": "POTREB_ID"
+  },
+  {
+   "table": "SPISOK1",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "SPISOK2",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "SPISOK3",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "SUB_ABONENT",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "SUB_ABONENT",
+   "field": "POTREB_ID",
+   "to_table": "POTREB",
+   "to_field": "POTREB_ID"
+  },
+  {
+   "table": "SUB_ABONENT",
+   "field": "COD_MINIST",
+   "to_table": "MINIST",
+   "to_field": "COD_MINIST"
+  },
+  {
+   "table": "VED_POTREB",
+   "field": "COD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  },
+  {
+   "table": "GVS_KOT",
+   "field": "KOD_GOR",
+   "to_table": "DANRASCH",
+   "to_field": "COD_GOROD"
+  }
+ ],
+ "exclude": [
+  "SUL",
+  "POISK_AB"
+ ]
+}

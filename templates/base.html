@@ -1,0 +1,29 @@
+{% load static %}<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Теплоснабжение{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="{% url 'catalogs:index' %}">Теплоснабжение</a>
+  {% if user.is_authenticated %}
+  <nav>
+    <a href="{% url 'catalogs:index' %}">Справочники</a>
+    {% if user.is_staff %}<a href="{% url 'admin:index' %}">Администрирование</a>{% endif %}
+  </nav>
+  <div class="user">
+    {{ user.get_full_name|default:user.username }}
+    {% if user_roles %}<span class="role">{{ user_roles|join:", " }}</span>{% endif %}
+    <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="link">Выйти</button></form>
+  </div>
+  {% endif %}
+</header>
+<main>
+  {% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

@@ -1,0 +1,2 @@
+-r requirements.txt
+dbf==0.99.11          # создание тестовых таблиц: dbfsync/tests/make_fixtures.py и тесты
