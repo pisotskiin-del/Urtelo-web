@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Абоненты{% endblock %}
+{% block content %}
+<div class="head"><h1>Карта абонента</h1></div>
+<nav class="tabs">
+  {% for c in cities %}<a href="?gorod={{ c.cod_gorod }}" {% if c.cod_gorod == city %}class="active"{% endif %}>{{ c.name_gorod }}</a>{% endfor %}
+</nav>
+<div class="finder">
+  <form method="get"><input type="hidden" name="gorod" value="{{ city }}">
+    <label>по № договора <input name="dog" value="{{ dog }}" inputmode="numeric" size="6"></label><button>Поиск</button>
+  </form>
+  <form method="get"><input type="hidden" name="gorod" value="{{ city }}">
+    <label>по наименованию <input name="q" value="{{ q }}" size="24"></label><button>Поиск</button>
+  </form>
+  <form method="get">
+    <label>по лицевому № <input name="ls" inputmode="numeric" size="6"></label><button>Поиск</button>
+  </form>
+</div>
+{% if sub %}<p>Субабоненты абонента № {{ sub }}</p>{% endif %}
+{% if filtered %}<p><a href="?gorod={{ city }}">Показать всех абонентов города</a></p>{% endif %}
+<div class="scroll">
+<table class="grid">
+  <thead><tr><th>Л/№</th><th>№ договора</th><th>№ сч.</th><th>Наименование</th><th>Наименование объекта</th><th>Адрес объекта</th><th>Категория</th></tr></thead>
+  <tbody>
+  {% for p, kategor, address in rows %}
+    <tr class="clickable" onclick="location.href='{% url 'abonents:karta' p.potreb_id %}'">
+      <td class="num"><a href="{% url 'abonents:karta' p.potreb_id %}">{{ p.potreb_id }}</a></td>
+      <td class="num">{{ p.nom_dog|default_if_none:"" }}</td><td class="num">{{ p.inf_pribor|default_if_none:"" }}</td>
+      <td class="wrap">{{ p.name_potre|default_if_none:"" }}</td><td class="wrap">{{ p.glav_potre|default_if_none:"" }}</td>
+      <td>{{ address }}</td><td>{{ kategor }}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="7" class="muted">По вашему условию ничего не найдено</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="pager">
+  {% if page.has_previous %}<a href="?{{ query }}&page={{ page.previous_page_number }}">← Назад</a>{% endif %}
+  Страница {{ page.number }} из {{ page.paginator.num_pages }}, всего записей: {{ page.paginator.count }}
+  {% if page.has_next %}<a href="?{{ query }}&page={{ page.next_page_number }}">Вперёд →</a>{% endif %}
+</p>
+{% endblock %}

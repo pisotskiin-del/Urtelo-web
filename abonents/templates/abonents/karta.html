@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Л/№ {{ p.potreb_id }} — {{ p.name_potre }}{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a> /</p>
+<div class="head">
+  <h1>Карта потребителя</h1>
+  <div class="actions">
+    <span class="navbtns">
+      {% if nav.prev %}<a class="button" href="{% url 'abonents:karta' nav.first %}?tab={{ tab }}" title="Первая запись">⏮</a><a class="button" href="{% url 'abonents:karta' nav.prev %}?tab={{ tab }}" title="Предыдущая">◀</a>{% else %}<span class="button off">⏮</span><span class="button off">◀</span>{% endif %}
+      <span class="muted">{{ nav.position }} из {{ nav.total }}</span>
+      {% if nav.next %}<a class="button" href="{% url 'abonents:karta' nav.next %}?tab={{ tab }}" title="Следующая">▶</a><a class="button" href="{% url 'abonents:karta' nav.last %}?tab={{ tab }}" title="Последняя запись">⏭</a>{% else %}<span class="button off">▶</span><span class="button off">⏭</span>{% endif %}
+    </span>
+    {% if can_change %}<a class="button primary" href="{% url 'abonents:edit' p.potreb_id %}?tab={{ tab }}">Изменить</a>{% endif %}
+    {% if can_delete %}<a class="button danger" href="{% url 'abonents:delete' p.potreb_id %}">Удалить</a>{% endif %}
+  </div>
+</div>
+{% include "abonents/_card.html" %}
+{% endblock %}

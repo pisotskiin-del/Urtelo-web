@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Карта договора № {{ nom_dog }}{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a> /</p>
+<h1>Карта договора № {{ nom_dog }}, {{ city.name_gorod }}</h1>
+<div class="scroll">
+<table class="grid">
+  <thead><tr><th>№-лиц</th><th>Наименование потребителя</th><th>к оплате</th><th>отоп. пр.</th><th>отоп. наг.</th><th>нач. ГВС</th><th>потери пр.</th><th>потери наг.</th><th>катег. абон.</th><th>адрес объекта</th></tr></thead>
+  <tbody>
+  {% for p, values, katabon, address in rows %}
+    <tr class="clickable{% if p.potreb_id == current %} current{% endif %}" onclick="location.href='{% url 'abonents:karta' p.potreb_id %}'">
+      <td class="num"><a href="{% url 'abonents:karta' p.potreb_id %}">{{ p.potreb_id }}</a></td>
+      <td class="wrap">{{ p.glav_potre|default_if_none:"" }}</td>
+      {% for v in values %}<td class="num">{{ v|default_if_none:"" }}</td>{% endfor %}
+      <td>{{ katabon }}</td><td>{{ address }}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="10" class="muted">Объектов нет</td></tr>
+  {% endfor %}
+  </tbody>
+  <tfoot><tr><th colspan="2">Итого</th>{% for v in totals %}<th class="num">{% if v is not None %}{{ v|floatformat:3 }}{% endif %}</th>{% endfor %}<th colspan="2"></th></tr></tfoot>
+</table>
+</div>
+{% endblock %}

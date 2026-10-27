@@ -8,9 +8,10 @@
 </head>
 <body>
 <header class="topbar">
-  <a class="brand" href="{% url 'catalogs:index' %}">Теплоснабжение</a>
+  <a class="brand" href="{% url 'abonents:index' %}">Теплоснабжение</a>
   {% if user.is_authenticated %}
   <nav>
+    {% if perms.catalogs.view_potreb %}<a href="{% url 'abonents:index' %}">Абоненты</a>{% endif %}
     <a href="{% url 'catalogs:index' %}">Справочники</a>
     {% if user.is_staff %}<a href="{% url 'admin:index' %}">Администрирование</a>{% endif %}
   </nav>

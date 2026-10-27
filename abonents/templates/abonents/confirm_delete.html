@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Удаление{% endblock %}
+{% block content %}
+<div class="card narrow">
+  <h1>Удалить запись из базы данных?</h1>
+  <p>Абонент «{{ p.name_potre }}» (Л/№ {{ p.potreb_id }}) будет удалён. Вы уверены?</p>
+  <form method="post">{% csrf_token %}
+    <button class="danger">Да, удалить</button>
+    <a href="{% url 'abonents:karta' p.potreb_id %}">Нет</a>
+  </form>
+</div>
+{% endblock %}

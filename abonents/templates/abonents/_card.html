@@ -1,0 +1,13 @@
+<section class="card karta-head">
+  <div class="kgrid">{% include "abonents/_fields.html" with items=header %}</div>
+  {% if p.nom_dog %}<p class="links"><a href="{% url 'abonents:dogovor' p.cod_gor_id p.nom_dog %}?ls={{ p.potreb_id }}">Карта договора № {{ p.nom_dog }}</a>
+    {% if p.nom_dogab %} · <a href="{% url 'abonents:index' %}?gorod={{ p.cod_gor_id }}&sub={{ p.nom_dogab }}">Все субабоненты абонента № {{ p.nom_dogab }}</a>{% endif %}</p>{% endif %}
+</section>
+<nav class="tabs">
+  {% for key, title in tabs %}<a href="{{ tab_url }}?tab={{ key }}" {% if key == tab %}class="active"{% endif %}>{{ title }}</a>{% endfor %}
+</nav>
+<div class="kgroups">
+{% for title, items in groups %}
+  <section class="card kgroup"><h2>{{ title }}</h2><div class="kgrid">{% include "abonents/_fields.html" %}</div></section>
+{% endfor %}
+</div>
