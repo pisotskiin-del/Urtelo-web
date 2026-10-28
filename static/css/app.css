@@ -298,3 +298,4 @@ dialog.confirm h3 { margin: 0; padding: 10px 16px; color: #fff; font-size: 15px;
 dialog.confirm p { padding: 16px; margin: 0; }
 dialog.confirm .buttons { display: flex; gap: 8px; justify-content: flex-end; padding: 0 16px 16px; }
 dialog.confirm .buttons button { min-width: 80px; }
+.add-pop .buttons { display:flex; gap:8px; }

@@ -11,7 +11,8 @@
     <form method="post" action="{% url 'abonents:prisoed' p.potreb_id %}" class="card">{% csrf_token %}
       <label>Что присоединяется <select name="kind">{% for k, label in prisoed_kinds %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select></label>
       <label>Лицевой № объекта <input name="ls" inputmode="numeric" required></label>
-      <button class="primary">{% icon "plus" %} Добавить</button>
+      <div class="buttons"><button class="primary">{% icon "plus" %} Добавить</button>
+        <button type="button" onclick="var d=this.closest('details'); d.open=false; d.querySelector('form').reset()">{% icon "x" %} Отменить</button></div>
     </form></details>{% endif %}</div>
 {% elif tab == "ishod" %}<p class="tabtools"><a class="button" href="{% url 'abonents:teplosch' p.potreb_id %}">{% icon "gauge" %} Информация по теплосчетчику</a></p>{% endif %}{% endif %}
 <div class="kgroups">
@@ -24,7 +25,7 @@
     </form>
     <dialog class="confirm" id="sposob-confirm"><form method="dialog">
       <h3>{% icon "settings" %} Изменение способа расчёта</h3>
-      <p>Вы действительно хотите изменить тип расчёта на «<b class="to"></b>»?</p>
+      <p>Вы действительно хотите изменить способ расчёта на «<b class="to"></b>»?</p>
       <div class="buttons"><button value="yes" class="primary">Да</button><button value="no">Нет</button></div>
     </form></dialog>
     <script>
