@@ -182,6 +182,29 @@ def _prisoed(p):
     return [(label, name, value, objects.get(value)) for label, name, value in found]
 
 
+def _hero(p, related):
+    """Сводка для шапки карты: (иконка, подпись, значение) в две колонки."""
+    def s(*parts):
+        text = " ".join(str(x).strip() for x in parts if x not in (None, "", 0) and str(x).strip())
+        return text or None
+    date = formats.date_format(p.data_dog, "d.m.Y") if p.data_dog else None
+    left = [
+        ("pin", "Населённый пункт", related["@gorod"]),
+        ("building", "Адрес объекта", s(p.adres_sd, p.oba_dom and f"дом {str(p.oba_dom).strip()}", p.oba_kv and f"кв. {str(p.oba_kv).strip()}")),
+        ("flame", "Подключен к", related["@kotel"]),
+        ("book", "Министерство", related["@minist"]),
+        ("calendar", "Расчетный месяц", related["@mes"]),
+    ]
+    right = [
+        ("phone", "Телефон", s(p.telefon)),
+        ("open", "E-mail", s(p.mail)),
+        ("user", "Руководитель", s(p.direktor)),
+        ("calendar", "Дата договора", date),
+        ("sliders", "Способ расчёта", dict(layout.TIP_RASOT).get(p.tip_rasot)),
+    ]
+    return {"kategor": related["@kategor"], "left": left, "right": right}
+
+
 SPOSOB = ("tip_rasot", "tip_rasgvs")  # переключатели «Способ расчёта» на вкладках
 
 
@@ -210,6 +233,7 @@ def _card_context(request, p, tab_key, form=None):
         "prisoed_kinds": [(k, label) for k, (label, _) in layout.PRISOED.items()],
         "sposob": _sposob(p, groups),
         "rasot_label": dict(layout.TIP_RASOT).get(p.tip_rasot, ""),
+        "hero": _hero(p, related),
         "can_change": request.user.has_perm("catalogs.change_potreb"),
         "can_delete": request.user.has_perm("catalogs.delete_potreb"),
     }

@@ -7,28 +7,38 @@
   <link rel="icon" href="{% static 'img/teplo.svg' %}" type="image/svg+xml">
   <link rel="icon" href="{% static 'img/teplo.ico' %}" sizes="any">
   <link rel="manifest" href="{% static 'manifest.webmanifest' %}">
-  <meta name="theme-color" content="#ffffff">
+  <meta name="theme-color" content="#13284b">
   <link rel="stylesheet" href="{% static_v 'css/app.css' %}">
 </head>
 <body>
 {% include "_icons.html" %}
+<script>try { if (localStorage.getItem("side-mini") === "1") document.documentElement.classList.add("side-mini"); } catch (e) {}</script>
 <header class="topbar">
-  <a class="brand" href="{% url 'abonents:index' %}"><img class="brand-mark" src="{% static 'img/teplo.svg' %}" alt="">Теплоснабжение</a>
+  {% if user.is_authenticated %}<button class="burger" type="button" onclick="toggleSide()" title="Свернуть / развернуть меню">{% icon "menu" %}</button>{% endif %}
+  <a class="brand" href="{% url 'abonents:index' %}"><img class="brand-mark" src="{% static 'img/teplo.svg' %}" alt="">
+    <span class="bt"><b>Теплоснабжение</b><small>Учёт абонентов и расчётов</small></span></a>
   {% if user.is_authenticated %}
+  {% if perms.catalogs.view_potreb %}<form class="gsearch" method="get" action="{% url 'abonents:index' %}" role="search">
+    <input name="q" placeholder="Поиск абонентов по наименованию…" value="{{ request.GET.q|default:'' }}" aria-label="Поиск абонентов">
+    <button title="Найти">{% icon "search" %}</button></form>{% endif %}
   <div class="user">
-    {% icon "user" %} {{ user.get_full_name|default:user.username }}
-    {% if user_roles %}<span class="role">{{ user_roles|join:", " }}</span>{% endif %}
-    <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="link">{% icon "logout" %} Выйти</button></form>
+    <span class="ava">{% icon "user" %}</span>
+    <span class="who">{{ user.get_full_name|default:user.username }}{% if user_roles %}<small>{{ user_roles|join:", " }}</small>{% endif %}</span>
+    <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="link">{% icon "logout" %} Выход</button></form>
   </div>
   {% endif %}
 </header>
+<div class="layout">
 {% if user.is_authenticated %}
 {% with app=request.resolver_match.app_name url=request.resolver_match.url_name %}
-<nav class="navbar">
-  {% if perms.catalogs.view_potreb %}<a href="{% url 'abonents:index' %}" {% if app == "abonents" and url != "raschet" and url != "raschet_itog" and url != "dan_rasch" %}class="active"{% endif %}>{% icon "users" %} Абоненты</a>
-  <a href="{% url 'abonents:raschet' %}" {% if url == "raschet" or url == "raschet_itog" or url == "dan_rasch" %}class="active"{% endif %}>{% icon "calc" %} Расчет</a>{% endif %}
-  <a href="{% url 'catalogs:index' %}" {% if app == "catalogs" %}class="active"{% endif %}>{% icon "book" %} Справочники</a>
-  {% if user.is_staff %}<a href="{% url 'admin:index' %}">{% icon "settings" %} Администрирование</a>{% endif %}
+<nav class="sidebar">
+  {% if perms.catalogs.view_potreb %}<a href="{% url 'abonents:index' %}" title="Абоненты" {% if app == "abonents" and url != "raschet" and url != "raschet_itog" and url != "dan_rasch" %}class="active"{% endif %}>{% icon "users" %}<span class="t">Абоненты</span></a>
+  <a href="{% url 'abonents:raschet' %}" title="Расчет" {% if url == "raschet" or url == "raschet_itog" %}class="active"{% endif %}>{% icon "calc" %}<span class="t">Расчет</span></a>
+  <a href="{% url 'abonents:dan_rasch' %}" title="Исходные данные для расчета" {% if url == "dan_rasch" %}class="active"{% endif %}>{% icon "sliders" %}<span class="t">Исходные данные</span></a>{% endif %}
+  <a href="{% url 'catalogs:index' %}" title="Справочники" {% if app == "catalogs" %}class="active"{% endif %}>{% icon "book" %}<span class="t">Справочники</span></a>
+  {% if user.is_staff %}<a href="{% url 'admin:index' %}" title="Администрирование">{% icon "settings" %}<span class="t">Администрирование</span></a>{% endif %}
+  <span class="sp"></span>
+  <button class="collapse" type="button" onclick="toggleSide()">{% icon "back" %}<span class="t">Свернуть</span></button>
 </nav>
 {% endwith %}
 {% endif %}
@@ -36,7 +46,12 @@
   {% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
   {% block content %}{% endblock %}
 </main>
+</div>
 <script>
+function toggleSide() {
+  var on = document.documentElement.classList.toggle("side-mini");
+  try { localStorage.setItem("side-mini", on ? "1" : "0"); } catch (e) {}
+}
 // Горячие клавиши: «/» — к поиску; PageUp/PageDown в карте — предыдущая/следующая запись.
 document.addEventListener("keydown", function (e) {
   var t = e.target, typing = t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName);

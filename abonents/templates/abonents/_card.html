@@ -1,8 +1,30 @@
-{% load ui %}<section class="card karta-head{% if otkluchen %} otkl{% endif %}">{% if otkluchen %}<p class="otkl-note"><span class="chip off">Лицевой счет: {{ p.d_stat_val|default:"отключен" }}</span></p>{% endif %}
+{% load ui %}{% if form %}<section class="card karta-head{% if otkluchen %} otkl{% endif %}">{% if otkluchen %}<p class="otkl-note"><span class="chip off">Лицевой счет: {{ p.d_stat_val|default:"отключен" }}</span></p>{% endif %}
   <div class="kgrid">{% include "abonents/_fields.html" with items=header %}</div>
   {% if p.nom_dog %}<p class="links"><a href="{% url 'abonents:dogovor' p.cod_gor_id p.nom_dog %}?ls={{ p.potreb_id }}">{% icon "file" %} Карта договора № {{ p.nom_dog }}</a>
     {% if p.nom_dogab %}<a href="{% url 'abonents:index' %}?gorod={{ p.cod_gor_id }}&sub={{ p.nom_dogab }}">{% icon "users" %} Все субабоненты абонента № {{ p.nom_dogab }}</a>{% endif %}</p>{% endif %}
 </section>
+{% else %}<section class="card hero{% if otkluchen %} otkl{% endif %}">
+  <div class="main">
+    <span class="avatar">{% icon "building" %}</span>
+    <div>
+      <div class="nums">
+        <div class="ls"><small>Лицевой счёт</small><b>{{ p.potreb_id }}</b></div>
+        <div><small>№ договора</small><b>{{ p.nom_dog|default:"—" }}</b></div>
+        <div><small>№ сч.</small><b>{{ p.inf_pribor|default:"0" }}</b></div>
+      </div>
+      <div class="nm">{{ p.name_potre|default:"Без наименования" }}</div>
+      <div class="chips">
+        {% if otkluchen %}<span class="chip {% if p.d_stat == 61 %}warn{% else %}off{% endif %}">Лицевой счет: {{ p.d_stat_val|default:"отключен" }}</span>{% elif p.d_stat == 60 %}<span class="chip ok">{% icon "shield" %} Заключен</span>{% endif %}
+        {% if hero.kategor %}<span class="chip cat">{{ hero.kategor }}</span>{% endif %}
+      </div>
+    </div>
+  </div>
+  <div><dl>{% for ic, label, value in hero.left %}<dt>{% icon ic %} {{ label }}</dt><dd>{{ value|default:"—" }}</dd>{% endfor %}
+    <dt>{% icon "building" %} Объект</dt><dd>{{ p.glav_potre|default:"—" }}</dd></dl></div>
+  <div><dl>{% for ic, label, value in hero.right %}<dt>{% icon ic %} {{ label }}</dt><dd>{{ value|default:"—" }}</dd>{% endfor %}</dl></div>
+  {% if p.nom_dog %}<p class="links"><a href="{% url 'abonents:dogovor' p.cod_gor_id p.nom_dog %}?ls={{ p.potreb_id }}">{% icon "file" %} Карта договора № {{ p.nom_dog }}</a>
+    {% if p.nom_dogab %}<a href="{% url 'abonents:index' %}?gorod={{ p.cod_gor_id }}&sub={{ p.nom_dogab }}">{% icon "users" %} Все субабоненты абонента № {{ p.nom_dogab }}</a>{% endif %}</p>{% endif %}
+</section>{% endif %}
 <nav class="tabs">
   {% for key, title in tabs %}<a href="{{ tab_url }}?tab={{ key }}" {% if key == tab %}class="active"{% endif %}>{% tab_icon key %} {{ title }}</a>{% endfor %}
 </nav>
