@@ -345,3 +345,19 @@ body.splash { min-height: 100vh; margin: 0; display: flex; align-items: center; 
 @keyframes splash-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes splash-form { from { opacity: 0; transform: translateY(16px); visibility: hidden; } to { opacity: 1; transform: none; visibility: visible; } }
 .seg button.on { background:var(--accent); border-color:var(--accent); }
+
+/* Переход на новый месяц */
+.nm-head { display:grid; grid-template-columns:auto 1fr; gap:28px; align-items:center; margin-bottom:14px; }
+.nm-months { display:flex; align-items:center; gap:18px; }
+.nm-months small { display:block; color:var(--muted); font-size:13px; }
+.nm-months b { font-size:24px; font-weight:700; } .nm-months b.accent { color:var(--accent); }
+.nm-arrow svg.i { width:28px; height:28px; color:#9aa6b8; }
+.nm-warn { border-left:4px solid #e0a10b; background:#fff8e6; padding:10px 14px; border-radius:8px; color:#5c4300; }
+.nm-warn p { margin:0 0 4px; } .nm-warn p:last-child { margin:0; }
+.nm-list { margin:0; padding:12px 18px 14px 36px; display:flex; flex-direction:column; gap:8px; }
+.nm-run { display:flex; gap:20px; align-items:center; flex-wrap:wrap; justify-content:space-between; }
+.nm-run .check { display:flex; gap:10px; align-items:center; margin:0; font-weight:500; }
+@media (max-width:900px) { .nm-head { grid-template-columns:1fr; } }
+.nm-groups { columns:auto; display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+.nm-groups .kgroup { margin:0; }
+@media (max-width:1100px) { .nm-groups { grid-template-columns:1fr; } }

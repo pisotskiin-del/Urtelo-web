@@ -1,0 +1,76 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Переход на новый месяц{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a><span class="sep">›</span>Переход на новый месяц</p>
+<div class="page-head"><h1>Переход на новый месяц</h1></div>
+
+<section class="card nm-head">
+  <div class="nm-months">
+    <div><small>Закрывается</small><b>{{ mes }} {{ god }}</b></div>
+    <span class="nm-arrow">{% icon "next" %}</span>
+    <div><small>Открывается</small><b class="accent">{{ next }}</b></div>
+  </div>
+  <div class="nm-warn">
+    <p><b>Перед переходом к новому месяцу</b> необходимо всё рассчитать, произвести перерасчет, сверить итоговые суммы по начислению и получить все необходимые ведомости.</p>
+    <p>Убедитесь, что другие операторы сейчас не меняют данные.</p>
+  </div>
+</section>
+
+<div class="kgroups nm-groups">
+<section class="card kgroup"><h2>{% icon "list" %} Что произойдёт</h2>
+  <ul class="nm-list">
+    <li>Месяц {{ mes }} {{ god }} сохранится в архиве: карты абонентов и исходные данные по городам.</li>
+    <li>Для 1С подготовится таблица начислений (abot): абоненты с начислением больше нуля.</li>
+    <li>«Выставлено с начала финанс. года» и «с начала отопит. сезона» увеличатся на начисленное за месяц, пересчитается остаток лимита.{% if year_reset %} <b>Январь: накопления за год и лимиты сначала обнулятся.</b>{% endif %}{% if season_reset %} <b>Октябрь: накопление за отопительный сезон сначала обнулится.</b>{% endif %}</li>
+    <li>Начисления, тепловые потери и дни отопления/ГВС обнулятся; «Показания предыдущие» станут равны «Показаниям настоящим».</li>
+    <li>Во всех городах установится месяц {{ next }}; нагрузка котельных обнулится.</li>
+  </ul>
+</section>
+<section class="card kgroup"><h2>{% icon "chart" %} Начислено за {{ mes }} {{ god }}</h2>
+  <div class="scroll" style="border:0;box-shadow:none"><table class="grid">
+    <thead><tr><th>Город</th><th class="num">Абонентов</th><th class="num">С начислением</th><th class="num">Начислено всего, Гкал</th></tr></thead>
+    <tbody>{% for c, s in rows %}<tr><td>{{ c.name_gorod }}</td><td class="num">{{ s.n|default:0 }}</td><td class="num">{{ s.nach|default:0 }}</td><td class="num">{{ s.s|default:0|floatformat:3 }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  <p class="muted" style="padding:0 16px 12px">Если суммы нулевые, сначала выполните <a href="{% url 'abonents:raschet' %}">Расчет</a>.</p>
+</section>
+</div>
+
+{% if can_run %}
+<form method="post" class="card nm-run" id="nm-form">{% csrf_token %}
+  <label class="check"><input type="checkbox" name="ready" value="1" required> Расчет выполнен, итоги сверены, ведомости получены</label>
+  <div class="actions">
+    <button class="primary" type="submit">{% icon "calendar" %} Перейти на {{ next }}</button>
+  </div>
+</form>
+<dialog class="confirm" id="nm-confirm"><form method="dialog">
+  <h3>{% icon "calendar" %} Переход на новый месяц</h3>
+  <p>Вы уверены? Месяц {{ mes }} {{ god }} будет закрыт, откроется {{ next }}.</p>
+  <div class="buttons"><button value="yes" class="primary">Да</button><button value="no">Нет</button></div>
+</form></dialog>
+<script>
+(function () {
+  var form = document.getElementById("nm-form"), dlg = document.getElementById("nm-confirm"), ok = false;
+  form.addEventListener("submit", function (e) {
+    if (ok) return;
+    e.preventDefault(); dlg.returnValue = ""; dlg.showModal(); dlg.querySelector("button[value=no]").focus();
+  });
+  dlg.addEventListener("close", function () {
+    if (dlg.returnValue === "yes") { ok = true; form.querySelector("button[type=submit]").disabled = true; form.submit(); }
+  });
+})();
+</script>
+{% else %}
+<p class="msg warning">Переход на новый месяц выполняет Администратор.</p>
+{% endif %}
+
+<section class="card kgroup" style="margin-top:14px"><h2>{% icon "book" %} Закрытые месяцы</h2>
+  {% if arhiv %}
+  <div class="scroll" style="border:0;box-shadow:none"><table class="grid">
+    <thead><tr><th>Месяц</th><th>Закрыт</th><th>Кто</th><th class="num">Абонентов</th><th class="num">Начислено всего, Гкал</th><th></th></tr></thead>
+    <tbody>{% for a in arhiv %}<tr><td>{{ a.nom_mes|stringformat:"02d" }}.{{ a.god }}</td><td>{{ a.created|date:"d.m.Y H:i" }}</td><td>{{ a.user }}</td>
+      <td class="num">{{ a.potreb_count }}</td><td class="num">{{ a.nac_vsego|floatformat:3 }}</td>
+      <td>{% if can_run and a.pk == last.pk %}<form method="post" class="inline">{% csrf_token %}<button name="action" value="undo" class="link-btn" onclick="return confirm('Отменить переход и вернуть месяц {{ a.nom_mes|stringformat:"02d" }}.{{ a.god }}? Изменения, сделанные после перехода, в начислениях и показаниях будут потеряны.')">{% icon "back" %} Отменить переход</button></form>{% endif %}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="muted" style="padding:12px 16px">В новой программе месяцы ещё не закрывались.</p>{% endif %}
+</section>
+{% endblock %}

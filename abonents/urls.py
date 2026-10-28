@@ -10,6 +10,7 @@ urlpatterns = [
     path("raschet/", views.raschet_view, name="raschet"),
     path("raschet/itog/", views.raschet_itog, name="raschet_itog"),
     path("raschet/dannye/", views.dan_rasch, name="dan_rasch"),
+    path("nov-mes/", views.nov_mes_view, name="nov_mes"),
     path("<int:potreb_id>/", views.karta, name="karta"),
     path("<int:potreb_id>/edit/", views.karta_edit, name="edit"),
     path("<int:potreb_id>/delete/", views.karta_delete, name="delete"),

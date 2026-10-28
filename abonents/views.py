@@ -21,7 +21,7 @@ from django.db import transaction
 from catalogs.models import Akcept, Bank, Danrasch, GvsKot, Kategorpot, Limit, Potreb, SpTeplosch, SpTeplpoteri
 from teplo.sqlite_unicode import UnicodeLower
 
-from . import layout, poteri, raschet
+from . import layout, nov_mes, poteri, raschet
 from .forms import DanRaschForm, NovAbonentForm, PoteriForm, TeploschForm, karta_form
 
 view_required = permission_required("catalogs.view_potreb", raise_exception=True)
@@ -513,3 +513,40 @@ def sposob(request, potreb_id):
             p.save(update_fields=[name])
             messages.success(request, f"Способ расчёта: {choices[value]}. Начисления пересчитаются при следующем расчёте.")
     return redirect(reverse("abonents:karta", args=[p.potreb_id]) + f"?tab={tab}")
+
+
+@login_required
+@permission_required("catalogs.view_potreb", raise_exception=True)
+def nov_mes_view(request):
+    """Переход на новый месяц (форма nov_mes): архив месяца, накопления с начала
+    года и сезона, обнуление начислений, следующий месяц во всех городах.
+    Выполняет только Администратор; последний переход можно отменить."""
+    can_run = request.user.has_perm("catalogs.delete_danrasch")
+    if request.method == "POST":
+        if not can_run:
+            raise PermissionDenied
+        if request.POST.get("action") == "undo":
+            try:
+                arh = nov_mes.undo()
+            except ValueError as e:
+                messages.error(request, str(e))
+            else:
+                messages.success(request, f"Переход отменён: снова {nov_mes.MONTHS[arh.nom_mes - 1]} {arh.god}")
+        elif request.POST.get("ready") != "1":
+            messages.error(request, "Отметьте, что расчет выполнен и итоги сверены")
+        else:
+            r = nov_mes.run(request.user.get_full_name() or request.user.username)
+            messages.success(request, f"Выполнен переход к новому месяцу: {nov_mes.MONTHS[r.opened[0] - 1]} {r.opened[1]}. "
+                                      f"Месяц {nov_mes.MONTHS[r.closed[0] - 1]} {r.closed[1]} сохранён в архиве.")
+        return redirect("abonents:nov_mes")
+    mes, god = nov_mes.current()
+    nxt = nov_mes.next_month(mes, god) if mes else None
+    cities = _cities()
+    sums = {row["cod_gor"]: row for row in Potreb.objects.values("cod_gor").annotate(
+        n=Count("pk"), s=Sum("nac_vsego"), nach=Count("pk", filter=Q(nac_vsego__gt=0)))}
+    rows = [(c, sums.get(c.cod_gorod, {})) for c in cities]
+    return render(request, "abonents/nov_mes.html", {
+        "mes": mes and nov_mes.MONTHS[mes - 1], "god": god, "next": nxt and f"{nov_mes.MONTHS[nxt[0] - 1]} {nxt[1]}",
+        "rows": rows, "can_run": can_run, "arhiv": nov_mes.MesArhiv.objects.defer("data")[:24],
+        "last": nov_mes.last(), "year_reset": nxt and nxt[0] == 1, "season_reset": nxt and nxt[0] == 10,
+    })

@@ -374,3 +374,70 @@ class PrisoedTests(KartaBase):
         self.assertContains(response, "только действующий")
         c = Potreb.objects.get(potreb_id=9)
         self.assertFalse(c.posle_prib)
+
+
+class NovMesTests(KartaBase):
+    def setUp(self):
+        super().setUp()
+        from catalogs.models import Abot, Arhiv, Tarif
+        self.Abot, self.Arhiv = Abot, Arhiv
+        Tarif.objects.create(id_tar=1, zn_tar=Decimal("412.50"))
+        Danrasch.objects.update(nom_mes=12, name_mes="Декабрь", god=2025)
+        Potreb.objects.filter(potreb_id=5).update(nach_finan=Decimal("100"), nach_otopi=Decimal("40"),
+                                                  vd_limit=Decimal("200"), ost_limit=Decimal("100"),
+                                                  pok_old=Decimal("10"), dnotop=Decimal("31"))
+        Potreb.objects.filter(potreb_id=7).update(nach_finan=Decimal("5"), nach_otopi=Decimal("5"))
+        GvsKot.objects.update(nagr_kot=Decimal("1.5"))
+
+    def test_close_month_and_undo(self):
+        from abonents import nov_mes
+        before = {p.potreb_id: p for p in Potreb.objects.all()}
+        r = nov_mes.run("тест")
+        self.assertEqual((r.closed, r.opened), ((12, 2025), (1, 2026)))
+        self.assertEqual(set(Danrasch.objects.values_list("nom_mes", "name_mes", "god")), {(1, "Январь", 2026)})
+        a = Potreb.objects.get(potreb_id=5)
+        # Январь: накопления за год и лимит обнуляются, затем прибавляется начисленное за декабрь.
+        self.assertEqual((a.nach_finan, a.vd_limit, a.ost_limit), (Decimal("10.500"), 0, 0))
+        self.assertEqual(a.nach_otopi, Decimal("50.500"))
+        self.assertEqual((a.nac_vsego, a.dnotop, a.gkl_perer, a.tkf_perer), (0, 0, 0, 0))
+        self.assertEqual(a.pok_old, Decimal("12.500"))
+        self.assertEqual(GvsKot.objects.get().nagr_kot, 0)
+        abot = self.Abot.objects.order_by("kodabon")
+        self.assertEqual([(x.ras_kol, x.koduslug, x.tarif, x.akcept) for x in abot],
+                         [(Decimal("10.50"), 7, Decimal("412.50"), 2), (Decimal("2.00"), 7, Decimal("412.50"), 2)])
+        self.assertEqual(list(self.Arhiv.objects.values_list("nom_mes", "god")), [(12, 2025)])
+
+        nov_mes.undo()
+        self.assertEqual(set(Danrasch.objects.values_list("nom_mes", "god")), {(12, 2025)})
+        for p in Potreb.objects.all():
+            for name in nov_mes.CHANGED:
+                self.assertEqual(getattr(p, name), getattr(before[p.potreb_id], name), (p.potreb_id, name))
+        self.assertEqual(GvsKot.objects.get().nagr_kot, Decimal("1.500"))
+        self.assertFalse(self.Arhiv.objects.exists())
+        self.assertFalse(nov_mes.MesArhiv.objects.exists())
+
+    def test_ordinary_month_keeps_year_and_limit(self):
+        from abonents import nov_mes
+        Danrasch.objects.update(nom_mes=3, name_mes="Март", god=2026)
+        nov_mes.run()
+        a = Potreb.objects.get(potreb_id=5)
+        self.assertEqual((a.nach_finan, a.nach_otopi, a.ost_limit), (Decimal("110.500"), Decimal("50.500"), Decimal("89.500")))
+        Danrasch.objects.update(nom_mes=9, name_mes="Сентябрь", god=2026)
+        nov_mes.run()  # открывается октябрь: накопление за сезон начинается заново
+        a.refresh_from_db()
+        self.assertEqual((a.nach_finan, a.nach_otopi), (Decimal("110.500"), 0))
+
+    def test_page_and_permissions(self):
+        self.login("Оператор")
+        page = self.client.get("/abonents/nov-mes/")
+        self.assertContains(page, "Декабрь 2025")
+        self.assertContains(page, "Январь 2026")
+        self.assertContains(page, "выполняет Администратор")
+        self.assertEqual(self.client.post("/abonents/nov-mes/", {"ready": "1"}).status_code, 403)
+        self.login("Администратор")
+        self.assertContains(self.client.post("/abonents/nov-mes/", {}, follow=True), "Отметьте")
+        response = self.client.post("/abonents/nov-mes/", {"ready": "1"}, follow=True)
+        self.assertContains(response, "Выполнен переход к новому месяцу: Январь 2026")
+        self.assertContains(response, "Отменить переход")
+        response = self.client.post("/abonents/nov-mes/", {"action": "undo"}, follow=True)
+        self.assertContains(response, "Переход отменён: снова Декабрь 2025")
