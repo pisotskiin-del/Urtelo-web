@@ -59,3 +59,7 @@ dl.fields dt, dl.fields dd { margin:0; padding:8px 12px; border-bottom:1px solid
 .msg.error, .msg.warning { background:#fdecea; }
 @media (max-width:640px) { .kgroups { columns:1; } .kf.wide { grid-column:auto; } .finder { flex-direction:column; gap:8px; } }
 .kgroup .kv { display:flex; align-items:center; gap:6px; flex-wrap:wrap; } .kgroup .kv input:not([type=checkbox]), .kgroup .kv select { flex:1; min-width:0; }
+.tabtools { margin:0 0 12px; }
+.kgroup .kgrid.two { grid-template-columns:repeat(auto-fill, minmax(460px, 1fr)); gap:0 32px; }
+.kgroup .kgrid.two .kf.wide { grid-column:1 / -1; grid-template-columns:minmax(140px, 27%) 1fr; }
+.narrow-grid { max-width:760px; } .narrow-grid select, .narrow-grid input { width:140px; }

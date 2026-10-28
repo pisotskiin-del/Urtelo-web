@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Ввод нового абонента{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a> /</p>
+<h1>Ввод нового абонента</h1>
+<form method="post">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="error">{{ form.non_field_errors }}</div>{% endif %}
+  <section class="card kgroup"><div class="kgrid two">
+    {% for field in form %}<div class="kf{% if field.name in 'name_potre glav_potre adres_regi adres_sd' %} wide{% endif %}">
+      <span class="kl"><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label></span>
+      <span class="kv">{{ field }}{% if field.errors %}<span class="error">{{ field.errors|join:" " }}</span>{% endif %}</span>
+    </div>{% endfor %}
+  </div></section>
+  <div class="actions sticky">
+    <button class="primary">Добавить запись</button>
+    <a href="{% url 'abonents:index' %}">Отмена</a>
+    <span class="muted">Лицевой № присвоится следующий по порядку. Остальные данные заполняются в карте абонента.</span>
+  </div>
+</form>
+{% endblock %}

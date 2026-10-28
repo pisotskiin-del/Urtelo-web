@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Теплосчетчик: Л/№ {{ p.potreb_id }}{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a> / <a href="{% url 'abonents:karta' p.potreb_id %}?tab=ishod">Л/№ {{ p.potreb_id }}</a> /</p>
+<h1>Информация по теплосчетчику</h1>
+<form method="post">{% csrf_token %}
+  <section class="card kgroup"><div class="kgrid two">
+    {% for field in form %}<div class="kf{% if field.name in 'name_obek adres_obek mesto_ust mesto_ustp' %} wide{% endif %}">
+      <span class="kl"><label for="{{ field.id_for_label }}">{{ field.label }}</label></span>
+      <span class="kv">{% if can_change %}{{ field }}{% else %}{{ field.value|default_if_none:"—" }}{% endif %}{% if field.errors %}<span class="error">{{ field.errors|join:" " }}</span>{% endif %}</span>
+    </div>{% endfor %}
+  </div></section>
+  <div class="actions">
+    {% if can_change %}<button class="primary">Сохранить</button>{% endif %}
+    <a href="{% url 'abonents:karta' p.potreb_id %}?tab=ishod">Вернуться в карту</a>
+  </div>
+</form>
+{% endblock %}

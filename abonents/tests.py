@@ -13,7 +13,7 @@ from abonents import layout
 from catalogs.models import Akcept, Danrasch, GvsKot, Kategorpot, Minist, Potreb
 
 
-class KartaTests(TestCase):
+class KartaBase(TestCase):
     def setUp(self):
         call_command("init_roles", stdout=open("/dev/null", "w"))
         self.ryb = Danrasch.objects.create(cod_gorod=1, name_gorod="Рыбница", name_mes="Октябрь", god=2026,
@@ -39,6 +39,8 @@ class KartaTests(TestCase):
         user.groups.add(Group.objects.get(name=role))
         self.client.force_login(user)
 
+
+class KartaTests(KartaBase):
     def test_each_editable_field_has_one_input_on_its_page(self):
         for key in layout.TAB_KEYS:
             _, _, groups = layout.tab(key)
@@ -148,3 +150,80 @@ class KartaTests(TestCase):
         self.login("Администратор")
         self.assertRedirects(self.client.post("/abonents/9/delete/"), "/abonents/")
         self.assertFalse(Potreb.objects.filter(potreb_id=9).exists())
+
+
+class NewAbonentAndPoteriTests(KartaBase):
+    """Ввод нового абонента, тепловые потери и теплосчетчик."""
+
+    def test_new_abonent_gets_next_number_and_defaults(self):
+        self.login("Оператор")
+        self.assertContains(self.client.get("/abonents/"), "Новый абонент")
+        response = self.client.post("/abonents/new/", {
+            "cod_gor": "1", "nom_dog": "77", "name_potre": "ООО Новое", "id_kategor": "1", "id_koteln": "16",
+            "cod_minist": "1",
+        })
+        p = Potreb.objects.get(nom_dog=77)
+        self.assertRedirects(response, f"/abonents/{p.potreb_id}/edit/?tab=ishod")
+        self.assertEqual(p.potreb_id, 12)
+        self.assertEqual(p.cod_gor_id, 1)
+        self.assertEqual(p.accept, 1)
+        self.assertEqual(p.name_kot, "(Р) Котельная №2")
+        self.assertEqual(p.tip_rasot, 0)
+        self.assertEqual(p.adres_sd, "")
+
+    def test_new_abonent_needs_contract_and_city_kotel(self):
+        self.login("Оператор")
+        response = self.client.post("/abonents/new/", {"cod_gor": "2", "nom_dog": "", "id_koteln": "16"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Котельная из другого города")
+        self.assertFalse(Potreb.objects.filter(potreb_id=12).exists())
+        self.client.logout()
+        self.login("Наблюдатель")
+        self.assertEqual(self.client.get("/abonents/new/").status_code, 403)
+
+    def test_poteri_raschet(self):
+        from catalogs.models import SpDiametr, SpTeplpoteri
+        SpDiametr.objects.create(id_diam=2, diametr=57)
+        Potreb.objects.filter(potreb_id=5).update(dnotop=Decimal("30"), tip_rasot=1, nalich_pot=1)
+        self.login("Оператор")
+        self.assertContains(self.client.get("/abonents/5/"), "/abonents/5/poteri/")
+        self.assertFalse(SpTeplpoteri.objects.filter(ln=5).exists())  # просмотр ничего не создаёт
+        data = {"diametr1": "57", "dlina1": "100", "raschet": "1"}
+        for i in range(2, 7):
+            data.update({f"diametr{i}": "", f"dlina{i}": ""})
+        self.assertRedirects(self.client.post("/abonents/5/poteri/", data), "/abonents/5/poteri/")
+        sp = SpTeplpoteri.objects.get(ln=5)
+        # 56 × 100 × 24 × 30 × 0,000001 = 4,032 → 4,03
+        self.assertEqual(sp.poteri_pr1, Decimal("4.03"))
+        self.assertEqual(sp.vs_poteri, Decimal("4.03"))
+        self.a.refresh_from_db()
+        self.assertEqual(self.a.poter_pr, Decimal("4.03"))
+        self.assertEqual(self.a.poter_nag, 0)
+
+    def test_teploschetchik_created_with_object_name(self):
+        from catalogs.models import SpTeplosch
+        self.login("Оператор")
+        self.assertContains(self.client.get("/abonents/5/teploschetchik/"), 'value="ООО &quot;Крипс&quot;"')
+        self.client.post("/abonents/5/teploschetchik/", {
+            "name_obek": 'ООО "Крипс"', "adres_obek": "", "tip_prib": "СВТУ 10М", "kdata_pov": "2027-01-31",
+        })
+        obj = SpTeplosch.objects.get(ln=5)
+        self.assertEqual(obj.tip_prib, "СВТУ 10М")
+        self.assertEqual(str(obj.kdata_pov), "2027-01-31")
+        self.client.logout()
+        self.login("Наблюдатель")
+        self.assertEqual(self.client.post("/abonents/5/teploschetchik/", {"tip_prib": "x"}).status_code, 403)
+
+    def test_changing_kotel_updates_its_name(self):
+        GvsKot.objects.create(id_kot=17, name_kot="(Р) Котельная №3", kod_gor=self.ryb)
+        from abonents.forms import karta_form
+        p = Potreb.objects.get(potreb_id=5)
+        form = karta_form("ishod", None, instance=p)
+        data = {name: form[name].value() for name in form.fields}
+        data = {k: ("" if v is None else v) for k, v in data.items()}
+        data["id_koteln"] = "17"
+        form = karta_form("ishod", data, instance=p)
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        p.refresh_from_db()
+        self.assertEqual(p.name_kot, "(Р) Котельная №3")

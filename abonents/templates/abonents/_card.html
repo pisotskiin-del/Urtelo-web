@@ -6,6 +6,8 @@
 <nav class="tabs">
   {% for key, title in tabs %}<a href="{{ tab_url }}?tab={{ key }}" {% if key == tab %}class="active"{% endif %}>{{ title }}</a>{% endfor %}
 </nav>
+{% if not form %}{% if tab == "otop" %}<p class="tabtools"><a class="button" href="{% url 'abonents:poteri' p.potreb_id %}">Диаметр/длина для расч. потерь</a></p>
+{% elif tab == "ishod" %}<p class="tabtools"><a class="button" href="{% url 'abonents:teplosch' p.potreb_id %}">Информация по теплосчетчику</a></p>{% endif %}{% endif %}
 <div class="kgroups">
 {% for title, items in groups %}
   <section class="card kgroup"><h2>{{ title }}</h2><div class="kgrid">{% include "abonents/_fields.html" %}</div></section>

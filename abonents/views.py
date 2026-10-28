@@ -8,6 +8,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
+from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import ProtectedError, Sum, Value
 from django.db.models.functions import Replace
@@ -15,11 +16,13 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import formats, timezone
 
-from catalogs.models import Akcept, Bank, Danrasch, GvsKot, Kategorpot, Potreb
+from django.db import transaction
+
+from catalogs.models import Akcept, Bank, Danrasch, GvsKot, Kategorpot, Potreb, SpTeplosch, SpTeplpoteri
 from teplo.sqlite_unicode import UnicodeLower
 
-from . import layout
-from .forms import karta_form
+from . import layout, poteri
+from .forms import NovAbonentForm, PoteriForm, TeploschForm, karta_form
 
 view_required = permission_required("catalogs.view_potreb", raise_exception=True)
 
@@ -242,3 +245,69 @@ def dogovor(request, cod_gor, nom_dog):
         "city": city, "nom_dog": nom_dog, "rows": rows,
         "totals": [totals[c] for c in columns], "current": _int(request.GET.get("ls")),
     })
+
+
+@login_required
+@permission_required("catalogs.add_potreb", raise_exception=True)
+def nov_abonent(request):
+    """Ввод нового абонента: лицевой № присваивается следующий по порядку."""
+    city = _current_city(request, _cities())
+    form = NovAbonentForm(request.POST or None, city=city)
+    if request.method == "POST" and form.is_valid():
+        with transaction.atomic():
+            p = form.save()
+        messages.success(request, f"Абонент добавлен, лицевой № {p.potreb_id}")
+        return redirect(reverse("abonents:edit", args=[p.potreb_id]) + "?tab=ishod")
+    return render(request, "abonents/nov_abonent.html", {"form": form})
+
+
+def _sub_record(model, p, **defaults):
+    """Запись дополнительной таблицы абонента (связь по ln = potreb_id).
+    Как в старой программе, создаётся при первом сохранении."""
+    obj = model.objects.filter(ln=p.potreb_id).order_by("pk").first()
+    return obj or model(ln=p.potreb_id, **defaults)
+
+
+@login_required
+@permission_required("catalogs.view_spteplpoteri", raise_exception=True)
+def poteri_view(request, potreb_id):
+    p = get_object_or_404(Potreb, potreb_id=potreb_id)
+    sp = _sub_record(SpTeplpoteri, p)
+    can_change = request.user.has_perm("catalogs.change_spteplpoteri") and request.user.has_perm(
+        "catalogs.change_potreb")
+    form = PoteriForm(request.POST or None, instance=sp)
+    if request.method == "POST":
+        if not can_change:
+            raise PermissionDenied
+        if form.is_valid():
+            with transaction.atomic():
+                sp = form.save(commit=False)
+                if "raschet" in request.POST:
+                    total = poteri.raschet(sp, p)
+                    p.save(update_fields=["poter_pr", "poter_nag"])
+                    messages.success(request, f"Потери рассчитаны: всего {formats.localize(total)} Гкал")
+                else:
+                    messages.success(request, "Изменения сохранены")
+                sp.save()
+            return redirect("abonents:poteri", potreb_id=p.potreb_id)
+    rows = [(i, form[f"diametr{i}"], form[f"dlina{i}"], getattr(sp, f"poteri_pr{i}")) for i in poteri.SECTIONS]
+    return render(request, "abonents/poteri.html", {
+        "p": p, "sp": sp, "form": form, "rows": rows, "can_change": can_change,
+    })
+
+
+@login_required
+@permission_required("catalogs.view_spteplosch", raise_exception=True)
+def teplosch_view(request, potreb_id):
+    p = get_object_or_404(Potreb, potreb_id=potreb_id)
+    obj = _sub_record(SpTeplosch, p, name_obek=p.name_potre or "", adres_obek=p.adres_sd or "")
+    can_change = request.user.has_perm("catalogs.change_spteplosch")
+    form = TeploschForm(request.POST or None, instance=obj)
+    if request.method == "POST":
+        if not can_change:
+            raise PermissionDenied
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Изменения сохранены")
+            return redirect(reverse("abonents:karta", args=[p.potreb_id]) + "?tab=ishod")
+    return render(request, "abonents/teplosch.html", {"p": p, "form": form, "can_change": can_change})
