@@ -170,6 +170,18 @@ def _neighbours(p):
             "position": position, "total": same_city.count()}
 
 
+def _prisoed(p):
+    """Присоединённые объекты абонента: [(вид, поле, лицевой №, абонент или None)]."""
+    found = []
+    for kind, (label, names) in layout.PRISOED.items():
+        for name in names:
+            value = getattr(p, name)
+            if value:
+                found.append((label, name, value))
+    objects = {o.potreb_id: o for o in Potreb.objects.filter(potreb_id__in=[v for _, _, v in found])}
+    return [(label, name, value, objects.get(value)) for label, name, value in found]
+
+
 def _card_context(request, p, tab_key, form=None):
     related = related_values(p)
     lookups = _lookups()
@@ -182,6 +194,8 @@ def _card_context(request, p, tab_key, form=None):
         "tabs": [(k, t) for k, t, _ in layout.TABS], "tab": tab_key, "tab_title": title,
         "tab_url": reverse("abonents:edit" if form is not None else "abonents:karta", args=[p.potreb_id]),
         "nav": _neighbours(p),
+        "prisoed": _prisoed(p) if tab_key == "otop" else [],
+        "prisoed_kinds": [(k, label) for k, (label, _) in layout.PRISOED.items()],
         "can_change": request.user.has_perm("catalogs.change_potreb"),
         "can_delete": request.user.has_perm("catalogs.delete_potreb"),
     }
@@ -400,3 +414,44 @@ def raschet_itog(request):
         "cities": cities, "table": table, "info": request.session.get("raschet_itog"),
         "limits": Limit.objects.order_by("potreb_id"),
     })
+
+
+@login_required
+@permission_required("catalogs.change_potreb", raise_exception=True)
+def prisoed(request, potreb_id):
+    """Добавить присоединённый объект в первое свободное поле или убрать его."""
+    p = get_object_or_404(Potreb, potreb_id=potreb_id)
+    back = redirect(reverse("abonents:karta", args=[p.potreb_id]) + "?tab=otop")
+    if request.method != "POST":
+        return back
+    slots = {name: kind for kind, (_, names) in layout.PRISOED.items() for name in names}
+    remove = request.POST.get("remove")
+    if remove:
+        if remove in slots and getattr(p, remove):
+            old = getattr(p, remove)
+            setattr(p, remove, 0)
+            p.save(update_fields=[remove])
+            messages.success(request, f"Объект л/№ {old} убран из присоединённых")
+        return back
+    kind = request.POST.get("kind")
+    ls = _int(request.POST.get("ls"))
+    if kind not in layout.PRISOED:
+        messages.error(request, "Выберите, что присоединяется: прибор или нагрузка")
+        return back
+    label, names = layout.PRISOED[kind]
+    obj = Potreb.objects.filter(potreb_id=ls).first() if ls else None
+    if obj is None:
+        messages.error(request, f"Абонент с лицевым № {request.POST.get('ls', '').strip()} не найден")
+    elif obj.potreb_id == p.potreb_id:
+        messages.error(request, "Нельзя присоединить абонента к самому себе")
+    elif any(getattr(p, name) == obj.potreb_id for name in names):
+        messages.warning(request, f"Л/№ {obj.potreb_id} уже присоединён")
+    else:
+        free = next((name for name in names if not getattr(p, name)), None)
+        if free is None:
+            messages.error(request, f"Свободных мест нет: можно присоединить не больше {len(names)}")
+        else:
+            setattr(p, free, obj.potreb_id)
+            p.save(update_fields=[free])
+            messages.success(request, f"{label}: л/№ {obj.potreb_id} {obj.name_potre or ''}".strip())
+    return back

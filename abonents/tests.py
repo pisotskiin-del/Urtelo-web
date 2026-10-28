@@ -322,3 +322,33 @@ class StatusTests(KartaBase):
         self.assertContains(self.client.get("/abonents/9/"), "Лицевой счет: Расторгнут")
         listing = self.client.get("/abonents/?gorod=1").content.decode()
         self.assertEqual(listing.count('class="clickable otkl"'), 1)
+
+
+class PrisoedTests(KartaBase):
+    def test_block_only_when_objects_exist(self):
+        self.login("Наблюдатель")
+        self.assertContains(self.client.get("/abonents/5/"), "Присоединённые объекты")  # posle_prib = 7
+        page = self.client.get("/abonents/9/").content.decode()
+        self.assertNotIn("<h2>Присоединённые объекты</h2>", page)
+        self.assertNotIn("＋ Присоединённый объект", page)  # наблюдателю добавлять нельзя
+        self.assertEqual(self.client.post("/abonents/9/prisoed/", {"kind": "pribor", "ls": "5"}).status_code, 403)
+
+    def test_add_into_free_slot_and_remove(self):
+        self.login("Оператор")
+        self.assertContains(self.client.get("/abonents/9/"), "＋ Присоединённый объект")
+        self.client.post("/abonents/9/prisoed/", {"kind": "nagruzka", "ls": "5"})
+        self.client.post("/abonents/9/prisoed/", {"kind": "nagruzka", "ls": "7"})
+        response = self.client.post("/abonents/9/prisoed/", {"kind": "nagruzka", "ls": "7"}, follow=True)
+        self.assertContains(response, "уже присоединён")
+        self.assertContains(self.client.post("/abonents/9/prisoed/", {"kind": "pribor", "ls": "999"}, follow=True),
+                            "не найден")
+        c = Potreb.objects.get(potreb_id=9)
+        self.assertEqual((c.pris_nag1, c.pris_nag2, c.pris_nag3), (5, 7, None))
+        self.assertContains(self.client.get("/abonents/9/"), 'href="/abonents/7/"')
+        self.client.post("/abonents/9/prisoed/", {"remove": "pris_nag1"})
+        c.refresh_from_db()
+        self.assertEqual((c.pris_nag1, c.pris_nag2), (0, 7))
+        # Освободившееся место занимается первым.
+        self.client.post("/abonents/9/prisoed/", {"kind": "nagruzka", "ls": "11"})
+        c.refresh_from_db()
+        self.assertEqual(c.pris_nag1, 11)

@@ -6,10 +6,26 @@
 <nav class="tabs">
   {% for key, title in tabs %}<a href="{{ tab_url }}?tab={{ key }}" {% if key == tab %}class="active"{% endif %}>{{ title }}</a>{% endfor %}
 </nav>
-{% if not form %}{% if tab == "otop" %}<p class="tabtools"><a class="button" href="{% url 'abonents:poteri' p.potreb_id %}">Диаметр/длина для расч. потерь</a></p>
+{% if not form %}{% if tab == "otop" %}<div class="tabtools"><a class="button" href="{% url 'abonents:poteri' p.potreb_id %}">Диаметр/длина для расч. потерь</a>
+  {% if can_change %}<details class="add-pop"><summary class="button">＋ Присоединённый объект</summary>
+    <form method="post" action="{% url 'abonents:prisoed' p.potreb_id %}" class="card">{% csrf_token %}
+      <label>Что присоединяется <select name="kind">{% for k, label in prisoed_kinds %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select></label>
+      <label>Лицевой № объекта <input name="ls" inputmode="numeric" required></label>
+      <button class="primary">Добавить</button>
+    </form></details>{% endif %}</div>
 {% elif tab == "ishod" %}<p class="tabtools"><a class="button" href="{% url 'abonents:teplosch' p.potreb_id %}">Информация по теплосчетчику</a></p>{% endif %}{% endif %}
 <div class="kgroups">
 {% for title, items in groups %}
   <section class="card kgroup"><h2>{{ title }}</h2><div class="kgrid">{% include "abonents/_fields.html" %}</div></section>
 {% endfor %}
+{% if prisoed and not form %}
+  <section class="card kgroup"><h2>Присоединённые объекты</h2>
+    <ul class="plist">{% for label, name, ls, obj in prisoed %}<li>
+      <span class="chip {% if name|slice:':5' == 'posle' %}info{% else %}ok{% endif %}">{% if name|slice:':5' == 'posle' %}прибор{% else %}нагрузка{% endif %}</span>
+      <a href="{% url 'abonents:karta' ls %}">Л/№ {{ ls }}</a>
+      <span class="pname">{% if obj %}{{ obj.name_potre|default:"" }}{% if obj.glav_potre %} <span class="muted">— {{ obj.glav_potre }}</span>{% endif %}{% else %}<span class="error">нет такого абонента</span>{% endif %}</span>
+      {% if can_change %}<form method="post" action="{% url 'abonents:prisoed' p.potreb_id %}" class="inline">{% csrf_token %}<button class="link-btn" name="remove" value="{{ name }}" title="Убрать из присоединённых" onclick="return confirm('Убрать л/№ {{ ls }} из присоединённых?')">✕</button></form>{% endif %}
+    </li>{% endfor %}</ul>
+  </section>
+{% endif %}
 </div>
