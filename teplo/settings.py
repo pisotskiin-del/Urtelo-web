@@ -10,6 +10,14 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Файл .env рядом с manage.py: строки ИМЯ=значение. Переменные окружения важнее.
+_dotenv = BASE_DIR / ".env"
+if _dotenv.exists():
+    for _line in _dotenv.read_text(encoding="utf-8-sig").splitlines():
+        _name, _sep, _value = _line.partition("=")
+        if _sep and not _line.lstrip().startswith("#"):
+            os.environ.setdefault(_name.strip(), _value.strip().strip('"'))
+
 
 def env(name, default=None):
     return os.environ.get(name, default)
@@ -127,4 +135,4 @@ CATALOG_PAGE_SIZE = 50
 # Папка, куда при переходе на новый месяц кладётся файл Abot<ГГ><ММ>.dbf для 1С
 # (в старой программе \\SERVER-B\Abon_teplo1C). Пусто — файл только скачивается
 # со страницы «Новый месяц».
-TEPLO_1C_DIR = os.environ.get("TEPLO_1C_DIR", "")
+TEPLO_1C_DIR = env("TEPLO_1C_DIR", "")
