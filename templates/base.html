@@ -4,17 +4,24 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Теплоснабжение{% endblock %}</title>
+  <link rel="icon" href="{% static 'img/teplo.svg' %}" type="image/svg+xml">
+  <link rel="icon" href="{% static 'img/teplo.ico' %}" sizes="any">
+  <link rel="manifest" href="{% static 'manifest.webmanifest' %}">
+  <meta name="theme-color" content="#ffffff">
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
 </head>
 <body>
 <header class="topbar">
-  <a class="brand" href="{% url 'abonents:index' %}">Теплоснабжение</a>
+  <a class="brand" href="{% url 'abonents:index' %}"><span class="brand-mark" aria-hidden="true">♨</span>Теплоснабжение</a>
   {% if user.is_authenticated %}
+  {% with app=request.resolver_match.app_name %}
   <nav>
-    {% if perms.catalogs.view_potreb %}<a href="{% url 'abonents:index' %}">Абоненты</a>{% endif %}
-    <a href="{% url 'catalogs:index' %}">Справочники</a>
+    {% if perms.catalogs.view_potreb %}<a href="{% url 'abonents:index' %}" {% if app == "abonents" %}class="active"{% endif %}>Абоненты</a>
+    <a href="{% url 'abonents:raschet' %}" {% if request.resolver_match.url_name == "raschet" or request.resolver_match.url_name == "raschet_itog" or request.resolver_match.url_name == "dan_rasch" %}class="active"{% endif %}>Расчет</a>{% endif %}
+    <a href="{% url 'catalogs:index' %}" {% if app == "catalogs" %}class="active"{% endif %}>Справочники</a>
     {% if user.is_staff %}<a href="{% url 'admin:index' %}">Администрирование</a>{% endif %}
   </nav>
+  {% endwith %}
   <div class="user">
     {{ user.get_full_name|default:user.username }}
     {% if user_roles %}<span class="role">{{ user_roles|join:", " }}</span>{% endif %}
@@ -26,5 +33,19 @@
   {% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
   {% block content %}{% endblock %}
 </main>
+<script>
+// Горячие клавиши: «/» — к поиску; PageUp/PageDown в карте — предыдущая/следующая запись.
+document.addEventListener("keydown", function (e) {
+  var t = e.target, typing = t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName);
+  if (typing || e.ctrlKey || e.altKey || e.metaKey) return;
+  if (e.key === "/") {
+    var s = document.querySelector("[data-hotkey-search]");
+    if (s) { e.preventDefault(); s.focus(); s.select(); }
+  } else if (e.key === "PageUp" || e.key === "PageDown") {
+    var a = document.getElementById(e.key === "PageUp" ? "nav-prev" : "nav-next");
+    if (a) { e.preventDefault(); location.href = a.href; }
+  }
+});
+</script>
 </body>
 </html>

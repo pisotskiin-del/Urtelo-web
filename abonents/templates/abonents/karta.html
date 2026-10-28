@@ -1,14 +1,19 @@
 {% extends "base.html" %}
 {% block title %}Л/№ {{ p.potreb_id }} — {{ p.name_potre }}{% endblock %}
 {% block content %}
-<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a> /</p>
+<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a> / Карта потребителя</p>
 <div class="head">
-  <h1>Карта потребителя</h1>
+  <div class="karta-title">
+    <h1>{{ p.name_potre|default:"Без наименования" }}</h1>
+    <div class="sub"><span>Л/№ <b>{{ p.potreb_id }}</b></span>{% if p.nom_dog %}<span>· Договор № <b>{{ p.nom_dog }}</b></span>{% endif %}
+      {% if p.cod_gor %}<span>· {{ p.cod_gor.name_gorod }}</span>{% endif %}
+      {% if p.d_stat == 61 %}<span class="chip warn">Приостановлен</span>{% elif p.d_stat == 63 %}<span class="chip off">Расторгнут</span>{% elif p.d_stat == 60 %}<span class="chip ok">Заключен</span>{% endif %}</div>
+  </div>
   <div class="actions">
     <span class="navbtns">
-      {% if nav.prev %}<a class="button" href="{% url 'abonents:karta' nav.first %}?tab={{ tab }}" title="Первая запись">⏮</a><a class="button" href="{% url 'abonents:karta' nav.prev %}?tab={{ tab }}" title="Предыдущая">◀</a>{% else %}<span class="button off">⏮</span><span class="button off">◀</span>{% endif %}
-      <span class="muted">{{ nav.position }} из {{ nav.total }}</span>
-      {% if nav.next %}<a class="button" href="{% url 'abonents:karta' nav.next %}?tab={{ tab }}" title="Следующая">▶</a><a class="button" href="{% url 'abonents:karta' nav.last %}?tab={{ tab }}" title="Последняя запись">⏭</a>{% else %}<span class="button off">▶</span><span class="button off">⏭</span>{% endif %}
+      {% if nav.prev %}<a class="button" href="{% url 'abonents:karta' nav.first %}?tab={{ tab }}" title="Первая запись">⏮</a><a class="button" id="nav-prev" href="{% url 'abonents:karta' nav.prev %}?tab={{ tab }}" title="Предыдущая (PageUp)">◀</a>{% else %}<span class="button off">⏮</span><span class="button off">◀</span>{% endif %}
+      <span class="pos">{{ nav.position }} из {{ nav.total }}</span>
+      {% if nav.next %}<a class="button" id="nav-next" href="{% url 'abonents:karta' nav.next %}?tab={{ tab }}" title="Следующая (PageDown)">▶</a><a class="button" href="{% url 'abonents:karta' nav.last %}?tab={{ tab }}" title="Последняя запись">⏭</a>{% else %}<span class="button off">▶</span><span class="button off">⏭</span>{% endif %}
     </span>
     {% if can_change %}<a class="button primary" href="{% url 'abonents:edit' p.potreb_id %}?tab={{ tab }}">Изменить</a>{% endif %}
     {% if can_delete %}<a class="button danger" href="{% url 'abonents:delete' p.potreb_id %}">Удалить</a>{% endif %}

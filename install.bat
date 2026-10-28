@@ -38,8 +38,10 @@ set /p ADMIN_PASS=Enter a password for user admin:
 .venv\Scripts\python.exe manage.py add_user admin --role admin --password "%ADMIN_PASS%" --name "Admin"
 if errorlevel 1 goto error
 
+.venv\Scripts\python.exe teplo.pyw --shortcut
+
 echo.
-echo DONE. Now start run.bat
+echo DONE. Start the app with the desktop shortcut (or run.bat).
 pause
 exit /b 0
 
