@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Расчет{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a> /</p>
+<h1>Расчет начислений</h1>
+<p>Расчет выполняется сразу по всем абонентам всех городов, как кнопка «Расчет» в старой программе. Перед расчетом проверьте исходные данные.</p>
+<div class="scroll">
+<table class="grid narrow-grid">
+  <thead><tr><th>Город</th><th>Месяц</th><th class="num">t факт</th><th class="num">t коэфф.</th><th class="num">Дней отопления</th><th class="num">Q факт, Гкал</th><th class="num">Абонентов</th><th class="num">из них с днями отопления</th><th></th></tr></thead>
+  <tbody>
+  {% for c, count, with_days in rows %}
+    <tr><td>{{ c.name_gorod }}</td><td>{{ c.name_mes|default:"" }} {{ c.god|default_if_none:"" }}</td>
+      <td class="num">{{ c.t_vozd|default_if_none:"" }}</td><td class="num">{{ c.tkoef|default_if_none:"" }}</td>
+      <td class="num">{{ c.dnotop|default_if_none:"" }}</td><td class="num">{{ c.qpfakt|default_if_none:"" }}</td>
+      <td class="num">{{ count }}</td><td class="num">{{ with_days }}</td>
+      <td><a href="{% url 'abonents:dan_rasch' %}?gorod={{ c.cod_gorod }}">Исходные данные</a></td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<form method="post" class="actions" style="margin-top:16px">{% csrf_token %}
+  {% if can_run %}<button class="primary" onclick="this.disabled=true;this.textContent='Идет расчет…';this.form.submit()">Расчет</button>{% endif %}
+  <a href="{% url 'abonents:raschet_itog' %}">Итоги последнего расчета</a>
+</form>
+{% endblock %}

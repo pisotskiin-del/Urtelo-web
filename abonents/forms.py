@@ -1,3 +1,5 @@
+from decimal import ROUND_HALF_UP, Decimal
+
 from django import forms
 from django.db import models
 
@@ -31,6 +33,8 @@ class DbfFormMixin:
 
     def setup_dbf_fields(self):
         for name, field in self.fields.items():
+            if name not in self._meta.fields:
+                continue
             model_field = self._meta.model._meta.get_field(name)
             if isinstance(field, forms.CharField):
                 field.empty_value = ""
@@ -41,7 +45,7 @@ class DbfFormMixin:
     def keep_unchanged(self, data):
         if self.instance.pk is None:
             return data
-        for name in self.fields:
+        for name in self._meta.fields:
             if name in data and name not in self.changed_data:
                 data[name] = getattr(self.instance, name)
         return data
@@ -212,3 +216,39 @@ class NovAbonentForm(DbfFormMixin, forms.ModelForm):
         if commit:
             p.save()
         return p
+
+
+class DanRaschForm(DbfFormMixin, forms.ModelForm):
+    """Исходные данные для расчета по городу (форма dan_rasch)."""
+
+    dnotop_vsem = forms.BooleanField(label="Записать дни отопления всем абонентам города", required=False)
+    dngvs_vsem = forms.BooleanField(label="Записать дни ГВС всем абонентам города", required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setup_dbf_fields()
+
+    class Meta:
+        model = Danrasch
+        fields = ["t_vozd", "t_proekt", "dnotop", "dngvs", "qpfakt"]
+        labels = {
+            "t_vozd": "Фактическая t наружного воздуха, °С", "t_proekt": "Расчетная t для проектирования, °С",
+            "dnotop": "Количество дней подачи отопления", "dngvs": "Количество дней подачи ГВС",
+            "qpfakt": "Q факт, Гкал",
+        }
+
+    def clean(self):
+        data = self.keep_unchanged(super().clean())
+        if data.get("t_proekt") == 18:
+            self.add_error("t_proekt", "Расчетная t не может быть 18 °С: на неё делится температурный коэффициент")
+        return data
+
+    def save(self, commit=True):
+        d = super().save(commit=False)
+        # Кнопка «сохранить» старой формы: t коэффициент = (18 − t факт) / (18 − t расчетная).
+        if d.t_vozd is not None and d.t_proekt not in (None, 18):
+            d.tkoef = ((Decimal(18) - d.t_vozd) / (Decimal(18) - d.t_proekt)).quantize(
+                Decimal("0.001"), rounding=ROUND_HALF_UP)
+        if commit:
+            d.save()
+        return d

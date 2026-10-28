@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Исходные данные для расчета{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a> / <a href="{% url 'abonents:raschet' %}">Расчет</a> /</p>
+<h1>Исходные данные для расчета</h1>
+<nav class="tabs">
+  {% for c in cities %}<a href="?gorod={{ c.cod_gorod }}" {% if c.cod_gorod == city %}class="active"{% endif %}>{{ c.name_gorod }}</a>{% endfor %}
+</nav>
+<p>Расчетный месяц: <b>{{ d.name_mes|default:"" }} {{ d.god|default_if_none:"" }}</b>. t коэффициент: <b>{{ d.tkoef|default_if_none:"—" }}</b> (считается при сохранении: (18 − t факт) / (18 − t расчетная)).</p>
+<form method="post">{% csrf_token %}
+  <section class="card kgroup"><div class="kgrid">
+    {% for field in form %}<div class="kf">
+      <span class="kl"><label for="{{ field.id_for_label }}">{{ field.label }}</label></span>
+      <span class="kv">{% if can_change %}{{ field }}{% else %}{{ field.value|default_if_none:"—" }}{% endif %}{% if field.errors %}<span class="error">{{ field.errors|join:" " }}</span>{% endif %}</span>
+    </div>{% endfor %}
+  </div></section>
+  {% if form.non_field_errors %}<p class="error">{{ form.non_field_errors|join:" " }}</p>{% endif %}
+  <p class="muted">Внимание! Проверьте данные по температуре и t коэффициенту. Дни отопления и ГВС записываются абонентам города, только если отмечен флажок.</p>
+  <div class="actions">
+    {% if can_change %}<button class="primary">Сохранить</button>{% endif %}
+    <a href="{% url 'abonents:raschet' %}">К расчету</a>
+  </div>
+</form>
+{% endblock %}

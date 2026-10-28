@@ -10,7 +10,7 @@ from django.core.management import call_command
 from django.test import TestCase
 
 from abonents import layout
-from catalogs.models import Akcept, Danrasch, GvsKot, Kategorpot, Minist, Potreb
+from catalogs.models import Akcept, Danrasch, GvsKot, Kategorpot, Limit, Minist, Potreb, SpTeplpoteri
 
 
 class KartaBase(TestCase):
@@ -227,3 +227,74 @@ class NewAbonentAndPoteriTests(KartaBase):
         form.save()
         p.refresh_from_db()
         self.assertEqual(p.name_kot, "(Р) Котельная №3")
+
+
+class RaschetTests(TestCase):
+    """Расчет начислений на небольшом примере, посчитанном вручную."""
+
+    def setUp(self):
+        call_command("init_roles", stdout=open("/dev/null", "w"))
+        self.ryb = Danrasch.objects.create(cod_gorod=1, name_gorod="Рыбница", tkoef=Decimal("0.5"),
+                                           qpfakt=Decimal("46"), t_vozd=Decimal("10"), t_proekt=-17)
+        self.dub = Danrasch.objects.create(cod_gorod=2, name_gorod="Дубоссары", qpfakt=Decimal("0"))
+        common = dict(nalich_pot=3, dnotop=Decimal("30"), accept=1, id_katabon=1)
+        # По прибору: (20 − 10) × 1,5 = 15 Гкал, ГВС 2, лимит 40 при выставленных 10.
+        self.a = Potreb.objects.create(potreb_id=1, nom_dog=1, cod_gor=self.ryb, tip_rasot=1, pok_old=10,
+                                       pok_new=20, koef_pok=Decimal("1.5"), nach_gvs=2, vd_limit=40, nach_finan=10,
+                                       name_potre="По прибору", **common)
+        # По нагрузке: 0,1 × 24 × 30 × 0,5 = 36 Гкал.
+        self.b = Potreb.objects.create(potreb_id=2, nom_dog=2, cod_gor=self.ryb, tip_rasot=3,
+                                       q_otoppr=Decimal("0.1"), **common)
+        # По прибору и нагрузке: 4 Гкал по прибору и 0,05 × 24 × 30 × 0,5 = 18 по нагрузке.
+        self.c = Potreb.objects.create(potreb_id=3, nom_dog=3, cod_gor=self.ryb, tip_rasot=2, pok_new=4,
+                                       koef_pok=1, q_otoppr=Decimal("0.05"), **common)
+        # Договор 50 в Дубоссарах: общий прибор (10 Гкал) делится по нагрузке 0,3 и 0,1.
+        self.h = Potreb.objects.create(potreb_id=4, nom_dog=50, nom_dogab=50, nom_pribor=1, cod_gor=self.dub,
+                                       tip_rasot=1, pok_new=10, koef_pok=1, q_otop=Decimal("0.3"), **common)
+        self.s = Potreb.objects.create(potreb_id=5, nom_dog=51, nom_dogab=50, nom_pribor=1, cod_gor=self.dub,
+                                       tip_rasot=1, q_otop=Decimal("0.1"), **common)
+
+    def login(self, role):
+        user = get_user_model().objects.create_user(role, password="x")
+        user.groups.add(Group.objects.get(name=role))
+        self.client.force_login(user)
+
+    def test_raschet(self):
+        self.login("Оператор")
+        response = self.client.post("/abonents/raschet/")
+        self.assertRedirects(response, "/abonents/raschet/itog/")
+        a, b, c, h, s = (Potreb.objects.get(pk=x.pk) for x in (self.a, self.b, self.c, self.h, self.s))
+        self.assertEqual((a.nach_otpr, a.nach_otnag), (Decimal("15.000"), Decimal("0.000")))
+        self.assertEqual((b.nach_otpr, b.nach_otnag), (Decimal("0.000"), Decimal("36.000")))
+        self.assertEqual((c.nach_otpr, c.nach_otnag), (Decimal("4.000"), Decimal("18.000")))
+        # По факту: 46 − 15 − 4 − 2 (ГВС) = 25 Гкал делятся пропорционально 36 и 18.
+        self.assertEqual((b.nac_pogaz, c.nac_pogaz), (Decimal("16.667"), Decimal("8.333")))
+        self.assertEqual(Danrasch.objects.get(cod_gorod=1).qpras, Decimal("54.00"))
+        self.assertEqual((a.nach_otopl, b.nach_otopl, c.nach_otopl),
+                         (Decimal("15.000"), Decimal("16.670"), Decimal("12.330")))
+        self.assertEqual(a.nac_vsego, Decimal("17.000"))
+        self.assertEqual((h.nach_otsub, s.nach_otsub, h.q_otopobsh), (Decimal("7.500"), Decimal("2.500"),
+                                                                      Decimal("0.40000")))
+        self.assertEqual((h.nach_otopl, s.nach_otopl), (Decimal("7.500"), Decimal("2.500")))
+        # 10 + 17 × 2 ≥ 40, но 10 + 17 ≤ 40.
+        self.assertEqual(list(Limit.objects.values_list("potreb_id", "koment")), [(1, "Лимит заканчивается")])
+        self.assertEqual(SpTeplpoteri.objects.count(), 5)  # записи потерь создаются, как в старой программе
+        page = self.client.get("/abonents/raschet/itog/")
+        self.assertContains(page, "рассчитано абонентов 5")
+        self.assertContains(page, "Лимит заканчивается")
+
+    def test_viewer_cannot_run(self):
+        self.login("Наблюдатель")
+        self.assertEqual(self.client.get("/abonents/raschet/").status_code, 200)
+        self.assertEqual(self.client.post("/abonents/raschet/").status_code, 403)
+
+    def test_dan_rasch_sets_koef_and_days(self):
+        self.login("Оператор")
+        response = self.client.post("/abonents/raschet/dannye/?gorod=1", {
+            "t_vozd": "4", "t_proekt": "-17", "dnotop": "31", "dngvs": "", "qpfakt": "46", "dnotop_vsem": "on",
+        })
+        self.assertRedirects(response, "/abonents/raschet/dannye/")
+        d = Danrasch.objects.get(cod_gorod=1)
+        self.assertEqual(d.tkoef, Decimal("0.400"))  # (18 − 4) / (18 + 17)
+        self.assertEqual(set(Potreb.objects.filter(cod_gor=1).values_list("dnotop", flat=True)), {Decimal("31.0")})
+        self.assertEqual(set(Potreb.objects.filter(cod_gor=2).values_list("dnotop", flat=True)), {Decimal("30.0")})

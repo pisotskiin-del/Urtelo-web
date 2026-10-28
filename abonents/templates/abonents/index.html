@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Абоненты{% endblock %}
 {% block content %}
-<div class="head"><h1>Карта абонента</h1>{% if perms.catalogs.add_potreb %}<a class="button primary" href="{% url 'abonents:new' %}">Новый абонент</a>{% endif %}</div>
+<div class="head"><h1>Карта абонента</h1><div class="actions">
+  <a class="button" href="{% url 'abonents:dan_rasch' %}">Исходные данные для расчета</a>
+  <a class="button" href="{% url 'abonents:raschet' %}">Расчет</a>
+  {% if perms.catalogs.add_potreb %}<a class="button primary" href="{% url 'abonents:new' %}">Новый абонент</a>{% endif %}
+</div></div>
 <nav class="tabs">
   {% for c in cities %}<a href="?gorod={{ c.cod_gorod }}" {% if c.cod_gorod == city %}class="active"{% endif %}>{{ c.name_gorod }}</a>{% endfor %}
 </nav>

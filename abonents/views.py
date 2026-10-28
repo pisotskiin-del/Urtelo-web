@@ -10,7 +10,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import ProtectedError, Sum, Value
+from django.db.models import Count, ProtectedError, Q, Sum, Value
 from django.db.models.functions import Replace
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -18,11 +18,11 @@ from django.utils import formats, timezone
 
 from django.db import transaction
 
-from catalogs.models import Akcept, Bank, Danrasch, GvsKot, Kategorpot, Potreb, SpTeplosch, SpTeplpoteri
+from catalogs.models import Akcept, Bank, Danrasch, GvsKot, Kategorpot, Limit, Potreb, SpTeplosch, SpTeplpoteri
 from teplo.sqlite_unicode import UnicodeLower
 
-from . import layout, poteri
-from .forms import NovAbonentForm, PoteriForm, TeploschForm, karta_form
+from . import layout, poteri, raschet
+from .forms import DanRaschForm, NovAbonentForm, PoteriForm, TeploschForm, karta_form
 
 view_required = permission_required("catalogs.view_potreb", raise_exception=True)
 
@@ -311,3 +311,87 @@ def teplosch_view(request, potreb_id):
             messages.success(request, "Изменения сохранены")
             return redirect(reverse("abonents:karta", args=[p.potreb_id]) + "?tab=ishod")
     return render(request, "abonents/teplosch.html", {"p": p, "form": form, "can_change": can_change})
+
+
+@login_required
+@permission_required("catalogs.view_danrasch", raise_exception=True)
+def dan_rasch(request):
+    """Исходные данные для расчета по городу (форма dan_rasch): температура,
+    t коэффициент, дни отопления и ГВС, фактический отпуск Q."""
+    cities = _cities()
+    city = _current_city(request, cities)
+    d = get_object_or_404(Danrasch, cod_gorod=city)
+    can_change = request.user.has_perm("catalogs.change_danrasch") and request.user.has_perm(
+        "catalogs.change_potreb")
+    form = DanRaschForm(request.POST or None, instance=d)
+    if request.method == "POST":
+        if not can_change:
+            raise PermissionDenied
+        if form.is_valid():
+            with transaction.atomic():
+                d = form.save()
+                in_city = Potreb.objects.filter(cod_gor=city)
+                changes = {}
+                if form.cleaned_data["dnotop_vsem"]:
+                    changes["dnotop"] = d.dnotop or 0
+                if form.cleaned_data["dngvs_vsem"]:
+                    changes["dngvs"] = d.dngvs or 0
+                if changes:
+                    in_city.update(**changes)
+                # Как кнопка «Выход» старой формы: название котельной в записях абонентов.
+                for kot in GvsKot.objects.filter(kod_gor=city):
+                    in_city.filter(id_koteln=kot.id_kot).exclude(name_kot=kot.name_kot).update(name_kot=kot.name_kot)
+            messages.success(request, f"Сохранено. t коэффициент: {formats.localize(d.tkoef)}"
+                             + (f"; дни записаны {in_city.count()} абонентам" if changes else ""))
+            return redirect("abonents:dan_rasch")
+    return render(request, "abonents/dan_rasch.html", {
+        "cities": cities, "city": city, "d": d, "form": form, "can_change": can_change,
+    })
+
+
+ITOG_FIELDS = [
+    ("nach_otpr", "Начислено по прибору"), ("nach_otnag", "Начислено по расчету"),
+    ("nac_pogaz", "Начислено по факту"), ("poter_pr", "Потери по прибору"), ("poter_nag", "Потери по нагрузке"),
+    ("gkl_perer", "Перерасчет"), ("nach_otopl", "Отопление, факт. потребление"), ("nach_gvs", "ГВС"),
+    ("predopl", "Предоплата"), ("nac_vsego", "Предъявлено к оплате"),
+]
+
+
+@login_required
+@permission_required("catalogs.view_potreb", raise_exception=True)
+def raschet_view(request):
+    """Расчет начислений по всем абонентам (кнопка «Расчет» карты)."""
+    can_run = request.user.has_perm("catalogs.change_potreb")
+    if request.method == "POST":
+        if not can_run:
+            raise PermissionDenied
+        result = raschet.run()
+        request.session["raschet_itog"] = {
+            "time": formats.localize(timezone.localtime()),
+            "potreb": result.potreb,
+            "created_poteri": result.created_poteri,
+            "zero_division": result.zero_division,
+        }
+        messages.success(request, f"Расчет закончен: рассчитано абонентов {result.potreb}")
+        return redirect("abonents:raschet_itog")
+    cities = _cities()
+    counts = {row["cod_gor"]: row for row in Potreb.objects.values("cod_gor").annotate(
+        n=Count("pk"), dn=Count("pk", filter=Q(dnotop__gt=0)))}
+    rows = [(c, counts.get(c.cod_gorod, {}).get("n", 0), counts.get(c.cod_gorod, {}).get("dn", 0)) for c in cities]
+    return render(request, "abonents/raschet.html", {"rows": rows, "can_run": can_run})
+
+
+@login_required
+@permission_required("catalogs.view_potreb", raise_exception=True)
+def raschet_itog(request):
+    """Итоги расчета по городам и абоненты, у которых заканчивается лимит
+    (таблица limit, её заполняет расчет)."""
+    cities = _cities()
+    sums = {row["cod_gor"]: row for row in Potreb.objects.values("cod_gor").annotate(
+        **{name: Sum(name) for name, _ in ITOG_FIELDS})}
+    columns = [(c, [sums.get(c.cod_gorod, {}).get(name) or 0 for name, _ in ITOG_FIELDS]) for c in cities]
+    table = [(label, [values[i] for _, values in columns]) for i, (_, label) in enumerate(ITOG_FIELDS)]
+    return render(request, "abonents/raschet_itog.html", {
+        "cities": cities, "table": table, "info": request.session.get("raschet_itog"),
+        "limits": Limit.objects.order_by("potreb_id"),
+    })
