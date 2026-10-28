@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load ui %}
 {% block title %}Теплосчетчик: Л/№ {{ p.potreb_id }}{% endblock %}
 {% block content %}
 <p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a> / <a href="{% url 'abonents:karta' p.potreb_id %}?tab=ishod">Л/№ {{ p.potreb_id }}</a> /</p>
@@ -11,7 +11,7 @@
     </div>{% endfor %}
   </div></section>
   <div class="actions">
-    {% if can_change %}<button class="primary">Сохранить</button>{% endif %}
+    {% if can_change %}<button class="primary">{% icon "save" %} Сохранить</button>{% endif %}
     <a href="{% url 'abonents:karta' p.potreb_id %}?tab=ishod">Вернуться в карту</a>
   </div>
 </form>

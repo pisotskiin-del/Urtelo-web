@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load ui %}
 {% block title %}Вход{% endblock %}
 {% block content %}
 <div class="card narrow">
@@ -8,7 +8,7 @@
     <label>Пользователь<input name="username" autofocus required value="{{ form.username.value|default:'' }}"></label>
     <label>Пароль<input type="password" name="password" required></label>
     <input type="hidden" name="next" value="{{ next }}">
-    <button class="primary">Войти</button>
+    <button class="primary">{% icon "logout" %} Войти</button>
   </form>
 </div>
 {% endblock %}

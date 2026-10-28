@@ -1,4 +1,4 @@
-{% load static %}<!doctype html>
+{% load static ui %}<!doctype html>
 <html lang="ru">
 <head>
   <meta charset="utf-8">
@@ -11,24 +11,27 @@
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
 </head>
 <body>
+{% include "_icons.html" %}
 <header class="topbar">
-  <a class="brand" href="{% url 'abonents:index' %}"><span class="brand-mark" aria-hidden="true">♨</span>Теплоснабжение</a>
+  <a class="brand" href="{% url 'abonents:index' %}"><img class="brand-mark" src="{% static 'img/teplo.svg' %}" alt="">Теплоснабжение</a>
   {% if user.is_authenticated %}
-  {% with app=request.resolver_match.app_name %}
-  <nav>
-    {% if perms.catalogs.view_potreb %}<a href="{% url 'abonents:index' %}" {% if app == "abonents" %}class="active"{% endif %}>Абоненты</a>
-    <a href="{% url 'abonents:raschet' %}" {% if request.resolver_match.url_name == "raschet" or request.resolver_match.url_name == "raschet_itog" or request.resolver_match.url_name == "dan_rasch" %}class="active"{% endif %}>Расчет</a>{% endif %}
-    <a href="{% url 'catalogs:index' %}" {% if app == "catalogs" %}class="active"{% endif %}>Справочники</a>
-    {% if user.is_staff %}<a href="{% url 'admin:index' %}">Администрирование</a>{% endif %}
-  </nav>
-  {% endwith %}
   <div class="user">
-    {{ user.get_full_name|default:user.username }}
+    {% icon "user" %} {{ user.get_full_name|default:user.username }}
     {% if user_roles %}<span class="role">{{ user_roles|join:", " }}</span>{% endif %}
-    <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="link">Выйти</button></form>
+    <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="link">{% icon "logout" %} Выйти</button></form>
   </div>
   {% endif %}
 </header>
+{% if user.is_authenticated %}
+{% with app=request.resolver_match.app_name url=request.resolver_match.url_name %}
+<nav class="navbar">
+  {% if perms.catalogs.view_potreb %}<a href="{% url 'abonents:index' %}" {% if app == "abonents" and url != "raschet" and url != "raschet_itog" and url != "dan_rasch" %}class="active"{% endif %}>{% icon "users" %} Абоненты</a>
+  <a href="{% url 'abonents:raschet' %}" {% if url == "raschet" or url == "raschet_itog" or url == "dan_rasch" %}class="active"{% endif %}>{% icon "calc" %} Расчет</a>{% endif %}
+  <a href="{% url 'catalogs:index' %}" {% if app == "catalogs" %}class="active"{% endif %}>{% icon "book" %} Справочники</a>
+  {% if user.is_staff %}<a href="{% url 'admin:index' %}">{% icon "settings" %} Администрирование</a>{% endif %}
+</nav>
+{% endwith %}
+{% endif %}
 <main>
   {% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
   {% block content %}{% endblock %}

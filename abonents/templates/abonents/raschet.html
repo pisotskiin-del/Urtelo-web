@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load ui %}
 {% block title %}Расчет{% endblock %}
 {% block content %}
 <p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a> /</p>
@@ -19,7 +19,7 @@
 </table>
 </div>
 <form method="post" class="actions" style="margin-top:16px">{% csrf_token %}
-  {% if can_run %}<button class="primary" onclick="this.disabled=true;this.textContent='Идет расчет…';this.form.submit()">Расчет</button>{% endif %}
+  {% if can_run %}<button class="primary" onclick="this.disabled=true;this.textContent='Идет расчет…';this.form.submit()">{% icon "calc" %} Расчет</button>{% endif %}
   <a href="{% url 'abonents:raschet_itog' %}">Итоги последнего расчета</a>
 </form>
 {% endblock %}

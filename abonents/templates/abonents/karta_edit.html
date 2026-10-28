@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load ui %}
 {% block title %}Изменение: Л/№ {{ p.potreb_id }}{% endblock %}
 {% block content %}
 <p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a> / <a href="{% url 'abonents:karta' p.potreb_id %}?tab={{ tab }}">Л/№ {{ p.potreb_id }}</a> /</p>
@@ -7,8 +7,8 @@
   {% if form.non_field_errors %}<div class="error">{{ form.non_field_errors }}</div>{% endif %}
   {% include "abonents/_card.html" %}
   <div class="actions sticky">
-    <button class="primary">Сохранить</button>
-    <a href="{% url 'abonents:karta' p.potreb_id %}?tab={{ tab }}">Отмена</a>
+    <button class="primary">{% icon "save" %} Сохранить</button>
+    <a href="{% url 'abonents:karta' p.potreb_id %}?tab={{ tab }}" class="button">{% icon "x" %} Отмена</a>
     <span class="muted">Поля без рамки заполняет расчёт, они здесь не меняются.</span>
   </div>
 </form>

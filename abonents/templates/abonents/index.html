@@ -1,12 +1,12 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load ui %}
 {% block title %}Абоненты<p class="legend"><span><span class="chip warn">Приостановлен</span> <span class="chip off">Расторгнут</span> — строки выделены серым</span>
   <span><kbd>/</kbd> поиск по наименованию</span><span><kbd>PgUp</kbd> <kbd>PgDn</kbd> в карте — предыдущая и следующая запись</span></p>
 {% endblock %}
 {% block content %}
 <div class="head"><h1>Абоненты</h1><div class="actions">
-  <a class="button" href="{% url 'abonents:dan_rasch' %}">Исходные данные для расчета</a>
-  <a class="button" href="{% url 'abonents:raschet' %}">Расчет</a>
-  {% if perms.catalogs.add_potreb %}<a class="button primary" href="{% url 'abonents:new' %}">＋ Новый абонент</a>{% endif %}
+  <a class="button" href="{% url 'abonents:dan_rasch' %}">{% icon "sliders" %} Исходные данные для расчета</a>
+  <a class="button" href="{% url 'abonents:raschet' %}">{% icon "calc" %} Расчет</a>
+  {% if perms.catalogs.add_potreb %}<a class="button primary" href="{% url 'abonents:new' %}">{% icon "plus" %} Новый абонент</a>{% endif %}
 </div></div>
 <div class="toolbar">
   <nav class="tabs">
@@ -14,13 +14,13 @@
   </nav>
   <div class="finder">
     <form method="get"><input type="hidden" name="gorod" value="{{ city }}">
-      <label>Наименование <input class="wide-input" name="q" value="{{ q }}" placeholder="Часть названия, нажмите /" data-hotkey-search></label><button>Найти</button>
+      <label>Наименование <input class="wide-input" name="q" value="{{ q }}" placeholder="Часть названия, нажмите /" data-hotkey-search></label><button title="Найти">{% icon "search" %}</button>
     </form>
     <form method="get"><input type="hidden" name="gorod" value="{{ city }}">
-      <label>№ договора <input name="dog" value="{{ dog }}" inputmode="numeric" size="6"></label><button>Найти</button>
+      <label>№ договора <input name="dog" value="{{ dog }}" inputmode="numeric" size="6"></label><button title="Найти">{% icon "search" %}</button>
     </form>
     <form method="get">
-      <label>Лицевой № <input name="ls" inputmode="numeric" size="6" title="Ищет во всех городах"></label><button>Открыть</button>
+      <label>Лицевой № <input name="ls" inputmode="numeric" size="6" title="Ищет во всех городах"></label><button title="Открыть карту">{% icon "open" %}</button>
     </form>
   </div>
 </div>

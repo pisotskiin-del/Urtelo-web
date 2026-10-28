@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load ui %}
 {% block title %}Исходные данные для расчета{% endblock %}
 {% block content %}
 <p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a> / <a href="{% url 'abonents:raschet' %}">Расчет</a> /</p>
@@ -17,7 +17,7 @@
   {% if form.non_field_errors %}<p class="error">{{ form.non_field_errors|join:" " }}</p>{% endif %}
   <p class="muted">Внимание! Проверьте данные по температуре и t коэффициенту. Дни отопления и ГВС записываются абонентам города, только если отмечен флажок; у отключённых абонентов (договор расторгнут или приостановлен) ставится 0, и расчет тоже считает их дни равными 0.</p>
   <div class="actions">
-    {% if can_change %}<button class="primary">Сохранить</button>{% endif %}
+    {% if can_change %}<button class="primary">{% icon "save" %} Сохранить</button>{% endif %}
     <a href="{% url 'abonents:raschet' %}">К расчету</a>
   </div>
 </form>

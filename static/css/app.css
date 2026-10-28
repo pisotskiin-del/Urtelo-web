@@ -190,3 +190,96 @@ form.inline { display:inline; margin:0; }
   .kgroups { columns:1; } .kf.wide { grid-column:auto; } .kgroup .kgrid.two { grid-template-columns:1fr; }
   .topbar { overflow-x:auto; } .finder .wide-input { width:160px; }
 }
+
+/* ===== Тема «синие панели»: градиентные шапки таблиц и блоков, чередование строк,
+   подписи слева от полей в рамках, иконки (по образцу, присланному 28.10.2026). ===== */
+:root {
+  --bg:#e9eef4; --line:#cfd9e4; --line-strong:#a9bdd2; --accent:#2f7bbf; --accent-text:#1f5f99; --accent-weak:#e4f0fa;
+  --blue-1:#6aaee0; --blue-2:#3a85c4; --blue-3:#2b6ea9; --radius:5px; --radius-sm:4px;
+  --shadow:0 1px 3px rgba(30,60,100,.12);
+}
+body { background:var(--bg) linear-gradient(180deg, #f4f7fa 0, #e9eef4 220px) no-repeat; }
+svg.i { width:16px; height:16px; flex:none; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; vertical-align:-3px; }
+
+/* Шапка и меню */
+.topbar { position:static; height:56px; background:linear-gradient(180deg, #ffffff, #f1f5f9); border-bottom:1px solid #d3dde8; }
+.brand { font-size:20px; font-weight:700; color:#3a4a5c; letter-spacing:-.01em; }
+.brand-mark { width:34px; height:34px; border-radius:9px; }
+.topbar .user { margin-left:auto; color:#3a4a5c; }
+.topbar .user svg.i { color:#6b7d91; }
+button.link { display:inline-flex; align-items:center; gap:4px; color:#3a4a5c; }
+.navbar { position:sticky; top:0; z-index:20; display:flex; gap:2px; padding:0 16px; height:40px; align-items:stretch;
+          background:linear-gradient(180deg, var(--blue-1), var(--blue-2) 55%, var(--blue-3)); border-bottom:1px solid #245d90;
+          box-shadow:0 1px 3px rgba(20,50,90,.25); }
+.navbar a { display:flex; align-items:center; gap:7px; padding:0 16px; color:#fff; font-weight:600; text-shadow:0 1px 0 rgba(0,0,0,.2);
+            border-left:1px solid rgba(255,255,255,.12); border-right:1px solid rgba(0,0,0,.08); }
+.navbar a:hover { text-decoration:none; background:rgba(255,255,255,.14); }
+.navbar a.active { background:linear-gradient(180deg, rgba(255,255,255,.32), rgba(255,255,255,.12)); box-shadow:inset 0 -3px 0 #fff; }
+html { scroll-padding-top:52px; }
+main { padding:14px 20px 48px; }
+h1 { color:#2c3e50; }
+
+/* Кнопки */
+button, .button { border-radius:var(--radius-sm); border-color:#b3c3d4; background:linear-gradient(180deg, #ffffff, #e9eff5);
+                  box-shadow:0 1px 0 rgba(255,255,255,.8) inset, 0 1px 1px rgba(30,60,100,.08); color:#2c3e50; }
+button:hover, .button:hover { background:linear-gradient(180deg, #ffffff, #dde7f1); }
+.primary { background:linear-gradient(180deg, #5aa3dd, #2f7bbf 60%, #2a6eab); border-color:#245f94; color:#fff !important;
+           text-shadow:0 1px 0 rgba(0,0,0,.2); box-shadow:0 1px 0 rgba(255,255,255,.35) inset, 0 1px 2px rgba(30,60,100,.25); }
+.primary:hover { background:linear-gradient(180deg, #4b97d4, #296fb0 60%, #235f97); }
+.danger { background:linear-gradient(180deg, #ffffff, #fbeceb); border-color:#e2b2ae; }
+.danger:hover { background:linear-gradient(180deg, #fff, #f6dcda); }
+button svg.i, .button svg.i { margin:0 -1px; }
+
+/* Таблицы: синяя шапка, чередование строк */
+.scroll { border-color:#9fb6cd; border-radius:var(--radius); }
+.grid th { background:linear-gradient(180deg, #7bb6e3, #4a90cb 60%, #3f84c0); color:#fff; text-transform:none; letter-spacing:0;
+           font-size:13px; font-weight:600; border-bottom:1px solid #2f6ea6; border-right:1px solid rgba(255,255,255,.18);
+           text-shadow:0 1px 0 rgba(0,0,0,.18); }
+.grid th a { color:#fff; }
+.grid td { border-bottom:1px solid #e1e8ef; border-right:1px solid #eef2f6; }
+.grid tbody tr:nth-child(even) td { background:#f2f5f8; }
+.grid tbody tr.clickable:hover td { background:#dcebf8; }
+.grid tbody tr.current td { background:#fff1cf; }
+.grid tbody tr.otkl td { background:#e4e7eb; color:#8a929c; }
+.grid tbody tr.otkl:nth-child(even) td { background:#dde1e6; }
+.grid tfoot th { background:linear-gradient(180deg, #f3f6f9, #e3eaf1); color:#2c3e50; text-shadow:none; border-right:0; }
+.grid td.id a { text-decoration:underline; text-decoration-color:rgba(47,123,191,.35); }
+
+/* Панель поиска */
+.toolbar { background:linear-gradient(180deg, #f5f9fd, #dfeaf5); border-color:#a9c2da; border-radius:var(--radius); }
+.finder label { color:#2c3e50; font-weight:600; }
+.finder button { color:var(--accent-text); padding:6px 10px; }
+
+/* Вкладки как в старых формах: «папки» */
+.tabs { background:none; padding:0; border-radius:0; gap:3px; border-bottom:1px solid #a9bdd2; display:flex; }
+.toolbar .tabs { border-bottom:0; gap:2px; }
+.tabs a { display:inline-flex; align-items:center; gap:6px; border:1px solid #a9bdd2; border-bottom:0; border-radius:5px 5px 0 0;
+          background:linear-gradient(180deg, #fbfdff, #e3ecf5); color:#40566d; padding:6px 14px; margin-bottom:-1px; }
+.toolbar .tabs a { border-bottom:1px solid #a9bdd2; border-radius:4px; margin:0; }
+.tabs a.active { background:#fff; color:#1f4f7d; font-weight:700; box-shadow:none; border-color:#a9bdd2; border-bottom-color:#fff; }
+.toolbar .tabs a.active { background:linear-gradient(180deg, #5aa3dd, #2f7bbf); color:#fff; border-color:#245f94; }
+
+/* Карточки и блоки карты: синяя полоса заголовка, подписи справа налево, значения в рамках */
+.card { border-color:#a9bfd6; border-radius:var(--radius); }
+.kgroup { padding:0 14px 8px; overflow:hidden; }
+.kgroup h2 { display:flex; align-items:center; gap:8px; margin:0 -14px 8px; padding:7px 14px; color:#fff; font-size:13px;
+             text-transform:none; letter-spacing:0; text-shadow:0 1px 0 rgba(0,0,0,.2);
+             background:linear-gradient(180deg, #6aaee0, #3a85c4 60%, #3479b5); border-bottom:1px solid #2b6ea9; }
+.kgroup .kf { grid-template-columns:minmax(130px, 48%) 1fr; border-bottom:0; padding:3px 0; min-height:0; }
+.kgroup .kl { text-align:right; font-weight:600; color:#2c3e50; font-size:13px; }
+.kgroup .kv:not(:has(input, select, textarea)) { min-height:28px; padding:3px 8px; border:1px solid #c3d1df; border-radius:3px;
+                                                  background:#fbfdff; box-shadow:inset 0 1px 1px rgba(30,60,100,.05); }
+.kgroup .kf.wide { grid-template-columns:1fr; }
+.kgroup .kf.wide .kl { text-align:left; }
+.karta-head { border-top:3px solid var(--blue-2); }
+.karta-head .kf .kl { font-weight:600; color:#4a5d70; }
+.karta-head .kv { padding:3px 8px; border:1px solid #c3d1df; border-radius:3px; background:#fbfdff; min-height:28px; }
+.karta-head .kv:has(input, select, textarea) { padding:0; border:0; background:none; }
+.karta-head.otkl .kv { background:#eef0f2; }
+.karta-title h1 { color:#1f4f7d; }
+.navbtns { border-color:#b3c3d4; background:linear-gradient(180deg, #ffffff, #e9eff5); }
+.navbtns .button { background:none; box-shadow:none; color:#3a5a7a; }
+.plist li { border-bottom-color:#e1e8ef; }
+.msg { border-radius:var(--radius-sm); }
+.add-pop > form { border-top:3px solid var(--blue-2); }
+.legend kbd { background:#fff; }

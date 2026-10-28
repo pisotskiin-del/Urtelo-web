@@ -330,12 +330,12 @@ class PrisoedTests(KartaBase):
         self.assertContains(self.client.get("/abonents/5/"), "Присоединённые объекты")  # posle_prib = 7
         page = self.client.get("/abonents/9/").content.decode()
         self.assertNotIn("<h2>Присоединённые объекты</h2>", page)
-        self.assertNotIn("＋ Присоединённый объект", page)  # наблюдателю добавлять нельзя
+        self.assertNotIn("Присоединённый объект</summary>", page)  # наблюдателю добавлять нельзя
         self.assertEqual(self.client.post("/abonents/9/prisoed/", {"kind": "pribor", "ls": "5"}).status_code, 403)
 
     def test_add_into_free_slot_and_remove(self):
         self.login("Оператор")
-        self.assertContains(self.client.get("/abonents/9/"), "＋ Присоединённый объект")
+        self.assertContains(self.client.get("/abonents/9/"), "Присоединённый объект</summary>")
         self.client.post("/abonents/9/prisoed/", {"kind": "nagruzka", "ls": "5"})
         self.client.post("/abonents/9/prisoed/", {"kind": "nagruzka", "ls": "7"})
         response = self.client.post("/abonents/9/prisoed/", {"kind": "nagruzka", "ls": "7"}, follow=True)

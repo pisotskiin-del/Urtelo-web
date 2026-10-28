@@ -1,15 +1,15 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load ui %}
 {% block title %}{{ meta.verbose_name_plural }}{% endblock %}
 {% block content %}
 <p class="crumbs"><a href="{% url 'catalogs:index' %}">Справочники</a> /</p>
 <div class="head">
   <h1>{{ meta.verbose_name_plural }}</h1>
-  {% if can_add %}<a class="button primary" href="{% url 'catalogs:create' slug %}">Добавить</a>{% endif %}
+  {% if can_add %}<a class="button primary" href="{% url 'catalogs:create' slug %}">{% icon "plus" %} Добавить</a>{% endif %}
 </div>
 <form class="search" method="get">
   <input name="q" value="{{ query }}" placeholder="Поиск по тексту">
   {% if sort %}<input type="hidden" name="o" value="{{ sort }}">{% endif %}
-  <button>Найти</button>{% if query %} <a href="?">Сбросить</a>{% endif %}
+  <button>{% icon "search" %} Найти</button>{% if query %} <a href="?">Сбросить</a>{% endif %}
 </form>
 <div class="scroll">
 <table class="grid">

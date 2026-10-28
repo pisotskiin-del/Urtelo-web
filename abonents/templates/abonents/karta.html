@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load ui %}
 {% block title %}Л/№ {{ p.potreb_id }} — {{ p.name_potre }}{% endblock %}
 {% block content %}
 <p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a> / Карта потребителя</p>
@@ -11,12 +11,12 @@
   </div>
   <div class="actions">
     <span class="navbtns">
-      {% if nav.prev %}<a class="button" href="{% url 'abonents:karta' nav.first %}?tab={{ tab }}" title="Первая запись">⏮</a><a class="button" id="nav-prev" href="{% url 'abonents:karta' nav.prev %}?tab={{ tab }}" title="Предыдущая (PageUp)">◀</a>{% else %}<span class="button off">⏮</span><span class="button off">◀</span>{% endif %}
+      {% if nav.prev %}<a class="button" href="{% url 'abonents:karta' nav.first %}?tab={{ tab }}" title="Первая запись">{% icon "first" %}</a><a class="button" id="nav-prev" href="{% url 'abonents:karta' nav.prev %}?tab={{ tab }}" title="Предыдущая (PageUp)">{% icon "prev" %}</a>{% else %}<span class="button off">{% icon "first" %}</span><span class="button off">{% icon "prev" %}</span>{% endif %}
       <span class="pos">{{ nav.position }} из {{ nav.total }}</span>
-      {% if nav.next %}<a class="button" id="nav-next" href="{% url 'abonents:karta' nav.next %}?tab={{ tab }}" title="Следующая (PageDown)">▶</a><a class="button" href="{% url 'abonents:karta' nav.last %}?tab={{ tab }}" title="Последняя запись">⏭</a>{% else %}<span class="button off">▶</span><span class="button off">⏭</span>{% endif %}
+      {% if nav.next %}<a class="button" id="nav-next" href="{% url 'abonents:karta' nav.next %}?tab={{ tab }}" title="Следующая (PageDown)">{% icon "next" %}</a><a class="button" href="{% url 'abonents:karta' nav.last %}?tab={{ tab }}" title="Последняя запись">{% icon "last" %}</a>{% else %}<span class="button off">{% icon "next" %}</span><span class="button off">{% icon "last" %}</span>{% endif %}
     </span>
-    {% if can_change %}<a class="button primary" href="{% url 'abonents:edit' p.potreb_id %}?tab={{ tab }}">Изменить</a>{% endif %}
-    {% if can_delete %}<a class="button danger" href="{% url 'abonents:delete' p.potreb_id %}">Удалить</a>{% endif %}
+    {% if can_change %}<a class="button primary" href="{% url 'abonents:edit' p.potreb_id %}?tab={{ tab }}">{% icon "edit" %} Изменить</a>{% endif %}
+    {% if can_delete %}<a class="button danger" href="{% url 'abonents:delete' p.potreb_id %}">{% icon "trash" %} Удалить</a>{% endif %}
   </div>
 </div>
 {% include "abonents/_card.html" %}

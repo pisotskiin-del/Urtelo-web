@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load ui %}
 {% block title %}Тепловые потери: Л/№ {{ p.potreb_id }}{% endblock %}
 {% block content %}
 <p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a> / <a href="{% url 'abonents:karta' p.potreb_id %}">Л/№ {{ p.potreb_id }}</a> /</p>
@@ -21,8 +21,8 @@
 </div>
 <p class="muted">Потери записываются в карту: по прибору, если расчёт по прибору и есть потребление или потери начисляются; по нагрузке, если расчёт по нагрузке.</p>
 {% if can_change %}<div class="actions">
-  <button class="primary" name="raschet" value="1">Расчитать</button>
-  <button>Сохранить без расчёта</button>
+  <button class="primary" name="raschet" value="1">{% icon "calc" %} Расчитать</button>
+  <button>{% icon "save" %} Сохранить без расчёта</button>
   <a href="{% url 'abonents:karta' p.potreb_id %}">Вернуться в карту</a>
 </div>{% else %}<p><a href="{% url 'abonents:karta' p.potreb_id %}">Вернуться в карту</a></p>{% endif %}
 </form>
