@@ -209,6 +209,7 @@ def _card_context(request, p, tab_key, form=None):
         "prisoed": _prisoed(p) if tab_key == "otop" else [],
         "prisoed_kinds": [(k, label) for k, (label, _) in layout.PRISOED.items()],
         "sposob": _sposob(p, groups),
+        "rasot_label": dict(layout.TIP_RASOT).get(p.tip_rasot, ""),
         "can_change": request.user.has_perm("catalogs.change_potreb"),
         "can_delete": request.user.has_perm("catalogs.delete_potreb"),
     }

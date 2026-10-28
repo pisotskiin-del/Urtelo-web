@@ -290,3 +290,11 @@ button svg.i, .button svg.i { margin:0 -1px; }
 .seg button:hover { background: #eaf2fb; }
 .seg button.on { background: linear-gradient(#5b9be0, #2f6fbf); border-color: #2a62a8; color: #fff; font-weight: 600; }
 .seg button.on::before { content: "✓ "; }
+.seg button.on:disabled { opacity: 1; cursor: default; }
+.chip.mode { background: #2f6fbf; color: #fff; }
+dialog.confirm { border: 1px solid #2a62a8; border-radius: 8px; padding: 0; width: min(440px, 92vw); box-shadow: 0 12px 40px rgba(20,40,80,.35); }
+dialog.confirm::backdrop { background: rgba(20,40,80,.35); }
+dialog.confirm h3 { margin: 0; padding: 10px 16px; color: #fff; font-size: 15px; background: linear-gradient(#5b9be0, #2f6fbf); display: flex; gap: 8px; align-items: center; }
+dialog.confirm p { padding: 16px; margin: 0; }
+dialog.confirm .buttons { display: flex; gap: 8px; justify-content: flex-end; padding: 0 16px 16px; }
+dialog.confirm .buttons button { min-width: 80px; }

@@ -19,8 +19,26 @@
   <section class="card kgroup"><h2>{% group_icon title %} {{ title }}</h2>
   {% if title == "Способ расчёта" and sposob and can_change and not form %}
     <form method="post" action="{% url 'abonents:sposob' p.potreb_id %}" class="seg">{% csrf_token %}<input type="hidden" name="field" value="{{ sposob.0 }}">
-      {% for value, label in sposob.2 %}<button name="value" value="{{ value }}"{% if value == sposob.1 %} class="on" aria-pressed="true"{% endif %}>{{ label|capfirst }}</button>{% endfor %}
+      {% for value, label in sposob.2 %}{% if value == sposob.1 %}<button type="button" class="on" aria-pressed="true" disabled>{{ label|capfirst }}</button>{% else %}<button type="button" data-value="{{ value }}" data-label="{{ label }}">{{ label|capfirst }}</button>{% endif %}{% endfor %}
+      <input type="hidden" name="value">
     </form>
+    <dialog class="confirm" id="sposob-confirm"><form method="dialog">
+      <h3>{% icon "settings" %} Изменение способа расчёта</h3>
+      <p>Вы действительно хотите изменить тип расчёта на «<b class="to"></b>»?</p>
+      <div class="buttons"><button value="yes" class="primary">Да</button><button value="no">Нет</button></div>
+    </form></dialog>
+    <script>
+    (function () {
+      var form = document.currentScript.parentElement.querySelector("form.seg"), dlg = document.getElementById("sposob-confirm");
+      form.querySelectorAll("button[data-value]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          dlg.querySelector(".to").textContent = b.dataset.label;
+          dlg.onclose = function () { if (dlg.returnValue === "yes") { form.elements.value.value = b.dataset.value; form.submit(); } };
+          dlg.returnValue = ""; dlg.showModal(); dlg.querySelector("button[value=no]").focus();
+        });
+      });
+    })();
+    </script>
   {% else %}<div class="kgrid">{% include "abonents/_fields.html" %}</div>{% endif %}</section>
 {% endfor %}
 {% if prisoed and not form %}

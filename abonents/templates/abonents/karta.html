@@ -7,7 +7,8 @@
     <h1>{{ p.name_potre|default:"Без наименования" }}</h1>
     <div class="sub"><span>Л/№ <b>{{ p.potreb_id }}</b></span>{% if p.nom_dog %}<span>· Договор № <b>{{ p.nom_dog }}</b></span>{% endif %}
       {% if p.cod_gor %}<span>· {{ p.cod_gor.name_gorod }}</span>{% endif %}
-      {% if p.d_stat == 61 %}<span class="chip warn">Приостановлен</span>{% elif p.d_stat == 63 %}<span class="chip off">Расторгнут</span>{% elif p.d_stat == 60 %}<span class="chip ok">Заключен</span>{% endif %}</div>
+      {% if p.d_stat == 61 %}<span class="chip warn">Приостановлен</span>{% elif p.d_stat == 63 %}<span class="chip off">Расторгнут</span>{% elif p.d_stat == 60 %}<span class="chip ok">Заключен</span>{% endif %}
+      {% if rasot_label %}<span class="chip mode" title="Способ расчёта отопления">Отопление: {{ rasot_label }}</span>{% endif %}</div>
   </div>
   <div class="actions">
     <span class="navbtns">
