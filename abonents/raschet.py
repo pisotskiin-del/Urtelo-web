@@ -5,11 +5,13 @@
 таблицы potreb. Каждое записанное значение округляется до знаков поля, как
 при REPLACE в DBF, и следующие шаги читают уже округлённое значение.
 
-kod_predopl — флажки «Выставить предоплату» (1) и «Удалить предоплату» (2)
-формы dan_rasch. В старой форме они всегда недоступны, поэтому по умолчанию 0.
-pr_tiprasch старая программа всегда ставит 2."""
+Отличия от старой программы:
+- у отключённых абонентов (договор расторгнут или приостановлен, d_stat 63 и
+  61) дней отопления 0 (решено 28.10.2026);
+- предоплатой не пользуются (28.10.2026), поэтому ветки «Выставить
+  предоплату» и «Удалить предоплату» не перенесены: в старой форме эти
+  флажки всегда недоступны. pr_tiprasch старая программа всегда ставит 2."""
 
-from collections import defaultdict
 from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -22,6 +24,7 @@ from .poteri import SECTIONS, section_loss
 ZERO = Decimal(0)
 POSLE = ["posle_prib", "posle_pri1", "posle_pri2", "posle_pri3", "posle_pri4"]
 PRIS_NAG = [f"pris_nag{i}" for i in range(1, 9)]
+OTKLUCHEN = (61, 63)  # potreb.d_stat: договор приостановлен, расторгнут
 
 
 def n(value):
@@ -56,6 +59,7 @@ class Result:
     zero_division: list = field(default_factory=list)    # (л/№, что считалось)
     limits: list = field(default_factory=list)          # записи таблицы limit
     cities: list = field(default_factory=list)          # итоги по городам
+    otkluchen: list = field(default_factory=list)       # л/№ отключённых, у которых обнулены дни
 
 
 def _div(a, b, result, rec, what):
@@ -67,7 +71,7 @@ def _div(a, b, result, rec, what):
 
 
 @transaction.atomic
-def run(kod_predopl=0):
+def run():
     """Рассчитать всех абонентов и записать результат в базу."""
     recs = list(Potreb.objects.order_by("pk"))
     cities = {d.cod_gorod: d for d in Danrasch.objects.exclude(cod_gorod=None)}
@@ -76,7 +80,7 @@ def run(kod_predopl=0):
         sp_by_ln.setdefault(sp.ln, sp)
     old_sp = list(sp_by_ln.values())
 
-    result, pt, st = compute(recs, cities, sp_by_ln, kod_predopl)
+    result, pt, st = compute(recs, cities, sp_by_ln)
 
     new_sp = [sp_by_ln[ln] for ln in result.created_poteri]
     SpTeplpoteri.objects.bulk_create(new_sp)
@@ -90,7 +94,7 @@ def run(kod_predopl=0):
     return result
 
 
-def compute(recs, cities, sp_by_ln, kod_predopl=0):
+def compute(recs, cities, sp_by_ln):
     """Расчет над записями в памяти: recs — абоненты в порядке таблицы,
     cities — danrasch по коду города, sp_by_ln — потери по участкам по л/№
     (недостающие добавляются). Возвращает итоги и какие поля изменены."""
@@ -114,6 +118,9 @@ def compute(recs, cities, sp_by_ln, kod_predopl=0):
 
     # 1. Потери по участкам, обнуление итогов, начисление по прибору и по нагрузке.
     for p in recs:
+        if p.d_stat in OTKLUCHEN and n(p.dnotop) != 0:
+            put(p, "dnotop", 0)
+            result.otkluchen.append(p.potreb_id)
         sp = sp_by_ln.get(p.potreb_id)
         if sp is None:
             sp = SpTeplpoteri(ln=p.potreb_id)
@@ -139,8 +146,6 @@ def compute(recs, cities, sp_by_ln, kod_predopl=0):
         for name in ("nach_otpr", "nacs_priso", "nach_otsub", "nach_otnag", "nac_pogaz", "nach_otopl",
                      "nac_vsego", "poterschob", "poternagob"):
             put(p, name, 0)
-        if kod_predopl == 2:
-            put(p, "predopl", 0)
         if n(p.dn_pereras) != 0:
             put(p, "gkl_perer", n(p.q_otoppr) * 24 * n(p.dn_pereras) * n(p.tkf_perer))
         city = cities.get(p.cod_gor_id)
@@ -242,10 +247,7 @@ def compute(recs, cities, sp_by_ln, kod_predopl=0):
 
     # 8. Фактическое потребление и предъявлено к оплате.
     for p in recs:
-        if kod_predopl == 1:
-            otopnag = n(p.nach_otnag)
-            put(p, "nac_pogaz", 0)
-        elif n(p.nac_pogaz) > n(p.nach_otnag) or n(p.nac_pogaz) == 0:
+        if n(p.nac_pogaz) > n(p.nach_otnag) or n(p.nac_pogaz) == 0:
             otopnag = n(p.nach_otnag)
         else:
             otopnag = n(p.nac_pogaz)
@@ -255,38 +257,23 @@ def compute(recs, cities, sp_by_ln, kod_predopl=0):
                                         + poteri_ob - n(p.nacs_priso)))
         else:
             put(p, "nach_otopl", round2(n(p.nach_otsub) + otopnag + n(p.gkl_perer) + poteri_ob))
-        if kod_predopl == 1:
-            if p.id_kategor == 1 and p.accept != 3:
-                put(p, "predopl", n(p.nach_otopl) - n(p.gkl_perer))
-            else:
-                put(p, "predopl", 0)
-            put(p, "nac_vsego", 0)
-            put(p, "nach_otopl", 0)
-        else:
-            put(p, "nac_vsego", n(p.nach_gvs) + n(p.nach_otopl) - n(p.predopl))
+        put(p, "nac_vsego", n(p.nach_gvs) + n(p.nach_otopl))
 
     # 9. Объекты одного договора (otnos_dog): к оплате собирается на абоненте.
     for p in recs:
         if not (p.id_katabon == 1 and n(p.otnos_dog) > 0):
             continue
         nom2, gorod = n(p.otnos_dog), p.cod_gor_id
-        nac_ob = pred_obch = ZERO
+        nac_ob = ZERO
         for r in recs:
             if n(r.otnos_dog) == nom2 and r.id_katabon == 1 and r.cod_gor_id == gorod:
-                if kod_predopl == 1:
-                    pred_obch += n(r.predopl)
-                    put(r, "predopl", 0)
-                else:
-                    nac_ob += n(r.nac_vsego)
-                    put(r, "nac_vsego", 0)
+                nac_ob += n(r.nac_vsego)
+                put(r, "nac_vsego", 0)
         for r in recs:
             if n(r.otnos_dog) == nom2 and r.id_katabon == 3 and r.cod_gor_id == gorod:
                 nac_ob += n(r.nac_vsego)
                 put(r, "nac_vsego", 0)
-        if kod_predopl == 1:
-            put(p, "predopl", pred_obch + n(p.predopl))
-        else:
-            put(p, "nac_vsego", nac_ob + n(p.nac_vsego))
+        put(p, "nac_vsego", nac_ob + n(p.nac_vsego))
 
     # 10. Лимиты.
     limits = []
@@ -303,7 +290,7 @@ def compute(recs, cities, sp_by_ln, kod_predopl=0):
     for code, city in sorted(cities.items()):
         in_city = [r for r in recs if r.cod_gor_id == code]
         row = {"city": city, "count": len(in_city), **totals[code]}
-        for name in ("nac_pogaz", "nach_otopl", "nac_vsego", "predopl", "poter_pr", "poter_nag"):
+        for name in ("nac_pogaz", "nach_otopl", "nac_vsego", "poter_pr", "poter_nag"):
             row[name] = sum((n(getattr(r, name)) for r in in_city), ZERO)
         result.cities.append(row)
     return result, pt, st

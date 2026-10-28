@@ -253,6 +253,9 @@ class RaschetTests(TestCase):
                                        tip_rasot=1, pok_new=10, koef_pok=1, q_otop=Decimal("0.3"), **common)
         self.s = Potreb.objects.create(potreb_id=5, nom_dog=51, nom_dogab=50, nom_pribor=1, cod_gor=self.dub,
                                        tip_rasot=1, q_otop=Decimal("0.1"), **common)
+        # Договор расторгнут: дней отопления 0, по нагрузке ничего не начисляется.
+        self.x = Potreb.objects.create(potreb_id=6, nom_dog=6, cod_gor=self.ryb, tip_rasot=3, d_stat=63,
+                                       q_otoppr=Decimal("0.1"), **common)
 
     def login(self, role):
         user = get_user_model().objects.create_user(role, password="x")
@@ -278,9 +281,11 @@ class RaschetTests(TestCase):
         self.assertEqual((h.nach_otopl, s.nach_otopl), (Decimal("7.500"), Decimal("2.500")))
         # 10 + 17 × 2 ≥ 40, но 10 + 17 ≤ 40.
         self.assertEqual(list(Limit.objects.values_list("potreb_id", "koment")), [(1, "Лимит заканчивается")])
-        self.assertEqual(SpTeplpoteri.objects.count(), 5)  # записи потерь создаются, как в старой программе
+        x = Potreb.objects.get(pk=self.x.pk)
+        self.assertEqual((x.dnotop, x.nach_otnag, x.nac_vsego), (Decimal("0.0"), Decimal("0.000"), Decimal("0.000")))
+        self.assertEqual(SpTeplpoteri.objects.count(), 6)  # записи потерь создаются, как в старой программе
         page = self.client.get("/abonents/raschet/itog/")
-        self.assertContains(page, "рассчитано абонентов 5")
+        self.assertContains(page, "рассчитано абонентов 6")
         self.assertContains(page, "Лимит заканчивается")
 
     def test_viewer_cannot_run(self):
@@ -296,5 +301,7 @@ class RaschetTests(TestCase):
         self.assertRedirects(response, "/abonents/raschet/dannye/")
         d = Danrasch.objects.get(cod_gorod=1)
         self.assertEqual(d.tkoef, Decimal("0.400"))  # (18 − 4) / (18 + 17)
-        self.assertEqual(set(Potreb.objects.filter(cod_gor=1).values_list("dnotop", flat=True)), {Decimal("31.0")})
+        self.assertEqual(set(Potreb.objects.filter(cod_gor=1, d_stat=None).values_list("dnotop", flat=True)),
+                         {Decimal("31.0")})
+        self.assertEqual(Potreb.objects.get(potreb_id=6).dnotop, Decimal("0.0"))
         self.assertEqual(set(Potreb.objects.filter(cod_gor=2).values_list("dnotop", flat=True)), {Decimal("30.0")})
