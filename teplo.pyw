@@ -1,7 +1,7 @@
 """Запуск «Теплоснабжения» как обычной программы.
 
 Двойной щелчок по ярлыку «Теплоснабжение» запускает сервер без окна консоли и
-открывает приложение в отдельном окне Microsoft Edge (или Google Chrome) без
+открывает приложение в отдельном окне Microsoft Edge (или Chrome, Яндекс Браузера) без
 адресной строки и вкладок. Когда окно приложения закрыто, сервер
 останавливается. Если сервер уже работает (например, через run.bat), просто
 открывается окно.
@@ -77,6 +77,7 @@ def find_browser():
     places = [
         r"Microsoft\Edge\Application\msedge.exe",
         r"Google\Chrome\Application\chrome.exe",
+        r"Yandex\YandexBrowser\Application\browser.exe",
     ]
     for root in filter(None, roots):
         for place in places:

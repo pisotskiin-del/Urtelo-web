@@ -1,14 +1,39 @@
-{% extends "base.html" %}{% load ui %}
-{% block title %}Вход{% endblock %}
-{% block content %}
-<div class="card narrow">
-  <h1>Вход</h1>
-  {% if form.errors %}<p class="error">Неверное имя пользователя или пароль.</p>{% endif %}
-  <form method="post">{% csrf_token %}
-    <label>Пользователь<input name="username" autofocus required value="{{ form.username.value|default:'' }}"></label>
+{% load static ui %}<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Система расчётов с юридическими потребителями</title>
+  <link rel="icon" href="{% static 'img/teplo.svg' %}" type="image/svg+xml">
+  <link rel="icon" href="{% static 'img/teplo.ico' %}" sizes="any">
+  <link rel="manifest" href="{% static 'manifest.webmanifest' %}">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  {# Заставка показывается 3 секунды при запуске; после ошибки входа или выхода — сразу форма. #}
+  <script>
+    try { if (sessionStorage.getItem("splash-shown")) document.documentElement.classList.add("no-splash"); sessionStorage.setItem("splash-shown", "1"); } catch (e) {}
+  </script>
+</head>
+<body class="splash{% if form.errors %} no-splash{% endif %}">
+{% include "_icons.html" %}
+<main class="splash-box">
+  <img class="splash-logo" src="{% static logo %}" alt="Логотип">
+  <h1 class="splash-title">Система расчётов с юридическими потребителями</h1>
+  <form method="post" class="splash-form card">{% csrf_token %}
+    {% if form.errors %}<p class="error">Неверное имя пользователя или пароль.</p>{% endif %}
+    <label>Пользователь<input name="username" required value="{{ form.username.value|default:'' }}"></label>
     <label>Пароль<input type="password" name="password" required></label>
     <input type="hidden" name="next" value="{{ next }}">
     <button class="primary">{% icon "logout" %} Войти</button>
   </form>
-</div>
-{% endblock %}
+</main>
+<script>
+  // Курсор в поле ввода, как только форма появилась.
+  (function () {
+    var form = document.querySelector(".splash-form");
+    function focus() { var u = form.elements.username; (u.value ? form.elements.password : u).focus(); }
+    if (document.documentElement.classList.contains("no-splash") || document.body.classList.contains("no-splash")) focus();
+    else form.addEventListener("animationend", focus);
+  })();
+</script>
+</body>
+</html>

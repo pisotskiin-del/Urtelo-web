@@ -114,7 +114,7 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "catalogs:index"
+LOGIN_REDIRECT_URL = "abonents:index"
 LOGOUT_REDIRECT_URL = "login"
 
 # Каталог с таблицами DBF старой программы и их кодировка по умолчанию.
