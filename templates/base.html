@@ -32,10 +32,11 @@
 {% if user.is_authenticated %}
 {% with app=request.resolver_match.app_name url=request.resolver_match.url_name %}
 <nav class="sidebar">
-  {% if perms.catalogs.view_potreb %}<a href="{% url 'abonents:index' %}" title="Абоненты" {% if app == "abonents" and url != "raschet" and url != "raschet_itog" and url != "dan_rasch" and url != "nov_mes" %}class="active"{% endif %}>{% icon "users" %}<span class="t">Абоненты</span></a>
+  {% if perms.catalogs.view_potreb %}<a href="{% url 'abonents:index' %}" title="Абоненты" {% if app == "abonents" and url != "raschet" and url != "raschet_itog" and url != "dan_rasch" and url != "nov_mes" and url != "otchety" and url != "otchet" %}class="active"{% endif %}>{% icon "users" %}<span class="t">Абоненты</span></a>
   <a href="{% url 'abonents:raschet' %}" title="Расчет" {% if url == "raschet" or url == "raschet_itog" %}class="active"{% endif %}>{% icon "calc" %}<span class="t">Расчет</span></a>
   <a href="{% url 'abonents:dan_rasch' %}" title="Исходные данные для расчета" {% if url == "dan_rasch" %}class="active"{% endif %}>{% icon "sliders" %}<span class="t">Исходные данные</span></a>
-  <a href="{% url 'abonents:nov_mes' %}" title="Переход на новый месяц" {% if url == "nov_mes" %}class="active"{% endif %}>{% icon "calendar" %}<span class="t">Новый месяц</span></a>{% endif %}
+  <a href="{% url 'abonents:nov_mes' %}" title="Переход на новый месяц" {% if url == "nov_mes" %}class="active"{% endif %}>{% icon "calendar" %}<span class="t">Новый месяц</span></a>
+  <a href="{% url 'abonents:otchety' %}" title="Отчеты и печать" {% if url == "otchety" or url == "otchet" %}class="active"{% endif %}>{% icon "file" %}<span class="t">Отчеты</span></a>{% endif %}
   <a href="{% url 'catalogs:index' %}" title="Справочники" {% if app == "catalogs" %}class="active"{% endif %}>{% icon "book" %}<span class="t">Справочники</span></a>
   {% if user.is_staff %}<a href="{% url 'admin:index' %}" title="Администрирование">{% icon "settings" %}<span class="t">Администрирование</span></a>{% endif %}
   <span class="sp"></span>

@@ -1,0 +1,49 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{{ rdef.title }}{% endblock %}
+{% block content %}
+<div class="no-print">
+<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a><span class="sep">›</span><a href="{% url 'abonents:otchety' %}">Отчеты</a><span class="sep">›</span>{{ rdef.title }}</p>
+<div class="page-head"><h1>{{ rdef.title }}</h1>
+  <div class="actions">
+    <button type="button" onclick="window.print()">{% icon "file" %} Печать</button>
+    <a class="button" href="?{{ xlsx_query }}">{% icon "chart" %} Excel</a>
+  </div>
+</div>
+<form method="get" class="toolbar rep-params">
+  {% if rdef.per_city %}<nav class="tabs">{% for c in cities %}<a href="?gorod={{ c.cod_gorod }}{% for name, value in opts.items %}&amp;{{ name }}={{ value }}{% endfor %}" {% if c.cod_gorod == city %}class="active"{% endif %}>{{ c.name_gorod }}</a>{% endfor %}</nav>{% endif %}
+  {% for name, label, choices in options %}
+  <label>{{ label }}
+    <select name="{{ name }}" onchange="this.form.submit()">
+      {% for value, title in choices %}<option value="{{ value }}"{% for n, v in opts.items %}{% if n == name and v == value %} selected{% endif %}{% endfor %}>{{ title }}</option>{% endfor %}
+    </select></label>
+  {% endfor %}
+</form>
+</div>
+
+<article class="card report{% if report.landscape %} landscape{% endif %}">
+  <header class="rep-head">
+    <h2>{{ report.title }}</h2>
+    {% for line in report.lines %}<p>{{ line }}</p>{% endfor %}
+  </header>
+  {% for t in report.tables %}
+  {% if t.title %}<h3>{{ t.title }}</h3>{% endif %}
+  <div class="scroll"><table class="grid rep">
+    <thead>
+      {% if t.groups %}<tr>{% for g, span in t.groups %}<th colspan="{{ span }}" class="grp">{{ g }}</th>{% endfor %}</tr>{% endif %}
+      <tr>{% for c in t.cols %}<th{% if c.kind != "text" %} class="num"{% endif %}>{{ c.title }}</th>{% endfor %}</tr>
+    </thead>
+    <tbody>
+    {% for s in t.sections %}
+      {% if s.title %}<tr class="sec"><td colspan="{{ t.cols|length }}">{{ s.title }}</td></tr>{% endif %}
+      {% for row in s.rows %}<tr>{% for v, c in row|withcols:t.cols %}<td{% if c.kind != "text" %} class="num"{% else %} class="wrap"{% endif %}>{% rcell v c %}</td>{% endfor %}</tr>
+      {% empty %}<tr><td colspan="{{ t.cols|length }}" class="muted">Нет записей</td></tr>{% endfor %}
+      {% if s.foot %}<tr class="foot">{% for v, c in s.foot|withcols:t.cols %}<td{% if c.kind != "text" %} class="num"{% endif %}>{% rcell v c %}</td>{% endfor %}</tr>{% endif %}
+    {% endfor %}
+    </tbody>
+    {% if t.total %}<tfoot><tr class="total">{% for v, c in t.total|withcols:t.cols %}<td{% if c.kind != "text" %} class="num"{% endif %}>{% rcell v c %}</td>{% endfor %}</tr></tfoot>{% endif %}
+  </table></div>
+  {% endfor %}
+  {% for note in report.notes %}<p class="rep-note">{{ note }}</p>{% endfor %}
+  {% if report.signatures %}<div class="rep-sign">{% for s in report.signatures %}<p>{{ s }}</p>{% endfor %}</div>{% endif %}
+</article>
+{% endblock %}

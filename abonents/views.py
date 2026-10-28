@@ -12,7 +12,7 @@ from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import Count, ProtectedError, Q, Sum, Value
 from django.db.models.functions import Replace
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import formats, timezone
@@ -22,7 +22,7 @@ from django.db import transaction
 from catalogs.models import Akcept, Bank, Danrasch, GvsKot, Kategorpot, Limit, Potreb, SpTeplosch, SpTeplpoteri
 from teplo.sqlite_unicode import UnicodeLower
 
-from . import layout, nov_mes, poteri, raschet
+from . import layout, nov_mes, poteri, raschet, reports
 from .forms import DanRaschForm, NovAbonentForm, PoteriForm, TeploschForm, karta_form
 
 view_required = permission_required("catalogs.view_potreb", raise_exception=True)
@@ -569,3 +569,42 @@ def abot_1c(request, pk):
     response["Content-Disposition"] = f'attachment; filename="{nov_mes.abot_filename(arh.nom_mes, arh.god)}"'
     nov_mes.write_abot(arh, response)
     return response
+
+
+@login_required
+@view_required
+def otchety(request):
+    """Список отчетов: форма «Отчеты» и меню «Печать» старой программы."""
+    groups = {}
+    for r in reports.REPORTS:
+        groups.setdefault(r.group, []).append(r)
+    return render(request, "abonents/otchety.html", {"groups": groups.items()})
+
+
+@login_required
+@view_required
+def otchet(request, key):
+    """Отчет на экране, для печати и в Excel (?xlsx=1)."""
+    rdef = reports.BY_KEY.get(key)
+    if rdef is None:
+        raise Http404
+    cities = _cities()
+    code = _current_city(request, cities)
+    city = next((c for c in cities if c.cod_gorod == code), None)
+    if city is None:
+        raise Http404
+    report, opts = reports.build(rdef, city, request.GET)
+    if request.GET.get("xlsx"):
+        import io
+        buf = io.BytesIO()
+        reports.to_xlsx(report, buf)
+        name = f"{rdef.key}_{city.cod_gorod}.xlsx" if rdef.per_city else f"{rdef.key}.xlsx"
+        response = HttpResponse(buf.getvalue(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        response["Content-Disposition"] = f'attachment; filename="{name}"'
+        return response
+    query = request.GET.copy()
+    query["xlsx"] = "1"
+    return render(request, "abonents/otchet.html", {
+        "rdef": rdef, "report": report, "opts": opts, "options": reports.options_for(rdef),
+        "cities": cities, "city": code, "xlsx_query": query.urlencode(),
+    })

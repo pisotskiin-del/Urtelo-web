@@ -459,3 +459,61 @@ class NovMesTests(KartaBase):
         self.assertEqual({(r["KODUSLUG"], r["NAME_KATEG"], r["CITY"]) for r in recs}, {(4, "Хозрасчет", 1)})
         response = self.client.post("/abonents/nov-mes/", {"action": "undo"}, follow=True)
         self.assertContains(response, "Переход отменён: снова Декабрь 2025")
+
+
+class ReportsTests(KartaBase):
+    def setUp(self):
+        super().setUp()
+        Potreb.objects.filter(potreb_id=5).update(nach_otopl=Decimal("8"), nach_gvs=Decimal("2.5"),
+                                                  q_otoppr=Decimal("0.12"), pasp_got="2026-09-01")
+        Potreb.objects.filter(potreb_id=9).update(q_otoppr=Decimal("0.3"), id_kategor=6)
+
+    def test_ot_kateg(self):
+        from abonents import reports
+        rep, _ = reports.build(reports.BY_KEY["ot_kateg"], self.ryb, {})
+        t = rep.tables[0]
+        # л/№ 7 — id_katabon 3 (присоединённый), л/№ 9 без начисления: не попадают.
+        self.assertEqual([s.title for s in t.sections], ["ХОЗРАСЧЕТ"])
+        self.assertEqual([r[1] for r in t.sections[0].rows], [5])
+        self.assertEqual(t.sections[0].rows[0][4], "С")
+        self.assertEqual(t.total[-1], Decimal("10.5"))
+        self.assertEqual(rep.signatures, reports.SIGNATURES)
+
+    def test_kotelnye_and_kategor(self):
+        from abonents import reports
+        rep, _ = reports.build(reports.BY_KEY["p_kot1"], self.ryb, {})
+        row = rep.tables[0].sections[0].rows[0]
+        self.assertEqual(row[0], "Котельная №2")
+        self.assertEqual(row[-2:], [Decimal("2.5"), Decimal("8")])   # всего ГВС, отопление
+        self.assertEqual(row[11:13], [Decimal("2.5"), Decimal("8")])  # хозрасчет
+        rep, _ = reports.build(reports.BY_KEY["p_kot2"], self.ryb, {})
+        row = rep.tables[0].sections[0].rows[0]
+        self.assertEqual(row[1], Decimal("0.3"))   # население абонентское — отдельно
+        self.assertEqual(row[3], Decimal("0.12"))
+        rep, _ = reports.build(reports.BY_KEY["potreb_kategor"], self.ryb, {})
+        ryb = rep.tables[0].sections[0].rows[0]
+        self.assertEqual((ryb[0], ryb[1], ryb[5], ryb[6]), ("г.Рыбница", Decimal("0.12"), Decimal("0.3"), Decimal("0.42")))
+        rep, _ = reports.build(reports.BY_KEY["pasp_got"], self.ryb, {})
+        self.assertEqual([r[0] for r in rep.tables[0].sections[0].rows], [5])
+        self.assertEqual(rep.tables[1].total[1:], [1, 1])
+
+    def test_pages_and_excel(self):
+        from io import BytesIO
+        from openpyxl import load_workbook
+        from abonents import reports
+        self.login("Наблюдатель")
+        r = self.client.get("/abonents/otchety/")
+        for d in reports.REPORTS:
+            self.assertContains(r, f"/abonents/otchety/{d.key}/")
+            page = self.client.get(f"/abonents/otchety/{d.key}/?gorod=1")
+            self.assertEqual(page.status_code, 200, d.key)
+        r = self.client.get("/abonents/otchety/ot_kateg/?gorod=1&kateg=1")
+        self.assertContains(r, "ОТПУСК ТЕПЛОВОЙ ЭНЕРГИИ ДЛЯ АБОНЕНТОВ")
+        self.assertContains(r, "10,500")
+        x = self.client.get("/abonents/otchety/ot_kateg/?gorod=1&xlsx=1")
+        self.assertEqual(x["Content-Disposition"], 'attachment; filename="ot_kateg_1.xlsx"')
+        ws = load_workbook(BytesIO(x.content)).active
+        values = [c for row in ws.iter_rows(values_only=True) for c in row if c is not None]
+        self.assertIn("ИТОГО:", values)
+        self.assertIn(10.5, values)
+        self.assertEqual(self.client.get("/abonents/otchety/net/").status_code, 404)

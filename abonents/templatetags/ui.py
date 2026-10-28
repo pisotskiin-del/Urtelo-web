@@ -43,3 +43,23 @@ def static_v(path):
     except OSError:
         return static(path)
     return f"{static(path)}?v={version}"
+
+
+@register.simple_tag
+def rcell(value, col):
+    """Значение ячейки отчета (abonents/reports.py) по типу колонки."""
+    from django.utils import formats
+
+    if value is None or value == "":
+        return ""
+    if col.kind == "num" and not isinstance(value, str):
+        return formats.number_format(value, col.places, use_l10n=True, force_grouping=True)
+    if col.kind == "date" and hasattr(value, "strftime"):
+        return value.strftime("%d.%m.%Y")
+    return value
+
+
+@register.filter
+def withcols(row, cols):
+    """Пары (значение, колонка) строки отчета."""
+    return list(zip(row, cols))

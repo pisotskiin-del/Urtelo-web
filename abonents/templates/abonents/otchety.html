@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Отчеты{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a><span class="sep">›</span>Отчеты</p>
+<div class="page-head"><h1>Отчеты и печать</h1></div>
+<div class="rep-groups">
+{% for group, items in groups %}
+<section class="card kgroup"><h2>{% icon "file" %} {{ group }}</h2>
+  <ul class="rep-list">
+  {% for r in items %}<li><a href="{% url 'abonents:otchet' r.key %}"><b>{{ r.title }}</b><small>{{ r.hint }}</small></a></li>{% endfor %}
+  </ul>
+</section>
+{% endfor %}
+</div>
+{% endblock %}
