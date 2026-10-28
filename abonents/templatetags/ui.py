@@ -30,3 +30,16 @@ def group_icon(title):
 @register.simple_tag
 def tab_icon(key):
     return icon(TAB_ICONS.get(key, "list"))
+
+
+@register.simple_tag
+def static_v(path):
+    """Ссылка на статический файл с меткой версии: после обновления программы
+    окно сразу берёт новое оформление, без Ctrl+F5."""
+    from django.conf import settings
+    from django.templatetags.static import static
+    try:
+        version = int((settings.BASE_DIR / "static" / path).stat().st_mtime)
+    except OSError:
+        return static(path)
+    return f"{static(path)}?v={version}"
