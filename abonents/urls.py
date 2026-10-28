@@ -14,6 +14,7 @@ urlpatterns = [
     path("<int:potreb_id>/edit/", views.karta_edit, name="edit"),
     path("<int:potreb_id>/delete/", views.karta_delete, name="delete"),
     path("<int:potreb_id>/prisoed/", views.prisoed, name="prisoed"),
+    path("<int:potreb_id>/sposob/", views.sposob, name="sposob"),
     path("<int:potreb_id>/poteri/", views.poteri_view, name="poteri"),
     path("<int:potreb_id>/teploschetchik/", views.teplosch_view, name="teplosch"),
     path("dogovor/<int:cod_gor>/<int:nom_dog>/", views.dogovor, name="dogovor"),

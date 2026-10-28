@@ -283,3 +283,10 @@ button svg.i, .button svg.i { margin:0 -1px; }
 .msg { border-radius:var(--radius-sm); }
 .add-pop > form { border-top:3px solid var(--blue-2); }
 .legend kbd { background:#fff; }
+
+/* Переключатель «Способ расчёта» на карте */
+.seg { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; }
+.seg button { text-align: left; background: #fff; border: 1px solid #b9c9dc; color: #23405f; font-weight: 500; }
+.seg button:hover { background: #eaf2fb; }
+.seg button.on { background: linear-gradient(#5b9be0, #2f6fbf); border-color: #2a62a8; color: #fff; font-weight: 600; }
+.seg button.on::before { content: "✓ "; }

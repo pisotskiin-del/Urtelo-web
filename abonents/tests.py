@@ -353,6 +353,20 @@ class PrisoedTests(KartaBase):
         c.refresh_from_db()
         self.assertEqual(c.pris_nag1, 11)
 
+    def test_sposob_switch(self):
+        self.login("Наблюдатель")
+        self.assertNotContains(self.client.get("/abonents/9/"), 'name="field" value="tip_rasot"')
+        self.assertEqual(self.client.post("/abonents/9/sposob/", {"field": "tip_rasot", "value": "3"}).status_code, 403)
+        self.login("Оператор")
+        self.assertContains(self.client.get("/abonents/9/"), 'name="field" value="tip_rasot"')
+        self.client.post("/abonents/9/sposob/", {"field": "tip_rasot", "value": "3"})
+        self.assertEqual(Potreb.objects.get(potreb_id=9).tip_rasot, 3)
+        self.client.post("/abonents/9/sposob/", {"field": "tip_rasot", "value": "7"})  # нет такого варианта
+        self.assertEqual(Potreb.objects.get(potreb_id=9).tip_rasot, 3)
+        response = self.client.post("/abonents/9/sposob/", {"field": "tip_rasgvs", "value": "1"})
+        self.assertTrue(response["Location"].endswith("?tab=gvs"))
+        self.assertEqual(Potreb.objects.get(potreb_id=9).tip_rasgvs, 1)
+
     def test_inactive_object_not_added(self):
         self.login("Оператор")
         Potreb.objects.filter(potreb_id=7).update(d_stat=61, d_stat_val="Приостановлен")

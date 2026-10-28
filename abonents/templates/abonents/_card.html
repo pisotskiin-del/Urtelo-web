@@ -16,7 +16,12 @@
 {% elif tab == "ishod" %}<p class="tabtools"><a class="button" href="{% url 'abonents:teplosch' p.potreb_id %}">{% icon "gauge" %} Информация по теплосчетчику</a></p>{% endif %}{% endif %}
 <div class="kgroups">
 {% for title, items in groups %}
-  <section class="card kgroup"><h2>{% group_icon title %} {{ title }}</h2><div class="kgrid">{% include "abonents/_fields.html" %}</div></section>
+  <section class="card kgroup"><h2>{% group_icon title %} {{ title }}</h2>
+  {% if title == "Способ расчёта" and sposob and can_change and not form %}
+    <form method="post" action="{% url 'abonents:sposob' p.potreb_id %}" class="seg">{% csrf_token %}<input type="hidden" name="field" value="{{ sposob.0 }}">
+      {% for value, label in sposob.2 %}<button name="value" value="{{ value }}"{% if value == sposob.1 %} class="on" aria-pressed="true"{% endif %}>{{ label|capfirst }}</button>{% endfor %}
+    </form>
+  {% else %}<div class="kgrid">{% include "abonents/_fields.html" %}</div>{% endif %}</section>
 {% endfor %}
 {% if prisoed and not form %}
   <section class="card kgroup"><h2>{% icon "link" %} Присоединённые объекты</h2>

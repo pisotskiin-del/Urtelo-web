@@ -182,6 +182,18 @@ def _prisoed(p):
     return [(label, name, value, objects.get(value)) for label, name, value in found]
 
 
+SPOSOB = ("tip_rasot", "tip_rasgvs")  # переключатели «Способ расчёта» на вкладках
+
+
+def _sposob(p, groups):
+    """Переключатель способа расчёта на карте: (поле, текущее значение, варианты) или None."""
+    for _, fields in groups:
+        for f in fields:
+            if f.name in SPOSOB:
+                return f.name, getattr(p, f.name), layout.CHOICES[f.name]
+    return None
+
+
 def _card_context(request, p, tab_key, form=None):
     related = related_values(p)
     lookups = _lookups()
@@ -196,6 +208,7 @@ def _card_context(request, p, tab_key, form=None):
         "nav": _neighbours(p),
         "prisoed": _prisoed(p) if tab_key == "otop" else [],
         "prisoed_kinds": [(k, label) for k, (label, _) in layout.PRISOED.items()],
+        "sposob": _sposob(p, groups),
         "can_change": request.user.has_perm("catalogs.change_potreb"),
         "can_delete": request.user.has_perm("catalogs.delete_potreb"),
     }
@@ -458,3 +471,20 @@ def prisoed(request, potreb_id):
             p.save(update_fields=[free])
             messages.success(request, f"{label}: л/№ {obj.potreb_id} {obj.name_potre or ''}".strip())
     return back
+
+
+@login_required
+@permission_required("catalogs.change_potreb", raise_exception=True)
+def sposob(request, potreb_id):
+    """Сменить способ расчёта прямо с карты (кнопки «по прибору» / «по нагрузке»)."""
+    p = get_object_or_404(Potreb, potreb_id=potreb_id)
+    name = request.POST.get("field")
+    tab = "gvs" if name == "tip_rasgvs" else "otop"
+    if request.method == "POST" and name in SPOSOB:
+        choices = dict(layout.CHOICES[name])
+        value = _int(request.POST.get("value"))
+        if value in choices and value != getattr(p, name):
+            setattr(p, name, value)
+            p.save(update_fields=[name])
+            messages.success(request, f"Способ расчёта: {choices[value]}. Начисления пересчитаются при следующем расчёте.")
+    return redirect(reverse("abonents:karta", args=[p.potreb_id]) + f"?tab={tab}")
