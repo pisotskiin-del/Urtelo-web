@@ -352,3 +352,11 @@ class PrisoedTests(KartaBase):
         self.client.post("/abonents/9/prisoed/", {"kind": "nagruzka", "ls": "11"})
         c.refresh_from_db()
         self.assertEqual(c.pris_nag1, 11)
+
+    def test_inactive_object_not_added(self):
+        self.login("Оператор")
+        Potreb.objects.filter(potreb_id=7).update(d_stat=61, d_stat_val="Приостановлен")
+        response = self.client.post("/abonents/9/prisoed/", {"kind": "pribor", "ls": "7"}, follow=True)
+        self.assertContains(response, "только действующий")
+        c = Potreb.objects.get(potreb_id=9)
+        self.assertFalse(c.posle_prib)

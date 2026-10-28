@@ -444,6 +444,9 @@ def prisoed(request, potreb_id):
         messages.error(request, f"Абонент с лицевым № {request.POST.get('ls', '').strip()} не найден")
     elif obj.potreb_id == p.potreb_id:
         messages.error(request, "Нельзя присоединить абонента к самому себе")
+    elif obj.d_stat in layout.OTKLUCHEN:
+        status = (obj.d_stat_val or dict(layout.D_STAT).get(obj.d_stat, "")).strip().lower()
+        messages.error(request, f"Л/№ {obj.potreb_id} {status}: присоединить можно только действующий лицевой счет")
     elif any(getattr(p, name) == obj.potreb_id for name in names):
         messages.warning(request, f"Л/№ {obj.potreb_id} уже присоединён")
     else:
