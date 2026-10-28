@@ -14,7 +14,9 @@
 Предоплата не используется (решение 28.10.2026), её ветка в baza_buh пропущена.
 """
 
+import datetime
 from dataclasses import dataclass
+from pathlib import Path
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.db import transaction
@@ -34,8 +36,19 @@ ZERO = ["nach_otsub", "nach_otopl", "nacs_priso", "nach_gvs", "nac_vsego", "nach
 # Все поля potreb, которые меняет переход (их же возвращает отмена).
 CHANGED = ZERO + ["nach_finan", "nach_otopi", "ost_limit", "vd_limit", "pok_old"]
 
-# Код услуги 1С и номер тарифа по категории потребителя (baza_buh, одинаково для всех городов).
-USLUGA = {1: (7, 1), 2: (1, 2), 3: (2, 2), 4: (3, 3), 5: (5, 3), 6: (4, 3), 7: (10, None)}
+# Выгрузка в 1С по категории потребителя: (код услуги, код услуги 1, № тарифа, название
+# категории). Исходник baza_buh.prg на диске старше программы (urteplo.exe 2026 г.),
+# поэтому коды сняты с последних 3000 записей dbf\abot.dbf, которые программа писала сама.
+USLUGA = {
+    1: (4, 4, 1, "Хозрасчет"),
+    2: (8, 5, 2, "Местный бюджет"),
+    3: (8, 6, 2, "Республиканский бюджет"),
+    4: (10, 10, 3, "Население бюджет"),
+    5: (5, 9, 3, "Население хозрасчет"),
+    6: (5, 8, 3, "Население Абонентское"),
+    7: (33, 14, 10, "Организация СКиОД"),
+}
+KODABON_BASE = 200000  # KODABON = 200000 + код абонента (cod_ac)
 
 
 def next_month(mes, god):
@@ -85,17 +98,25 @@ def run(user=""):
 
     # 2. abot для 1С.
     tarifs = {t.id_tar: t.zn_tar or 0 for t in Tarif.objects.all()}
+    cities = {d.cod_gorod: d.name_gorod for d in Danrasch.objects.all()}
     abot = []
     for p in potrebs:
         if not (p.nac_vsego or 0) > 0:
             continue
-        usl, tar = USLUGA.get(p.id_kategor, (None, None))
+        usl, usl1, tar, kateg = USLUGA.get(p.id_kategor, (None, None, None, ""))
         acc = p.accept or 0
-        abot.append(Abot(ras_chet=p.ras_chet, fisk_cod=p.fisk_cod, perc_peni=p.perc_peni, city=p.cod_gor_id,
-                         kod=p.cod_buhg, kodabon=p.cod_ac, name=p.name_potre, tarif=tarifs.get(tar, 0),
-                         tarifue=0, ras_kol=p.nac_vsego, koduslug=usl, akcept=acc - 1 if acc else 0))
+        abot.append(Abot(
+            kod=p.cod_buhg, kodabon=KODABON_BASE + (p.cod_ac or 0), name=p.name_potre, akcept=acc - 1 if acc else 0,
+            tarif=tarifs.get(tar, 0), ras_kol=_q(Abot, "ras_kol", p.nac_vsego), koduslug=usl, nameuslug="",
+            tarifue=0, city=p.cod_gor_id, ras_chet=p.ras_chet, fisk_cod=p.fisk_cod, perc_peni=p.perc_peni or 0,
+            koduslug1=usl1, name_city=cities.get(p.cod_gor_id, ""), name_kateg=kateg,
+            n_dog=str(p.nom_dog or "").rjust(10), dat_dog=p.data_dog))
     Abot.objects.all().delete()
     Abot.objects.bulk_create(abot)
+    tables = arh.tables()
+    tables["abot_1c"] = _rows(Abot)
+    arh.set_tables(tables)
+    arh.save(update_fields=["data"])
 
     # 3. Журнал закрытых месяцев.
     Arhiv.objects.create(data_arh=timezone.localdate(), god=god, nom_mes=mes)
@@ -153,3 +174,36 @@ def undo():
     Arhiv.objects.filter(nom_mes=arh.nom_mes, god=arh.god).order_by("-pk").first().delete()
     arh.delete()
     return arh
+
+
+def abot_filename(mes, god):
+    """Имя файла как в старой программе: Abot<ГГ><ММ>.dbf за закрытый месяц."""
+    return f"Abot{god % 100:02d}{mes:02d}.dbf"
+
+
+def abot_rows(arh):
+    """Строки выгрузки в 1С закрытого месяца (из архива) с именами полей DBF."""
+    return [{k.upper(): v for k, v in row.items()} for row in arh.tables().get("abot_1c", [])]
+
+
+def write_abot(arh, target):
+    """Записать файл выгрузки в 1С: target — путь или открытый файл."""
+    from .dbf_out import ABOT_FIELDS, write
+    rows = abot_rows(arh)
+    for row in rows:
+        if isinstance(row.get("DAT_DOG"), str):
+            row["DAT_DOG"] = datetime.date.fromisoformat(row["DAT_DOG"])
+    write(target, ABOT_FIELDS, rows)
+    return len(rows)
+
+
+def export_1c(arh):
+    """Положить файл в папку для 1С, если она задана (TEPLO_1C_DIR, в старой
+    программе \\SERVER-B\Abon_teplo1C). Возвращает путь или None."""
+    from django.conf import settings
+    folder = getattr(settings, "TEPLO_1C_DIR", "")
+    if not folder:
+        return None
+    path = Path(folder) / abot_filename(arh.nom_mes, arh.god)
+    write_abot(arh, path)
+    return path

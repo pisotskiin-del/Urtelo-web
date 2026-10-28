@@ -20,7 +20,7 @@
 <section class="card kgroup"><h2>{% icon "list" %} Что произойдёт</h2>
   <ul class="nm-list">
     <li>Месяц {{ mes }} {{ god }} сохранится в архиве: карты абонентов и исходные данные по городам.</li>
-    <li>Для 1С подготовится таблица начислений (abot): абоненты с начислением больше нуля.</li>
+    <li>Для 1С подготовится файл начислений Abot (абоненты с начислением больше нуля){% if dir_1c %} и запишется в папку {{ dir_1c }}{% else %}; его можно скачать в «Закрытых месяцах»{% endif %}.</li>
     <li>«Выставлено с начала финанс. года» и «с начала отопит. сезона» увеличатся на начисленное за месяц, пересчитается остаток лимита.{% if year_reset %} <b>Январь: накопления за год и лимиты сначала обнулятся.</b>{% endif %}{% if season_reset %} <b>Октябрь: накопление за отопительный сезон сначала обнулится.</b>{% endif %}</li>
     <li>Начисления, тепловые потери и дни отопления/ГВС обнулятся; «Показания предыдущие» станут равны «Показаниям настоящим».</li>
     <li>Во всех городах установится месяц {{ next }}; нагрузка котельных обнулится.</li>
@@ -66,9 +66,10 @@
 <section class="card kgroup" style="margin-top:14px"><h2>{% icon "book" %} Закрытые месяцы</h2>
   {% if arhiv %}
   <div class="scroll" style="border:0;box-shadow:none"><table class="grid">
-    <thead><tr><th>Месяц</th><th>Закрыт</th><th>Кто</th><th class="num">Абонентов</th><th class="num">Начислено всего, Гкал</th><th></th></tr></thead>
+    <thead><tr><th>Месяц</th><th>Закрыт</th><th>Кто</th><th class="num">Абонентов</th><th class="num">Начислено всего, Гкал</th><th>Выгрузка в 1С</th><th></th></tr></thead>
     <tbody>{% for a in arhiv %}<tr><td>{{ a.nom_mes|stringformat:"02d" }}.{{ a.god }}</td><td>{{ a.created|date:"d.m.Y H:i" }}</td><td>{{ a.user }}</td>
       <td class="num">{{ a.potreb_count }}</td><td class="num">{{ a.nac_vsego|floatformat:3 }}</td>
+      <td><a href="{% url 'abonents:abot_1c' a.pk %}">{% icon "save" %} Abot{{ a.god|stringformat:"d"|slice:"2:" }}{{ a.nom_mes|stringformat:"02d" }}.dbf</a></td>
       <td>{% if can_run and a.pk == last.pk %}<form method="post" class="inline">{% csrf_token %}<button name="action" value="undo" class="link-btn" onclick="return confirm('Отменить переход и вернуть месяц {{ a.nom_mes|stringformat:"02d" }}.{{ a.god }}? Изменения, сделанные после перехода, в начислениях и показаниях будут потеряны.')">{% icon "back" %} Отменить переход</button></form>{% endif %}</td></tr>{% endfor %}</tbody>
   </table></div>
   {% else %}<p class="muted" style="padding:12px 16px">В новой программе месяцы ещё не закрывались.</p>{% endif %}

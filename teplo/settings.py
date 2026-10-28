@@ -123,3 +123,8 @@ DBF_SOURCE_DIR = env("DBF_SOURCE_DIR", r"D:\teplo_dog\dbf")
 DBF_ENCODING = env("DBF_ENCODING", "")
 
 CATALOG_PAGE_SIZE = 50
+
+# Папка, куда при переходе на новый месяц кладётся файл Abot<ГГ><ММ>.dbf для 1С
+# (в старой программе \\SERVER-B\Abon_teplo1C). Пусто — файл только скачивается
+# со страницы «Новый месяц».
+TEPLO_1C_DIR = os.environ.get("TEPLO_1C_DIR", "")

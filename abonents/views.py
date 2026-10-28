@@ -12,6 +12,7 @@ from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import Count, ProtectedError, Q, Sum, Value
 from django.db.models.functions import Replace
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import formats, timezone
@@ -538,6 +539,13 @@ def nov_mes_view(request):
             r = nov_mes.run(request.user.get_full_name() or request.user.username)
             messages.success(request, f"Выполнен переход к новому месяцу: {nov_mes.MONTHS[r.opened[0] - 1]} {r.opened[1]}. "
                                       f"Месяц {nov_mes.MONTHS[r.closed[0] - 1]} {r.closed[1]} сохранён в архиве.")
+            try:
+                path = nov_mes.export_1c(nov_mes.last())
+            except OSError as e:
+                messages.error(request, f"Файл для 1С не записан в папку: {e}. Скачайте его в «Закрытых месяцах».")
+            else:
+                if path:
+                    messages.success(request, f"Файл для 1С: {path} (записей {r.abot})")
         return redirect("abonents:nov_mes")
     mes, god = nov_mes.current()
     nxt = nov_mes.next_month(mes, god) if mes else None
@@ -548,5 +556,16 @@ def nov_mes_view(request):
     return render(request, "abonents/nov_mes.html", {
         "mes": mes and nov_mes.MONTHS[mes - 1], "god": god, "next": nxt and f"{nov_mes.MONTHS[nxt[0] - 1]} {nxt[1]}",
         "rows": rows, "can_run": can_run, "arhiv": nov_mes.MesArhiv.objects.defer("data")[:24],
-        "last": nov_mes.last(), "year_reset": nxt and nxt[0] == 1, "season_reset": nxt and nxt[0] == 10,
+        "last": nov_mes.last(), "dir_1c": settings.TEPLO_1C_DIR, "year_reset": nxt and nxt[0] == 1, "season_reset": nxt and nxt[0] == 10,
     })
+
+
+@login_required
+@permission_required("catalogs.view_potreb", raise_exception=True)
+def abot_1c(request, pk):
+    """Скачать выгрузку в 1С закрытого месяца: Abot<ГГ><ММ>.dbf, как в старой программе."""
+    arh = get_object_or_404(nov_mes.MesArhiv, pk=pk)
+    response = HttpResponse(content_type="application/x-dbf")
+    response["Content-Disposition"] = f'attachment; filename="{nov_mes.abot_filename(arh.nom_mes, arh.god)}"'
+    nov_mes.write_abot(arh, response)
+    return response

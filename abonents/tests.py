@@ -377,6 +377,12 @@ class PrisoedTests(KartaBase):
 
 
 class NovMesTests(KartaBase):
+    def tmp_path(self, name):
+        import tempfile
+        d = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, d)
+        return f"{d}/{name}"
+
     def setUp(self):
         super().setUp()
         from catalogs.models import Abot, Arhiv, Tarif
@@ -402,9 +408,10 @@ class NovMesTests(KartaBase):
         self.assertEqual((a.nac_vsego, a.dnotop, a.gkl_perer, a.tkf_perer), (0, 0, 0, 0))
         self.assertEqual(a.pok_old, Decimal("12.500"))
         self.assertEqual(GvsKot.objects.get().nagr_kot, 0)
-        abot = self.Abot.objects.order_by("kodabon")
-        self.assertEqual([(x.ras_kol, x.koduslug, x.tarif, x.akcept) for x in abot],
-                         [(Decimal("10.50"), 7, Decimal("412.50"), 2), (Decimal("2.00"), 7, Decimal("412.50"), 2)])
+        abot = self.Abot.objects.order_by("ras_kol")
+        self.assertEqual([(x.ras_kol, x.koduslug, x.koduslug1, x.tarif, x.akcept, x.name_kateg, x.name_city) for x in abot],
+                         [(Decimal("2.00"), 4, 4, Decimal("412.50"), 2, "Хозрасчет", "Рыбница"),
+                          (Decimal("10.50"), 4, 4, Decimal("412.50"), 2, "Хозрасчет", "Рыбница")])
         self.assertEqual(list(self.Arhiv.objects.values_list("nom_mes", "god")), [(12, 2025)])
 
         nov_mes.undo()
@@ -439,5 +446,16 @@ class NovMesTests(KartaBase):
         response = self.client.post("/abonents/nov-mes/", {"ready": "1"}, follow=True)
         self.assertContains(response, "Выполнен переход к новому месяцу: Январь 2026")
         self.assertContains(response, "Отменить переход")
+        from abonents import nov_mes
+        import io
+        from dbfread import DBF
+        arh = nov_mes.last()
+        dl = self.client.get(f"/abonents/nov-mes/{arh.pk}/1c/")
+        self.assertIn('filename="Abot2512.dbf"', dl["Content-Disposition"])
+        path = self.tmp_path("Abot2512.dbf")
+        open(path, "wb").write(dl.content)
+        recs = list(DBF(path, encoding="cp1251"))
+        self.assertEqual(sorted(r["RAS_KOL"] for r in recs), [2.0, 10.5])
+        self.assertEqual({(r["KODUSLUG"], r["NAME_KATEG"], r["CITY"]) for r in recs}, {(4, "Хозрасчет", 1)})
         response = self.client.post("/abonents/nov-mes/", {"action": "undo"}, follow=True)
         self.assertContains(response, "Переход отменён: снова Декабрь 2025")
