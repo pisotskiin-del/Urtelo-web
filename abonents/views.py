@@ -176,6 +176,7 @@ def _card_context(request, p, tab_key, form=None):
     _, title, groups = layout.tab(tab_key)
     return {
         "p": p,
+        "otkluchen": p.d_stat in layout.OTKLUCHEN,
         "header": _items(p, layout.HEADER, related, form, lookups),
         "groups": [(g, _items(p, fields, related, form, lookups)) for g, fields in groups],
         "tabs": [(k, t) for k, t, _ in layout.TABS], "tab": tab_key, "tab_title": title,

@@ -98,6 +98,9 @@ class KartaForm(DbfFormMixin, forms.ModelForm):
 
     def save(self, commit=True):
         obj = super().save(commit=False)
+        if "d_stat" in self.changed_data:
+            # Расшифровка статуса хранится рядом с кодом, как в старой программе.
+            obj.d_stat_val = dict(layout.D_STAT).get(obj.d_stat, "")
         if "id_koteln" in self.changed_data:
             # Как форма nov_abonent: название котельной хранится и в самой записи.
             kotel = GvsKot.objects.filter(id_kot=obj.id_koteln).first()

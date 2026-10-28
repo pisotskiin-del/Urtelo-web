@@ -305,3 +305,20 @@ class RaschetTests(TestCase):
                          {Decimal("31.0")})
         self.assertEqual(Potreb.objects.get(potreb_id=6).dnotop, Decimal("0.0"))
         self.assertEqual(set(Potreb.objects.filter(cod_gor=2).values_list("dnotop", flat=True)), {Decimal("30.0")})
+
+
+class StatusTests(KartaBase):
+    def test_status_change_and_gray_rows(self):
+        self.login("Оператор")
+        html = self.client.get("/abonents/9/edit/?tab=ishod").content.decode()
+        self.assertIn('name="d_stat"', html)
+        data = {name: value for name, value in re.findall(
+            r'<(?:input|select|textarea)[^>]*name="([a-z_0-9]+)"[^>]*?(?:value="([^"]*)")?', html)}
+        data.update({"tab": "ishod", "d_stat": "63", "accept": "3", "nom_dog": "8"})
+        data.pop("csrfmiddlewaretoken", None)
+        self.client.post("/abonents/9/edit/?tab=ishod", data)
+        p = Potreb.objects.get(potreb_id=9)
+        self.assertEqual((p.d_stat, p.d_stat_val), (63, "Расторгнут"))
+        self.assertContains(self.client.get("/abonents/9/"), "Лицевой счет: Расторгнут")
+        listing = self.client.get("/abonents/?gorod=1").content.decode()
+        self.assertEqual(listing.count('class="clickable otkl"'), 1)

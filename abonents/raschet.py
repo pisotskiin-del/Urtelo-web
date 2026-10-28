@@ -19,12 +19,12 @@ from django.db import transaction
 
 from catalogs.models import Danrasch, Limit, Potreb, SpTeplpoteri
 
+from .layout import OTKLUCHEN
 from .poteri import SECTIONS, section_loss
 
 ZERO = Decimal(0)
 POSLE = ["posle_prib", "posle_pri1", "posle_pri2", "posle_pri3", "posle_pri4"]
 PRIS_NAG = [f"pris_nag{i}" for i in range(1, 9)]
-OTKLUCHEN = (61, 63)  # potreb.d_stat: договор приостановлен, расторгнут
 
 
 def n(value):

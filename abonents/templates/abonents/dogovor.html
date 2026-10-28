@@ -8,7 +8,7 @@
   <thead><tr><th>№-лиц</th><th>Наименование потребителя</th><th>к оплате</th><th>отоп. пр.</th><th>отоп. наг.</th><th>нач. ГВС</th><th>потери пр.</th><th>потери наг.</th><th>катег. абон.</th><th>адрес объекта</th></tr></thead>
   <tbody>
   {% for p, values, katabon, address in rows %}
-    <tr class="clickable{% if p.potreb_id == current %} current{% endif %}" onclick="location.href='{% url 'abonents:karta' p.potreb_id %}'">
+    <tr class="clickable{% if p.potreb_id == current %} current{% endif %}{% if p.d_stat == 61 or p.d_stat == 63 %} otkl{% endif %}" onclick="location.href='{% url 'abonents:karta' p.potreb_id %}'">
       <td class="num"><a href="{% url 'abonents:karta' p.potreb_id %}">{{ p.potreb_id }}</a></td>
       <td class="wrap">{{ p.glav_potre|default_if_none:"" }}</td>
       {% for v in values %}<td class="num">{{ v|default_if_none:"" }}</td>{% endfor %}

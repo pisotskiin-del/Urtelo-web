@@ -27,7 +27,7 @@
   <thead><tr><th>Л/№</th><th>№ договора</th><th>№ сч.</th><th>Наименование</th><th>Наименование объекта</th><th>Адрес объекта</th><th>Категория</th></tr></thead>
   <tbody>
   {% for p, kategor, address in rows %}
-    <tr class="clickable" onclick="location.href='{% url 'abonents:karta' p.potreb_id %}'">
+    <tr class="clickable{% if p.d_stat == 61 or p.d_stat == 63 %} otkl{% endif %}" onclick="location.href='{% url 'abonents:karta' p.potreb_id %}'">
       <td class="num"><a href="{% url 'abonents:karta' p.potreb_id %}">{{ p.potreb_id }}</a></td>
       <td class="num">{{ p.nom_dog|default_if_none:"" }}</td><td class="num">{{ p.inf_pribor|default_if_none:"" }}</td>
       <td class="wrap">{{ p.name_potre|default_if_none:"" }}</td><td class="wrap">{{ p.glav_potre|default_if_none:"" }}</td>
@@ -39,6 +39,7 @@
   </tbody>
 </table>
 </div>
+<p class="muted">Серым выделены лицевые счета со статусом «Приостановлен» или «Расторгнут».</p>
 <p class="pager">
   {% if page.has_previous %}<a href="?{{ query }}&page={{ page.previous_page_number }}">← Назад</a>{% endif %}
   Страница {{ page.number }} из {{ page.paginator.num_pages }}, всего записей: {{ page.paginator.count }}

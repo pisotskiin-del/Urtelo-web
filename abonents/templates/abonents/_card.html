@@ -1,4 +1,4 @@
-<section class="card karta-head">
+<section class="card karta-head{% if otkluchen %} otkl{% endif %}">{% if otkluchen %}<p class="otkl-note">Лицевой счет: {{ p.d_stat_val|default:"отключен" }}</p>{% endif %}
   <div class="kgrid">{% include "abonents/_fields.html" with items=header %}</div>
   {% if p.nom_dog %}<p class="links"><a href="{% url 'abonents:dogovor' p.cod_gor_id p.nom_dog %}?ls={{ p.potreb_id }}">Карта договора № {{ p.nom_dog }}</a>
     {% if p.nom_dogab %} · <a href="{% url 'abonents:index' %}?gorod={{ p.cod_gor_id }}&sub={{ p.nom_dogab }}">Все субабоненты абонента № {{ p.nom_dogab }}</a>{% endif %}</p>{% endif %}
