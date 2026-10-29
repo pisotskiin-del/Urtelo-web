@@ -2,6 +2,7 @@
 
 import re
 from collections import Counter
+from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -326,6 +327,8 @@ class StatusTests(KartaBase):
         self.client.post("/abonents/9/edit/?tab=ishod", data)
         p = Potreb.objects.get(potreb_id=9)
         self.assertEqual((p.d_stat, p.d_stat_val), (63, "Расторгнут"))
+        # Как в карте программы 2026 года: дата окончания и «отключен с» — сегодня.
+        self.assertEqual((p.dk_dog, p.data_otkot), (date.today(), date.today()))
         self.assertContains(self.client.get("/abonents/9/"), "Лицевой счет: Расторгнут")
         listing = self.client.get("/abonents/?gorod=1").content.decode()
         self.assertEqual(listing.count('class="clickable otkl"'), 1)
@@ -474,6 +477,7 @@ class ReportsTests(KartaBase):
         Potreb.objects.filter(potreb_id=5).update(nach_otopl=Decimal("8"), nach_gvs=Decimal("2.5"),
                                                   q_otoppr=Decimal("0.12"), pasp_got="2026-09-01")
         Potreb.objects.filter(potreb_id=9).update(q_otoppr=Decimal("0.3"), id_kategor=6)
+        Potreb.objects.update(d_stat=60)
 
     def test_ot_kateg(self):
         from abonents import reports
@@ -492,7 +496,13 @@ class ReportsTests(KartaBase):
         row = rep.tables[0].sections[0].rows[0]
         self.assertEqual(row[0], "Котельная №2")
         self.assertEqual(row[-2:], [Decimal("2.5"), Decimal("8")])   # всего ГВС, отопление
-        self.assertEqual(row[11:13], [Decimal("2.5"), Decimal("8")])  # хозрасчет
+        self.assertEqual(row[13:15], [Decimal("2.5"), Decimal("8")])  # хозрасчет
+        rep, _ = reports.build(reports.BY_KEY["p_kot1"], self.ryb, {"vid": "gvs"})
+        self.assertEqual(rep.tables[0].sections[0].rows[0][-2:], [Decimal("2.5"), Decimal("0")])
+        Potreb.objects.filter(potreb_id=5).update(d_stat=63)   # без договора — не в отчете
+        rep, _ = reports.build(reports.BY_KEY["p_kot1"], self.ryb, {})
+        self.assertEqual(rep.tables[0].sections[0].rows, [])
+        Potreb.objects.filter(potreb_id=5).update(d_stat=60)
         rep, _ = reports.build(reports.BY_KEY["p_kot2"], self.ryb, {})
         row = rep.tables[0].sections[0].rows[0]
         self.assertEqual(row[1], Decimal("0.3"))   # население абонентское — отдельно
@@ -503,6 +513,53 @@ class ReportsTests(KartaBase):
         rep, _ = reports.build(reports.BY_KEY["pasp_got"], self.ryb, {})
         self.assertEqual([r[0] for r in rep.tables[0].sections[0].rows], [5])
         self.assertEqual(rep.tables[1].total[1:], [1, 1])
+
+    def test_polez_otpusk(self):
+        from abonents import reports
+        from catalogs.models import Tarif
+        Tarif.objects.create(id_tar=1, zn_tar=Decimal("985.76"), diz_tar=0)
+        Kategorpot.objects.create(id_kotegor=2, name_kateg="Местный бюджет")
+        Danrasch.objects.filter(cod_gorod=1).update(gkl_pod=Decimal("3"), gkl_bezpod=Decimal("1"))
+        Potreb.objects.filter(potreb_id=5).update(poter_gvs=Decimal("0.5"))
+        Potreb.objects.filter(potreb_id=9).update(nach_otopl=Decimal("4"), tip_rasot=2)
+        Potreb.objects.create(potreb_id=21, name_potre="Школа", cod_gor=self.ryb, id_kategor=2, tip_rasot=1,
+                              vid_topl=True, nach_otopl=Decimal("6"), d_stat=60)
+        rep, _ = reports.build(reports.BY_KEY["polez_otpusk"], self.ryb, {})
+        t = rep.tables[0]
+        self.assertEqual(t.sections[0].rows[0][0], "Тариф (руб)")
+        self.assertEqual(t.sections[0].rows[0][6], Decimal("985.76"))
+        pu, nagr = t.sections[1].rows
+        self.assertEqual(pu[6], Decimal("11.0"))      # хозрасчет: 8 + 2,5 + потери ГВС 0,5
+        self.assertEqual(pu[8], Decimal("6"))         # местный бюджет, дизельное топливо
+        self.assertEqual(pu[-1], Decimal("17.0"))
+        self.assertEqual(nagr[2:4], [Decimal("3"), Decimal("1")])   # население абонентское 3:1
+        self.assertEqual(t.total[-1], Decimal("21.0"))
+        rep, _ = reports.build(reports.BY_KEY["polez_otpusk"], self.ryb, {"vid": "otopl"})
+        self.assertEqual(rep.tables[0].total[-1], Decimal("18"))
+
+    def test_minist_and_pribory(self):
+        from abonents import reports
+        from catalogs.models import SetUrdevice, SetUrdevicelist
+        Potreb.objects.filter(potreb_id=5).update(id_kategor=3, q_gvs=Decimal("0.01"))
+        rep, _ = reports.build(reports.BY_KEY["nag_minist"], self.ryb, {})
+        self.assertEqual([r[1] for r in rep.tables[0].sections[0].rows], ['ООО "Крипс"'])
+        self.assertEqual(rep.tables[0].total[-1], Decimal("0.13"))
+        Potreb.objects.filter(potreb_id=5).update(pok_old=Decimal("10"), pok_newg=Decimal("110"),
+                                                  pok_oldg=Decimal("10"))
+        SetUrdevicelist.objects.create(kod="3", name="ВКТ-7", koef=Decimal("2"), edn="Гкал")
+        SetUrdevice.objects.create(p_kod="5", d_kod="3", d_num="123", d_pov=date(2022, 1, 1),
+                                   d_next_pov=date(2026, 1, 1))
+        rep, _ = reports.build(reports.BY_KEY["otch_pribor"], self.ryb, {})
+        row = rep.tables[0].sections[0].rows[0]
+        self.assertEqual((row[0], row[3], row[7]), (5, "ВКТ-7  №123", Decimal("5.0")))
+        self.assertEqual(rep.signatures[0], reports.ISPOL["Рыбница"][1])
+        rep, _ = reports.build(reports.BY_KEY["otch_priborg"], self.ryb, {})
+        self.assertEqual(rep.tables[0].sections[0].rows[0][6], Decimal("5.33"))
+        rep, opts = reports.build(reports.BY_KEY["device_pov"], self.ryb, {"date": "2026-06-01"})
+        self.assertEqual(opts["date"], "2026-06-01")
+        self.assertEqual(rep.tables[0].sections[0].rows, [[5, 'ООО "Крипс"', date(2022, 1, 1), date(2026, 1, 1)]])
+        rep, _ = reports.build(reports.BY_KEY["device_pov"], self.ryb, {"date": "2025-06-01"})
+        self.assertEqual(rep.tables[0].sections[0].rows, [])
 
     def test_pages_and_excel(self):
         from io import BytesIO

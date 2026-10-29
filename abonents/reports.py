@@ -10,13 +10,25 @@ from decimal import Decimal
 
 from django.db.models import Q
 
-from catalogs.models import Akcept, Danrasch, GvsKot, Kategorpot, Limit, Minist, Potreb
+from catalogs.models import (Akcept, Danrasch, GvsKot, Kategorpot, Limit, Minist, Potreb, SetUrdevice,
+                             SetUrdevicelist, Tarif)
 
+from .layout import RASCHET
+
+# Подписи и исполнители — как в программе 2026 года (форма dan_rasch задает
+# их для каждого участка).
+FIO_NACH = "Борсуковский С.В."
 SIGNATURES = [
     "Исполнитель _________________________________",
-    "Начальник ОУиРТЭ __________________________________ Елфимова И.Ю.",
+    f"Ведущий специалист __________________________________ {FIO_NACH}",
 ]
+ISPOL = {
+    "Рыбница": ("Химач Н.И.", "Инспектор по контролю за потреблением тепловой энергии юридическим лицам"),
+    "Дубоссары": ("Дабижа И.Н.", "Контролёр по учёту и сбыту тепловой энергии"),
+    "Каменка": ("Кушнир В.И.", "Контролёр по учёту и сбыту тепловой энергии"),
+}
 FILIAL = 'ПЕРЕЧЕНЬ ПОТРЕБИТЕЛЕЙ МГУП "ТИРАСТЕПЛОЭНЕРГО" ФИЛИАЛ В Г.РЫБНИЦА'
+PERECHEN = 'ПЕРЕЧЕНЬ ПОТРЕБИТЕЛЕЙ МГУП "ТИРАСТЕПЛОЭНЕРГО"'
 
 
 @dataclass
@@ -51,6 +63,7 @@ class Report:
     notes: list = field(default_factory=list)
     signatures: list = field(default_factory=list)
     landscape: bool = False
+    approve: list = field(default_factory=list)   # гриф «УТВЕРЖДАЮ» справа вверху
 
 
 @dataclass
@@ -59,7 +72,7 @@ class ReportDef:
     title: str
     group: str
     build: object
-    options: list = field(default_factory=list)   # [(имя, подпись, [(значение, подпись)])]
+    options: list = field(default_factory=list)   # [(имя, подпись, [(значение, подпись)] | None | DATE)]
     per_city: bool = True
     hint: str = ""
 
@@ -89,6 +102,19 @@ def _city_lines(city, month=True):
     lines = [f"г. {(city.name_gorod or '').strip()}"]
     if month:
         lines.append(f"за {(city.name_mes or '').strip()} {city.god} г.")
+    return lines
+
+
+def _active(qs):
+    """Только лицевые счета с заключённым договором (программа 2026 года
+    отбирает d_stat=60; возобновлённые считаются вместе с ними, как в расчете)."""
+    return qs.filter(d_stat__in=RASCHET)
+
+
+def _approve(year=True):
+    lines = ["УТВЕРЖДАЮ:"]
+    if year:
+        lines.append(f'"____" ______________ {datetime.date.today().year} г.')
     return lines
 
 
@@ -196,24 +222,39 @@ def _koteln():
     return {k.id_kot: k.name_kot for k in GvsKot.objects.exclude(id_kot=None)}
 
 
-KOT_KATEG = [(4, "население ведомственное"), (6, "население абонентское"), (2, "местный бюджет"),
-             (3, "республиканский бюджет"), (7, "ОСКиИОД"), (1, "хозрасчет")]
+KOT_KATEG = [(4, "население ведомственное"), (6, "население абонентское"), (5, "население хозрасчет"),
+             (2, "местный бюджет"), (3, "республиканский бюджет"), (7, "ОСКиИОД"), (1, "хозрасчет")]
+VID_USLUGA = [("", "Отопление и ГВС"), ("gvs", "Без отопления (только ГВС)"), ("otopl", "Без ГВС (только отопление)")]
+
+
+def _gvs(p):
+    """ГВС в отчетах программы 2026 года — начислено плюс тепловые потери ГВС."""
+    return n(p.nach_gvs) + n(p.poter_gvs)
 
 
 def p_kot1(city, opts):
-    """Кнопка «Потребление по котельным» (p_kot1): начислено за ГВС и
-    отопление по котельным и категориям. Категория «Население хозрасчётное»
-    отдельной колонки не имеет и входит только во «Всего», как в старом
-    отчете."""
+    """Кнопка «Потребление по котельным» (p_kot1n): начислено за ГВС (с
+    потерями ГВС) и отопление по котельным и категориям. Котельная попадает
+    в отчет, если у нее есть начисление по выбранной услуге."""
+    vid = opts.get("vid")
     names = _koteln()
-    data = {}
-    for p in Potreb.objects.filter(cod_gor=city.cod_gorod, id_koteln__gt=0).order_by("id_koteln"):
+    data, bez_kot = {}, []
+    for p in _active(Potreb.objects.filter(cod_gor=city.cod_gorod)).order_by("id_koteln", "potreb_id"):
+        g = Decimal(0) if vid == "otopl" else _gvs(p)
+        o = Decimal(0) if vid == "gvs" else n(p.nach_otopl)
+        has = (n(p.nach_gvs) > 0 if vid == "gvs" else n(p.nach_otopl) > 0 if vid == "otopl"
+               else n(p.nach_gvs) > 0 or n(p.nach_otopl) > 0)
+        if not p.id_koteln:
+            if n(p.nach_gvs) > 0 or n(p.nach_otopl) > 0:
+                bez_kot.append(p.potreb_id)
+            continue
         if p.id_koteln not in names:
             continue
-        row = data.setdefault(p.id_koteln, {})
+        row = data.setdefault(p.id_koteln, {"has": False})
+        row["has"] = row["has"] or has
         for k in (p.id_kategor, "all"):
-            g, o = row.get(k, (Decimal(0), Decimal(0)))
-            row[k] = (g + n(p.nach_gvs), o + n(p.nach_otopl))
+            pg, po = row.get(k, (Decimal(0), Decimal(0)))
+            row[k] = (pg + g, po + o)
     cols = [Col("Наименование котельной")]
     groups = [("", 1)]
     for _, title in KOT_KATEG + [(None, "Всего")]:
@@ -221,16 +262,21 @@ def p_kot1(city, opts):
         groups.append((title, 2))
     rows = []
     for kot, row in data.items():
+        if not row["has"]:
+            continue
         r = [(names[kot] or "")[3:].strip()]
         for k, _ in KOT_KATEG + [("all", "")]:
             r += list(row.get(k, (Decimal(0), Decimal(0))))
         rows.append(r)
     total = _sum_row(cols, rows, "Итого")
     vsego = (total[-2] or 0) + (total[-1] or 0)
-    return Report("ФАКТИЧЕСКОЕ ПОТРЕБЛЕНИЕ ПО КОТЕЛЬНЫМ", [" ".join(_city_lines(city))],
+    notes = [f"ВСЕГО ПОТРЕБЛЕНИЕ ПО КОТЕЛЬНЫМ: {vsego:.2f} ГКал"]
+    if bez_kot:
+        notes.append("Не указан № котельной у потребителей: " + ", ".join(map(str, bez_kot)))
+    lines = [" ".join(_city_lines(city))] + ([dict(VID_USLUGA)[vid]] if vid else [])
+    return Report("ФАКТИЧЕСКОЕ ПОТРЕБЛЕНИЕ ПО КОТЕЛЬНЫМ", lines,
                   [Table(cols, [Section(rows=rows)], groups=groups, total=total)],
-                  notes=[f"ВСЕГО ПОТРЕБЛЕНИЕ ПО КОТЕЛЬНЫМ: {vsego:.2f} ГКал"],
-                  signatures=SIGNATURES, landscape=True)
+                  notes=notes, signatures=SIGNATURES, landscape=True)
 
 
 def p_kot2(city, opts):
@@ -238,7 +284,7 @@ def p_kot2(city, opts):
     котельным, население (абонентское) отдельно от прочих."""
     names = _koteln()
     data = {}
-    for p in Potreb.objects.filter(cod_gor=city.cod_gorod).order_by("id_koteln"):
+    for p in _active(Potreb.objects.filter(cod_gor=city.cod_gorod)).order_by("id_koteln"):
         if p.id_koteln not in names:
             continue
         r = data.setdefault(p.id_koteln, [Decimal(0)] * 4)
@@ -298,8 +344,8 @@ def pasp_got(city, opts):
     """«Печать → Паспорта готовности» (pasp_got.prg): объекты хозрасчета и
     бюджета с отопительной нагрузкой и даты паспортов готовности. Колонки
     «Дата запуска» и «Количество дней отпуска» в старом отчете пустые — их
-    заполняют от руки."""
-    qs = Potreb.objects.filter(cod_gor=city.cod_gorod, id_kategor__lt=4, q_otoppr__gt=0).order_by("potreb_id")
+    заполняют от руки. В отчет входят только заключённые договоры."""
+    qs = _active(Potreb.objects.filter(cod_gor=city.cod_gorod, id_kategor__lt=4, q_otoppr__gt=0)).order_by("potreb_id")
     cols = [Col("Лиц.№", "int"), Col("Наименование потребителя"), Col("Паспорт готовности", "date"),
             Col("Дата запуска"), Col("Количество дней отпуска"), Col("Адрес расположения объекта")]
     recs = list(qs)
@@ -309,7 +355,7 @@ def pasp_got(city, opts):
     scols = [Col(""), Col("Количество объектов", "int", total=True), Col("С паспортами готовности", "int", total=True)]
     srows = [[title, sum(1 for p in recs if p.id_kategor == k), sum(1 for p in recs if p.id_kategor == k and p.pasp_got)]
              for k, title in ((1, "Хозрасчет"), (2, "Местный бюджет"), (3, "Республиканский бюджет"))]
-    return Report(FILIAL, [f"участок г.{(city.name_gorod or '').strip()}", _today()],
+    return Report(PERECHEN, [f"участок г.{(city.name_gorod or '').strip()}", _today()],
                   [Table(cols, [Section(rows=rows)], title=""),
                    Table(scols, [Section(rows=srows)], total=_sum_row(scols, srows, "Итого по городу"))],
                   landscape=True)
@@ -366,6 +412,204 @@ def potreb_kategor(city, opts):
                   [Table(cols, [Section(rows=rows)], total=_sum_row(cols, rows, "Всего по категориям потреб."))])
 
 
+# --- Отчеты, добавленные в программе 2026 года --------------------------------
+
+def _tarif():
+    return {t.id_tar: (n(t.zn_tar), n(t.diz_tar)) for t in Tarif.objects.exclude(id_tar=None)}
+
+
+POLEZ_COLS = [Col("Категории потребителей"),
+              Col("Ведомст. жильё", "num", 3, total=True),
+              Col("Население абонентское (с господд.)", "num", 3, total=True),
+              Col("Население абонентское (без господд.)", "num", 3, total=True),
+              Col("Население хозрасчет", "num", 3, total=True),
+              Col("Всего население", "num", 3, total=True),
+              Col("Всего хозрасчёт", "num", 3, total=True),
+              Col("Местный", "num", 3, total=True), Col("Местный (диз.)", "num", 3, total=True),
+              Col("Республ.", "num", 3, total=True), Col("Республ. (диз.)", "num", 3, total=True),
+              Col("Организация СКиИОД", "num", 3, total=True),
+              Col("Всего бюджет", "num", 3, total=True),
+              Col("ВСЕГО", "num", 3, total=True)]
+
+
+def polez_otpusk(city, opts):
+    """Кнопка «Полезный отпуск» (polez_otpusk): отпуск тепловой энергии по
+    категориям потребителей по всем участкам — по приборам учета (П/У,
+    tip_rasot=1) и по нагрузке (tip_rasot 2, 3). Бюджет разделен по виду
+    топлива (дизельное — отдельные колонки), население абонентское — на «с
+    господдержкой» и «без» в пропорции Гкал, указанных в исходных данных
+    участка. Сложение и отборы повторяют старую программу: хозрасчёт по
+    прибору берется без учета вида топлива, а дизельное топливо для
+    населения и СКиИОД в отчет не входит."""
+    vid = opts.get("vid")
+
+    def val(p):
+        if vid == "otopl":
+            return n(p.nach_otopl)
+        if vid == "gvs":
+            return _gvs(p)
+        return n(p.nach_otopl) + _gvs(p)
+
+    sections, total_rows = [], []
+    for c in Danrasch.objects.exclude(cod_gorod=None).order_by("cod_gorod"):
+        recs = list(_active(Potreb.objects.filter(cod_gor=c.cod_gorod)))
+        gpod, gbez = n(c.gkl_pod), n(c.gkl_bezpod)
+        k_pod = gpod / (gpod + gbez) if gpod + gbez > 0 else Decimal(0)
+        k_bez = gbez / (gpod + gbez) if gpod + gbez > 0 else Decimal(0)
+        rows = []
+        for label, pu in (("П/У", True), ("Нагр.", False)):
+            def s(kat=None, diz=False, any_topl=False):
+                return sum((val(p) for p in recs
+                            if ((p.tip_rasot == 1) if pu else p.tip_rasot in (2, 3))
+                            and (kat is None or p.id_kategor == kat)
+                            and (any_topl or bool(p.vid_topl) == diz)), Decimal(0))
+            hoz = s(1, any_topl=pu)
+            nas_abon = s(6)
+            nas = [s(4), nas_abon * k_pod, nas_abon * k_bez, s(5)]
+            bud = [s(2), s(2, True), s(3), s(3, True)]
+            vsego_nas = s(4) + s(5) + nas_abon
+            vsego_bud = sum(bud, Decimal(0))
+            rows.append([label] + nas + [vsego_nas, hoz] + bud + [s(7), vsego_bud, s() + bud[1] + bud[3]])
+        sec = Section(f"г. {(c.name_gorod or '').strip()}", rows)
+        sec.foot = _sum_row(POLEZ_COLS, rows, f"Всего по г.{(c.name_gorod or '').strip()}")
+        sections.append(sec)
+        total_rows += rows
+    tar = _tarif()
+
+    def t(i, d=False):
+        return tar.get(i, (Decimal(0), Decimal(0)))[1 if d else 0]
+    tarif_row = ["Тариф (руб)", t(9), t(12), t(11), t(9), t(9), t(1), t(2), t(2, True), t(2), t(2, True),
+                 t(10), None, None]
+    groups = [("", 1), ("Население (Гкал)", 5), ("", 1), ("Бюджет (Гкал)", 6), ("", 1)]
+    lines = ["тепловой энергии по категориям потребителей",
+             f"за {(city.name_mes or '').strip()} {city.god} г."] + ([dict(VID_USLUGA)[vid]] if vid else [])
+    return Report("ПОЛЕЗНЫЙ ОТПУСК", lines,
+                  [Table(POLEZ_COLS, [Section(rows=[tarif_row])] + sections, groups=groups,
+                         total=_sum_row(POLEZ_COLS, total_rows, "Итого по филиалу"))],
+                  signatures=[f"Ведущий специалист __________________________________ {FIO_NACH}"],
+                  landscape=True,
+                  approve=["УТВЕРЖДАЮ:", "Начальник Рыбницкого участка по эксплуатации котельных",
+                           'и тепловых сетей МГУП "Тирастеплоэнерго"', "______________ А.Г.Тищенко",
+                           _approve()[1]])
+
+
+NAG_MINIST = (1, 2, 3, 4, 7, 8, 9, 10, 19)
+
+
+def nag_minist(city, opts):
+    """Кнопка «Нагрузка по министерствам» (nag_minist1): часовая нагрузка
+    республиканского бюджета по министерствам. Как в старой программе,
+    отбор идет по всем участкам и только по министерствам из списка."""
+    qs = _active(Potreb.objects.filter(nom_dog__gt=0, id_kategor=3, cod_minist__in=NAG_MINIST)
+                 .exclude(id_katabon=3)).order_by("cod_minist", "potreb_id")
+    names = dict(Minist.objects.values_list("cod_minist", "name_minis"))
+    cols = [Col("№ п/п", "int"), Col("Абонент"), Col("ГВС", "num", 5, total=True),
+            Col("Отопление", "num", 5, total=True), Col("Всего", "num", 5, total=True)]
+    sections = []
+    for s in _grouped(qs, lambda p: p.cod_minist_id, lambda k: (names.get(k) or "").strip(),
+                      lambda p: [0, p.name_potre, n(p.q_gvs), n(p.q_otoppr), n(p.q_gvs) + n(p.q_otoppr)], cols):
+        s.foot = _sum_row(cols, s.rows, "ВСЕГО:", label_col=1)
+        sections.append(s)
+    rows = [r for s in sections for r in s.rows]
+    return Report("РАСПРЕДЕЛЕННАЯ НАГРУЗКА ПО МИНИСТЕРСТВАМ", [f"{(city.name_mes or '').strip()} {city.god} г."],
+                  [Table(cols, sections, total=_sum_row(cols, rows, "ИТОГО:", label_col=1))],
+                  signatures=[f"Ведущий специалист СУиРТЭ __________________________________ {FIO_NACH}"])
+
+
+def _ispol_sign(city):
+    fio, dolj = ISPOL.get((city.name_gorod or "").strip(), ("", ""))
+    return [f"{dolj}", f"Подпись _______________ дата ___________      {fio}"]
+
+
+def _pribor_head(city, title):
+    return ([title, f"по участку г.{(city.name_gorod or '').strip()}",
+             f"за {(city.name_mes or '').strip()} {city.god} г."],
+            _approve() + ["Приложение №2", "к приказу от 08.04.2024г.№290"])
+
+
+def otch_pribor(city, opts):
+    """Кнопка «Отчет по приборам учета (отопление)» (otch_potr_pribor):
+    потребление по разнице показаний с коэффициентом прибора учета (если
+    прибор не указан — коэффициент 1). Абонент с несколькими приборами
+    показан строкой на каждый прибор."""
+    devlist = {d.kod: d for d in SetUrdevicelist.objects.exclude(kod=None)}
+    devices = {}
+    for d in SetUrdevice.objects.exclude(p_kod=None):
+        try:
+            devices.setdefault(round(float(d.p_kod)), []).append(d)
+        except ValueError:
+            continue
+    cols = [Col("Л/№", "int"), Col("Наименование абонента (потребителя)"), Col("Фактический адрес объекта"),
+            Col("Тип и номер прибора"), Col("ед. изм."), Col("Показания предыдущие", "num"),
+            Col("Показания настоящие", "num"), Col("Расчет потребления (Гкал)", "num", 3, total=True),
+            Col("Примечание")]
+    rows = []
+    for p in _active(Potreb.objects.filter(cod_gor=city.cod_gorod)).order_by("potreb_id"):
+        for d in devices.get(p.potreb_id) or [None]:
+            info = devlist.get(d.d_kod) if d else None
+            koef = info.koef if info and info.koef is not None else Decimal(1)
+            rasch = (n(p.pok_new) - n(p.pok_old)) * koef
+            if rasch <= 0:
+                continue
+            tip = f"{(info.name or '').strip() if info else ''}  №{(d.d_num or '').strip() if d else ''}"
+            rows.append([p.potreb_id, p.glav_potre, p.adres_sd, tip, (info.edn or "").strip() if info else "",
+                         n(p.pok_old), n(p.pok_new), rasch, p.prim_chot])
+    lines, approve = _pribor_head(city, "Отчет о потреблении тепловой энергии по приборам учета тепловой энергии")
+    return Report(lines[0], lines[1:], [Table(cols, [Section(rows=rows)], total=_sum_row(cols, rows, "Итого"))],
+                  signatures=_ispol_sign(city), landscape=True, approve=approve)
+
+
+def otch_priborg(city, opts):
+    """Кнопка «Отчет по приборам учета (ГВС)» (otch_potr_priborg): потребление
+    по разнице показаний счетчика ГВС, 1 куб.м = 0,0533 Гкал."""
+    from .raschet import GVS_GKAL
+    cols = [Col("Л/№", "int"), Col("Наименование абонента (потребителя)"), Col("Фактический адрес объекта"),
+            Col("ед. изм."), Col("Показания предыдущие", "num"), Col("Показания настоящие", "num"),
+            Col("Расчет потребления (Гкал)", "num", 3, total=True), Col("Примечание")]
+    rows = []
+    for p in _active(Potreb.objects.filter(cod_gor=city.cod_gorod)).order_by("potreb_id"):
+        rasch = (n(p.pok_newg) - n(p.pok_oldg)) * GVS_GKAL
+        if rasch > 0:
+            rows.append([p.potreb_id, p.glav_potre, p.adres_sd, "куб.м.", n(p.pok_oldg), n(p.pok_newg), rasch,
+                         p.prim_chgvs])
+    lines, approve = _pribor_head(city, "Отчет о потреблении ГВС по приборам учета")
+    return Report(lines[0], lines[1:], [Table(cols, [Section(rows=rows)], total=_sum_row(cols, rows, "Итого"))],
+                  signatures=_ispol_sign(city), landscape=True, approve=approve)
+
+
+DATE = "date"
+
+
+def device_pov(city, opts):
+    """Кнопка «Поверка приборов» (device_pov): приборы учета, у которых
+    дата следующей поверки раньше выбранной даты."""
+    try:
+        date = datetime.date.fromisoformat(opts.get("date") or "")
+    except ValueError:
+        date = datetime.date.today()
+    qs = Potreb.objects.filter(cod_gor=city.cod_gorod)
+    kat = opts.get("kateg")
+    if kat:
+        qs = qs.filter(id_kategor=int(kat))
+    names = dict(qs.values_list("potreb_id", "name_potre"))
+    rows = []
+    for d in SetUrdevice.objects.filter(d_next_pov__lt=date).exclude(p_kod=None).order_by("d_pov", "pk"):
+        try:
+            pid = int(float(d.p_kod))
+        except ValueError:
+            continue
+        if pid in names:
+            rows.append([pid, names[pid], d.d_pov, d.d_next_pov])
+    cols = [Col("№ Лиц.сч.", "int"), Col("Наименование потребителя"), Col("Дата поверки", "date"),
+            Col("Дата следующей поверки", "date")]
+    lines = [f"г. {(city.name_gorod or '').strip()}"]
+    if kat:
+        lines.append(_kategor().get(int(kat)) or "")
+    lines.append(f"следующая поверка ранее {date:%d.%m.%Y}")
+    return Report("Список приборов с истекающим (истекшим) сроком поверки", lines,
+                  [Table(cols, [Section(rows=rows)])], notes=[f"Всего: {len(rows)}"])
+
+
 VID_PRIBOR = [("nach", "Начислено"), ("nenach", "Не начислено")]
 VID_NUL = [("otopl", "Отопление"), ("gvs", "ГВС")]
 
@@ -380,12 +624,23 @@ REPORTS = [
               options=[("vid", "Услуга", VID_NUL)], hint="Список потребителей без начисления"),
     ReportDef("limit", "Превышение лимита", "Начисление", limit, per_city=False,
               hint="Заканчивающийся лимит (по последнему расчету)"),
+    ReportDef("polez_otpusk", "Полезный отпуск", "Начисление", polez_otpusk, per_city=False,
+              options=[("vid", "Услуга", VID_USLUGA)], hint="Отпуск тепловой энергии по категориям, все участки"),
     ReportDef("p_kot1", "Потребление по котельным", "Котельные", p_kot1,
-              hint="Фактическое потребление ГВС и отопления по котельным"),
+              options=[("vid", "Услуга", VID_USLUGA)], hint="Фактическое потребление ГВС и отопления по котельным"),
     ReportDef("p_kot2", "Нагрузка по котельным", "Котельные", p_kot2,
               hint="Распределенная часовая нагрузка по котельным"),
     ReportDef("nag_kateg", "Нагрузка по категориям", "Котельные", nag_kateg,
               hint="Тепловая нагрузка абонентов по категориям"),
+    ReportDef("nag_minist", "Нагрузка по министерствам", "Котельные", nag_minist, per_city=False,
+              hint="Нагрузка республиканского бюджета по министерствам"),
+    ReportDef("otch_pribor", "Потребление по приборам (отопление)", "Приборы учета", otch_pribor,
+              hint="Отчет о потреблении по приборам учета тепловой энергии"),
+    ReportDef("otch_priborg", "Потребление по приборам (ГВС)", "Приборы учета", otch_priborg,
+              hint="Отчет о потреблении ГВС по счетчикам"),
+    ReportDef("device_pov", "Поверка приборов", "Приборы учета", device_pov,
+              options=[("date", "Поверка ранее", DATE), ("kateg", "Категория", None)],
+              hint="Приборы с истекающим (истекшим) сроком поверки"),
     ReportDef("pasp_got", "Паспорта готовности", "Печать", pasp_got,
               hint="Перечень потребителей с паспортами готовности"),
     ReportDef("potreb_koteln", "Потребители по котельным", "Печать", potreb_koteln,
@@ -409,6 +664,13 @@ def options_for(rdef):
 def build(rdef, city, params):
     opts = {}
     for name, _, choices in options_for(rdef):
+        if choices == DATE:
+            value = params.get(name, "")
+            try:
+                opts[name] = datetime.date.fromisoformat(value).isoformat()
+            except ValueError:
+                opts[name] = datetime.date.today().isoformat()
+            continue
         value = params.get(name, choices[0][0])
         opts[name] = value if value in {c for c, _ in choices} else choices[0][0]
     return rdef.build(city, opts), opts
@@ -427,7 +689,11 @@ def to_xlsx(report, out):
     box = Border(left=thin, right=thin, top=thin, bottom=thin)
     bold = Font(bold=True)
     width = max(len(t.cols) for t in report.tables)
-    r = 1
+    r = 0
+    for line in report.approve:
+        r += 1
+        ws.cell(r, max(1, width - 2), line)
+    r += 1
     ws.cell(r, 1, report.title).font = Font(bold=True, size=13)
     for line in report.lines:
         r += 1

@@ -373,6 +373,8 @@ body.splash { min-height: 100vh; margin: 0; display: flex; align-items: center; 
 .rep-params { display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
 .rep-params label { display:flex; gap:8px; align-items:center; color:var(--muted); }
 .report { padding:20px 24px; }
+.rep-approve { margin-left:auto; width:max-content; max-width:100%; text-align:left; font-size:13px; margin-bottom:10px; }
+.rep-approve p { margin:2px 0; }
 .rep-head { text-align:center; margin-bottom:14px; }
 .rep-head h2 { margin:0 0 4px; font-size:17px; text-transform:none; }
 .rep-head p { margin:2px 0; color:var(--muted); }

@@ -13,14 +13,16 @@
   {% if rdef.per_city %}<nav class="tabs">{% for c in cities %}<a href="?gorod={{ c.cod_gorod }}{% for name, value in opts.items %}&amp;{{ name }}={{ value }}{% endfor %}" {% if c.cod_gorod == city %}class="active"{% endif %}>{{ c.name_gorod }}</a>{% endfor %}</nav>{% endif %}
   {% for name, label, choices in options %}
   <label>{{ label }}
-    <select name="{{ name }}" onchange="this.form.submit()">
+    {% if choices == "date" %}<input type="date" name="{{ name }}" value="{% for n, v in opts.items %}{% if n == name %}{{ v }}{% endif %}{% endfor %}" onchange="this.form.submit()">
+    {% else %}<select name="{{ name }}" onchange="this.form.submit()">
       {% for value, title in choices %}<option value="{{ value }}"{% for n, v in opts.items %}{% if n == name and v == value %} selected{% endif %}{% endfor %}>{{ title }}</option>{% endfor %}
-    </select></label>
+    </select>{% endif %}</label>
   {% endfor %}
 </form>
 </div>
 
 <article class="card report{% if report.landscape %} landscape{% endif %}">
+  {% if report.approve %}<div class="rep-approve">{% for line in report.approve %}<p>{{ line }}</p>{% endfor %}</div>{% endif %}
   <header class="rep-head">
     <h2>{{ report.title }}</h2>
     {% for line in report.lines %}<p>{{ line }}</p>{% endfor %}
