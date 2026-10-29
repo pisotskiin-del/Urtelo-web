@@ -60,6 +60,7 @@ class Table:
     groups: list = None     # верхняя строка шапки: [(заголовок, колонок)]
     total: list = None      # строка общего итога
     title: str = ""
+    head: list = None       # многоярусная шапка: строки [(заголовок, колонок, строк)] вместо groups и cols
 
 
 @dataclass
@@ -498,11 +499,16 @@ def polez_otpusk(city, opts):
         return tar.get(i, (Decimal(0), Decimal(0)))[1 if d else 0]
     tarif_row = ["Тариф (руб)", t(9), t(12), t(11), t(9), t(9), t(1), t(2), t(2, True), t(2), t(2, True),
                  t(10), None, None]
-    groups = [("", 1), ("Население (Гкал)", 4), ("", 2), ("Бюджет (Гкал)", 4), ("", 3)]
+    head = [[("Категории потребителей", 1, 2), ("Население (Гкал)", 4, 1), ("Всего население (Гкал)", 1, 2),
+             ("Всего хозрасчёт (Гкал)", 1, 2), ("Бюджет (Гкал)", 4, 1), ("Организация СКиИОД", 1, 2),
+             ("Всего бюджет (Гкал)", 1, 2), ("ВСЕГО (Гкал)", 1, 2)],
+            [("Ведомст. жильё", 1, 1), ("Население абонентское (с господд.)", 1, 1),
+             ("Население абонентское (без господд.)", 1, 1), ("Население хозрасчет", 1, 1),
+             ("Местный", 2, 1), ("Республ.", 2, 1)]]
     lines = ["тепловой энергии по категориям потребителей",
              f"за {(city.name_mes or '').strip()} {city.god} г."] + ([dict(VID_USLUGA)[vid]] if vid else [])
     return Report("ПОЛЕЗНЫЙ ОТПУСК", lines,
-                  [Table(POLEZ_COLS, [Section(rows=[tarif_row])] + sections + [itog], groups=groups)],
+                  [Table(POLEZ_COLS, [Section(rows=[tarif_row])] + sections + [itog], head=head)],
                   signatures=[_ved_spec(city, "\u2003" * 12)],
                   landscape=True,
                   approve=_utverjdau(city))
@@ -742,7 +748,7 @@ def to_xlsx(report, out):
             elif c.kind == "date" and v:
                 cell.number_format = "DD.MM.YYYY"
             if c.kind == "text":
-                widths[i] = max(widths.get(i, 8), min(60, len(str(v or "")) + 2))
+                widths[i] = max(widths.get(i, 8), min(60, len(str(v or "")) + 4))
             else:
                 widths[i] = max(widths.get(i, 8), 14)
 
@@ -751,7 +757,26 @@ def to_xlsx(report, out):
         if t.title:
             ws.cell(r, 1, t.title).font = bold
             r += 1
-        if t.groups and any(g for g, _ in t.groups):
+        if t.head:
+            busy = set()
+            for k, hrow in enumerate(t.head):
+                col = 1
+                for title, cs, rs in hrow:
+                    while (r + k, col) in busy:
+                        col += 1
+                    if cs > 1 or rs > 1:
+                        ws.merge_cells(start_row=r + k, start_column=col, end_row=r + k + rs - 1,
+                                       end_column=col + cs - 1)
+                    for dr in range(rs):
+                        for dc in range(cs):
+                            busy.add((r + k + dr, col + dc))
+                            ws.cell(r + k + dr, col + dc).border = box
+                    cell = ws.cell(r + k, col, title)
+                    cell.font = bold
+                    cell.alignment = Alignment(wrap_text=True, vertical="center", horizontal="center")
+                    col += cs
+            r += len(t.head) - 1
+        elif t.groups and any(g for g, _ in t.groups):
             col = 1
             for g, span in t.groups:
                 if span > 1:
@@ -761,6 +786,8 @@ def to_xlsx(report, out):
                 col += span
             r += 1
         for i, c in enumerate(t.cols, 1):
+            if t.head:
+                break
             cell = ws.cell(r, i, c.title)
             cell.font, cell.border = bold, box
             cell.alignment = Alignment(wrap_text=True, vertical="center", horizontal="center")
@@ -787,5 +814,7 @@ def to_xlsx(report, out):
         ws.column_dimensions[get_column_letter(i)].width = widths.get(i, 12)
     if report.landscape:
         ws.page_setup.orientation = "landscape"
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
     wb.save(out)

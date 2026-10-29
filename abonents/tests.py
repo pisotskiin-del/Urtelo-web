@@ -567,6 +567,17 @@ class ReportsTests(KartaBase):
         itog = t.sections[-1]
         self.assertEqual([r[0] for r in itog.rows], ["П/У", "Нагр."])
         self.assertEqual((itog.foot[0], itog.foot[-1]), ("Итого по филиалу", Decimal("21.0")))
+        # Шапка в два яруса, как в старом отчете, и так же в Excel.
+        self.assertEqual(t.head[1][4], ("Местный", 2, 1))
+        from io import BytesIO
+        from openpyxl import load_workbook
+        buf = BytesIO()
+        reports.to_xlsx(rep, buf)
+        ws = load_workbook(BytesIO(buf.getvalue())).active
+        merged = {str(m) for m in ws.merged_cells.ranges}
+        cell = next(c for row in ws.iter_rows() for c in row if c.value == "Местный")
+        self.assertIn(f"{cell.coordinate}:{cell.offset(column=1).coordinate}", merged)
+        self.assertNotIn("Местный, диз.", [c.value for row in ws.iter_rows() for c in row])
         rep, _ = reports.build(reports.BY_KEY["polez_otpusk"], self.ryb, {"vid": "otopl"})
         self.assertEqual(rep.tables[0].sections[-1].foot[-1], Decimal("18"))
 

@@ -31,8 +31,9 @@
   {% if t.title %}<h3>{{ t.title }}</h3>{% endif %}
   <div class="scroll"><table class="grid rep">
     <thead>
-      {% if t.groups %}<tr>{% for g, span in t.groups %}<th colspan="{{ span }}" class="grp">{{ g }}</th>{% endfor %}</tr>{% endif %}
-      <tr>{% for c in t.cols %}<th{% if c.kind != "text" %} class="num"{% endif %}>{{ c.title }}</th>{% endfor %}</tr>
+      {% if t.head %}{% for hrow in t.head %}<tr>{% for title, cs, rs in hrow %}<th colspan="{{ cs }}" rowspan="{{ rs }}" class="grp">{{ title }}</th>{% endfor %}</tr>{% endfor %}
+      {% else %}{% if t.groups %}<tr>{% for g, span in t.groups %}<th colspan="{{ span }}" class="grp">{{ g }}</th>{% endfor %}</tr>{% endif %}
+      <tr>{% for c in t.cols %}<th{% if c.kind != "text" %} class="num"{% endif %}>{{ c.title }}</th>{% endfor %}</tr>{% endif %}
     </thead>
     <tbody>
     {% for s in t.sections %}
