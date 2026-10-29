@@ -401,7 +401,8 @@ class NovMesTests(KartaBase):
         Danrasch.objects.update(nom_mes=12, name_mes="Декабрь", god=2025)
         Potreb.objects.filter(potreb_id=5).update(nach_finan=Decimal("100"), nach_otopi=Decimal("40"),
                                                   vd_limit=Decimal("200"), ost_limit=Decimal("100"),
-                                                  pok_old=Decimal("10"), dnotop=Decimal("31"))
+                                                  pok_old=Decimal("10"), dnotop=Decimal("31"),
+                                                  pok_newg=Decimal("7"), pok_oldg=Decimal("3"))
         Potreb.objects.filter(potreb_id=7).update(nach_finan=Decimal("5"), nach_otopi=Decimal("5"))
         GvsKot.objects.update(nagr_kot=Decimal("1.5"))
 
@@ -416,7 +417,7 @@ class NovMesTests(KartaBase):
         self.assertEqual((a.nach_finan, a.vd_limit, a.ost_limit), (Decimal("10.500"), 0, 0))
         self.assertEqual(a.nach_otopi, Decimal("50.500"))
         self.assertEqual((a.nac_vsego, a.dnotop, a.gkl_perer, a.tkf_perer), (0, 0, 0, 0))
-        self.assertEqual(a.pok_old, Decimal("12.500"))
+        self.assertEqual((a.pok_old, a.pok_oldg), (Decimal("12.500"), Decimal("7")))
         self.assertEqual(GvsKot.objects.get().nagr_kot, 0)
         abot = self.Abot.objects.order_by("ras_kol")
         self.assertEqual([(x.ras_kol, x.koduslug, x.koduslug1, x.tarif, x.akcept, x.name_kateg, x.name_city) for x in abot],
