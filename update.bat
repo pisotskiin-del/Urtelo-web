@@ -10,6 +10,8 @@ if not exist .venv\Scripts\python.exe (
 if errorlevel 1 goto error
 .venv\Scripts\python.exe manage.py migrate
 if errorlevel 1 goto error
+.venv\Scripts\python.exe manage.py init_roles
+if errorlevel 1 goto error
 .venv\Scripts\python.exe teplo.pyw --shortcut
 echo.
 echo DONE. Close the app window if it is open and start it again.

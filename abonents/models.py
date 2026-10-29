@@ -31,3 +31,49 @@ class MesArhiv(models.Model):
 
     def tables(self):
         return json.loads(gzip.decompress(bytes(self.data)).decode())
+
+
+UCHASTKI = [(1, "Рыбница"), (2, "Дубоссары"), (3, "Каменка")]
+
+
+class Podpisant(models.Model):
+    """Подписанты отчетов: кто утверждает, подписывает и исполняет. Запись
+    без участка действует на все участки; запись с участком заменяет ее для
+    этого участка (например, инспектор в отчетах по приборам учета)."""
+
+    UTVERJDAU = "utv"
+    VED_SPEC = "ved"
+    ISPOLNITEL = "isp"
+    PRIBORY = "pribor"
+    ROLI = [
+        (UTVERJDAU, "Утверждаю (гриф отчета)"),
+        (VED_SPEC, "Подпись отчетов (ведущий специалист)"),
+        (ISPOLNITEL, "Исполнитель"),
+        (PRIBORY, "Отчеты по приборам учета (инспектор, контролер)"),
+    ]
+
+    rol = models.CharField("Где подписывает", max_length=10, choices=ROLI)
+    # Код участка как в danrasch.cod_gorod. Не ссылка: dbf_import перезаливает
+    # danrasch, и подписанты от этого не должны пропадать.
+    gorod = models.IntegerField("Участок", null=True, blank=True,
+                                choices=[(None, "Все участки")] + UCHASTKI)
+    doljnost = models.CharField("Должность", max_length=200, blank=True)
+    fio = models.CharField("Ф.И.О.", max_length=60, blank=True)
+
+    class Meta:
+        verbose_name = "Подписант документов"
+        verbose_name_plural = "Подписанты документов"
+        ordering = ["rol", "gorod", "pk"]
+
+    def __str__(self):
+        return f"{self.get_rol_display()}: {self.fio}"
+
+    @classmethod
+    def get(cls, rol, city=None):
+        """(должность, Ф.И.О.) для роли и участка: сначала запись участка,
+        затем общая."""
+        rows = list(cls.objects.filter(rol=rol))
+        code = getattr(city, "cod_gorod", None)
+        p = next((r for r in rows if code is not None and r.gorod == code), None) or \
+            next((r for r in rows if r.gorod is None), None)
+        return ((p.doljnost or "").strip(), (p.fio or "").strip()) if p else ("", "")

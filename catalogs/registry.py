@@ -27,7 +27,10 @@ CATALOG_ORDER = [
     "seturdevplacelist",  # Места установки приборов учёта
     "seturdevice",        # Информация о приборах учёта
     "seturplomblist",     # Справочник пломб
+    "podpisant",          # Подписанты документов (новый, в старой программе были вписаны в отчеты)
 ]
+# Справочники веб-программы, которых нет в базе старой программы.
+EXTRA_MODELS = [("abonents", "Podpisant")]
 
 # Поля, которые не показываются ни в справочниках, ни в админке.
 SECRET_FIELDS = {"password"}
@@ -38,6 +41,9 @@ SEARCH_TYPES = (models.CharField, models.TextField)
 
 def catalog_models():
     found = {m._meta.model_name: m for m in apps.get_app_config("catalogs").get_models()}
+    for app_label, name in EXTRA_MODELS:
+        model = apps.get_model(app_label, name)
+        found[model._meta.model_name] = model
     if CATALOG_ORDER:
         return [found[name] for name in CATALOG_ORDER if name in found]
     return sorted(found.values(), key=lambda m: str(m._meta.verbose_name_plural))

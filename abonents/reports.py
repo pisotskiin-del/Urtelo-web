@@ -15,18 +15,25 @@ from catalogs.models import (Akcept, Danrasch, GvsKot, Kategorpot, Limit, Minist
 
 from .layout import RASCHET
 
-# Подписи и исполнители — как в программе 2026 года (форма dan_rasch задает
-# их для каждого участка).
-FIO_NACH = "Борсуковский С.В."
-SIGNATURES = [
-    "Исполнитель _________________________________",
-    f"Ведущий специалист __________________________________ {FIO_NACH}",
-]
-ISPOL = {
-    "Рыбница": ("Химач Н.И.", "Инспектор по контролю за потреблением тепловой энергии юридическим лицам"),
-    "Дубоссары": ("Дабижа И.Н.", "Контролёр по учёту и сбыту тепловой энергии"),
-    "Каменка": ("Кушнир В.И.", "Контролёр по учёту и сбыту тепловой энергии"),
-}
+LINE = "__________________________________"
+
+
+def _signer(rol, city=None):
+    from .models import Podpisant
+    return Podpisant.get(rol, city)
+
+
+def _signatures(city=None):
+    """Подписи «Исполнитель» и «Ведущий специалист» из справочника
+    «Подписанты документов»."""
+    from .models import Podpisant
+    out = []
+    for rol, default in ((Podpisant.ISPOLNITEL, "Исполнитель"), (Podpisant.VED_SPEC, "Ведущий специалист")):
+        dolj, fio = _signer(rol, city)
+        out.append(f"{dolj or default} {LINE} {fio}".strip())
+    return out
+
+
 FILIAL = 'ПЕРЕЧЕНЬ ПОТРЕБИТЕЛЕЙ МГУП "ТИРАСТЕПЛОЭНЕРГО" ФИЛИАЛ В Г.РЫБНИЦА'
 PERECHEN = 'ПЕРЕЧЕНЬ ПОТРЕБИТЕЛЕЙ МГУП "ТИРАСТЕПЛОЭНЕРГО"'
 
@@ -169,7 +176,7 @@ def ot_kateg(city, opts):
     rows = [r for s in sections for r in s.rows]
     return Report("ОТПУСК ТЕПЛОВОЙ ЭНЕРГИИ ДЛЯ АБОНЕНТОВ", _city_lines(city),
                   [Table(cols, sections, total=_sum_row(cols, rows, "ИТОГО:", label_col=4))],
-                  signatures=SIGNATURES)
+                  signatures=_signatures(city))
 
 
 def ot_minist(city, opts):
@@ -189,7 +196,7 @@ def ot_minist(city, opts):
     rows = [r for s in sections for r in s.rows]
     return Report("РЕСПУБЛИКАНСКИЙ БЮДЖЕТ", ["Расшифровка по министерствам"] + _city_lines(city),
                   [Table(cols, sections, total=_sum_row(cols, rows, "ИТОГО:", label_col=4))],
-                  signatures=SIGNATURES)
+                  signatures=_signatures(city))
 
 
 def ved_potreb(city, opts):
@@ -276,7 +283,7 @@ def p_kot1(city, opts):
     lines = [" ".join(_city_lines(city))] + ([dict(VID_USLUGA)[vid]] if vid else [])
     return Report("ФАКТИЧЕСКОЕ ПОТРЕБЛЕНИЕ ПО КОТЕЛЬНЫМ", lines,
                   [Table(cols, [Section(rows=rows)], groups=groups, total=total)],
-                  notes=notes, signatures=SIGNATURES, landscape=True)
+                  notes=notes, signatures=_signatures(city), landscape=True)
 
 
 def p_kot2(city, opts):
@@ -299,7 +306,7 @@ def p_kot2(city, opts):
     return Report("РАСПРЕДЕЛЕННАЯ НАГРУЗКА ПО КОТЕЛЬНЫМ", _city_lines(city),
                   [Table(cols, [Section(rows=rows)], groups=groups, total=total)],
                   notes=[f"ВСЕГО НАГРУЗКА ПО КОТЕЛЬНЫМ: {total[-1]:.4f} Гкал/час"],
-                  signatures=SIGNATURES)
+                  signatures=_signatures(city))
 
 
 def nag_kateg(city, opts):
@@ -316,7 +323,7 @@ def nag_kateg(city, opts):
     rows = [r for s in sections for r in s.rows]
     return Report("ТЕПЛОВАЯ НАГРУЗКА ПО КАТЕГОРИЯМ ПОТРЕБИТЕЛЕЙ", _city_lines(city),
                   [Table(cols, sections, total=_sum_row(cols, rows, "ИТОГО:", label_col=2))],
-                  signatures=SIGNATURES)
+                  signatures=_signatures(city))
 
 
 def limit(city, opts):
@@ -496,11 +503,22 @@ def polez_otpusk(city, opts):
              f"за {(city.name_mes or '').strip()} {city.god} г."] + ([dict(VID_USLUGA)[vid]] if vid else [])
     return Report("ПОЛЕЗНЫЙ ОТПУСК", lines,
                   [Table(POLEZ_COLS, [Section(rows=[tarif_row])] + sections + [itog], groups=groups)],
-                  signatures=["Ведущий специалист" + "\u2003" * 12 + FIO_NACH],
+                  signatures=[_ved_spec(city, "\u2003" * 12)],
                   landscape=True,
-                  approve=["УТВЕРЖДАЮ:", "Начальник Рыбницкого участка", "по эксплуатации котельных и тепловых",
-                           'сетей МГУП "Тирастеплоэнерго"', "______________ А.Г.Тищенко",
-                           _approve()[1]])
+                  approve=_utverjdau(city))
+
+
+def _ved_spec(city, sep):
+    from .models import Podpisant
+    dolj, fio = _signer(Podpisant.VED_SPEC, city)
+    return f"{dolj or 'Ведущий специалист'}{sep}{fio}"
+
+
+def _utverjdau(city):
+    """Гриф «УТВЕРЖДАЮ» из справочника подписантов."""
+    from .models import Podpisant
+    dolj, fio = _signer(Podpisant.UTVERJDAU, city)
+    return ["УТВЕРЖДАЮ:"] + ([dolj] if dolj else []) + [f"______________ {fio}", _approve()[1]]
 
 
 NAG_MINIST = (1, 2, 3, 4, 7, 8, 9, 10, 19)
@@ -523,11 +541,12 @@ def nag_minist(city, opts):
     rows = [r for s in sections for r in s.rows]
     return Report("РАСПРЕДЕЛЕННАЯ НАГРУЗКА ПО МИНИСТЕРСТВАМ", [f"{(city.name_mes or '').strip()} {city.god} г."],
                   [Table(cols, sections, total=_sum_row(cols, rows, "ИТОГО:", label_col=1))],
-                  signatures=[f"Ведущий специалист СУиРТЭ __________________________________ {FIO_NACH}"])
+                  signatures=[_ved_spec(city, f" {LINE} ")])
 
 
 def _ispol_sign(city):
-    fio, dolj = ISPOL.get((city.name_gorod or "").strip(), ("", ""))
+    from .models import Podpisant
+    dolj, fio = _signer(Podpisant.PRIBORY, city)
     return [f"{dolj}", f"Подпись _______________ дата ___________      {fio}"]
 
 

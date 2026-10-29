@@ -508,7 +508,16 @@ class ReportsTests(KartaBase):
         self.assertEqual([r[1] for r in t.sections[0].rows], [5])
         self.assertEqual(t.sections[0].rows[0][4], "С")
         self.assertEqual(t.total[-1], Decimal("10.5"))
-        self.assertEqual(rep.signatures, reports.SIGNATURES)
+        self.assertEqual(rep.signatures, [f"Исполнитель {reports.LINE}",
+                                          f"Ведущий специалист {reports.LINE} Борсуковский С.В."])
+        # Подписанты берутся из справочника.
+        from abonents.models import Podpisant
+        Podpisant.objects.filter(rol="ved").update(fio="Петров П.П.")
+        Podpisant.objects.create(rol="ved", gorod=2, doljnost="Инженер", fio="Сидоров С.С.")
+        rep, _ = reports.build(reports.BY_KEY["ot_kateg"], self.ryb, {})
+        self.assertTrue(rep.signatures[1].endswith("Петров П.П."))
+        rep, _ = reports.build(reports.BY_KEY["ot_kateg"], self.dub, {})
+        self.assertEqual(rep.signatures[1], f"Инженер {reports.LINE} Сидоров С.С.")
 
     def test_kotelnye_and_kategor(self):
         from abonents import reports
@@ -576,7 +585,9 @@ class ReportsTests(KartaBase):
         rep, _ = reports.build(reports.BY_KEY["otch_pribor"], self.ryb, {})
         row = rep.tables[0].sections[0].rows[0]
         self.assertEqual((row[0], row[3], row[7]), (5, "ВКТ-7  №123", Decimal("5.0")))
-        self.assertEqual(rep.signatures[0], reports.ISPOL["Рыбница"][1])
+        self.assertEqual(rep.signatures[0],
+                         "Инспектор по контролю за потреблением тепловой энергии юридическим лицам")
+        self.assertTrue(rep.signatures[1].endswith("Химач Н.И."))
         rep, _ = reports.build(reports.BY_KEY["otch_priborg"], self.ryb, {})
         self.assertEqual(rep.tables[0].sections[0].rows[0][6], Decimal("5.33"))
         rep, opts = reports.build(reports.BY_KEY["device_pov"], self.ryb, {"date": "2026-06-01"})
