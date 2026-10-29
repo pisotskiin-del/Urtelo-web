@@ -134,15 +134,17 @@ class KartaTests(KartaBase):
         Potreb.objects.filter(potreb_id=5).update(d_stat=60)
         Potreb.objects.filter(potreb_id=7).update(d_stat=63)
         self.login("Наблюдатель")
-        r = self.client.get("/abonents/?gorod=1&aktiv=0&aktiv=1")
+        # По умолчанию галочка включена.
+        r = self.client.get("/abonents/?gorod=1")
         self.assertEqual(r.context["page"].paginator.count, 1)
+        self.assertEqual(self.client.get("/abonents/?gorod=1&aktiv=0&aktiv=1").context["page"].paginator.count, 1)
         # Галочка запоминается.
         self.assertEqual(self.client.get("/abonents/?gorod=1").context["page"].paginator.count, 1)
         self.assertEqual(self.client.get("/abonents/?gorod=1&aktiv=0").context["page"].paginator.count, 3)
 
     def test_search(self):
         self.login("Наблюдатель")
-        self.assertRedirects(self.client.get("/abonents/", {"gorod": 1, "dog": 8}), "/abonents/9/")
+        self.assertRedirects(self.client.get("/abonents/", {"gorod": 1, "dog": 8, "aktiv": 0}), "/abonents/9/")
         response = self.client.get("/abonents/", {"gorod": 1, "dog": 6})
         self.assertContains(response, "Магазин")
         self.assertContains(response, "Склад")
@@ -347,7 +349,7 @@ class StatusTests(KartaBase):
         # Как в карте программы 2026 года: дата окончания и «отключен с» — сегодня.
         self.assertEqual((p.dk_dog, p.data_otkot), (date.today(), date.today()))
         self.assertContains(self.client.get("/abonents/9/"), "Лицевой счет: Расторгнут")
-        listing = self.client.get("/abonents/?gorod=1").content.decode()
+        listing = self.client.get("/abonents/?gorod=1&aktiv=0").content.decode()
         self.assertEqual(listing.count('class="clickable otkl"'), 1)
 
 

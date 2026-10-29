@@ -68,7 +68,7 @@ def index(request):
     # Галочка «Только активные лицевые счета» запоминается до выхода.
     if "aktiv" in request.GET:
         request.session["aktiv"] = request.GET.get("aktiv") == "1"
-    aktiv = request.session.get("aktiv", False)
+    aktiv = request.session.get("aktiv", True)
     qs = Potreb.objects.filter(cod_gor=city).select_related("cod_gor").order_by("pk")
     if aktiv:
         qs = qs.filter(d_stat__in=layout.RASCHET)
