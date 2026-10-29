@@ -114,7 +114,8 @@ class KartaTests(KartaBase):
         self.login("Оператор")
         Potreb.objects.filter(potreb_id=9).update(accept=0)
         html = self.client.get("/abonents/9/edit/?tab=ishod").content.decode()
-        self.assertNotIn('<option value="0"', html)
+        accept = re.search(r'<select name="accept".*?</select>', html, re.S).group(0)
+        self.assertNotIn('<option value="0"', accept)
         self.assertNotIn('<option value=""', re.search(r'<select name="accept".*?</select>', html, re.S).group(0))
         from abonents.forms import karta_form
         form = karta_form("ishod", {"accept": "0"}, instance=Potreb.objects.get(potreb_id=9))
@@ -237,11 +238,11 @@ class RaschetTests(TestCase):
         self.ryb = Danrasch.objects.create(cod_gorod=1, name_gorod="Рыбница", tkoef=Decimal("0.5"),
                                            qpfakt=Decimal("46"), t_vozd=Decimal("10"), t_proekt=-17)
         self.dub = Danrasch.objects.create(cod_gorod=2, name_gorod="Дубоссары", qpfakt=Decimal("0"))
-        common = dict(nalich_pot=3, dnotop=Decimal("30"), accept=1, id_katabon=1)
-        # По прибору: (20 − 10) × 1,5 = 15 Гкал, ГВС 2, лимит 40 при выставленных 10.
+        common = dict(nalich_pot=3, dnotop=Decimal("30"), accept=1, id_katabon=1, d_stat=60)
+        # По прибору: (20 − 10) × 1,5 = 15 Гкал, ГВС 2 и потери ГВС 1, лимит 40 при выставленных 10.
         self.a = Potreb.objects.create(potreb_id=1, nom_dog=1, cod_gor=self.ryb, tip_rasot=1, pok_old=10,
-                                       pok_new=20, koef_pok=Decimal("1.5"), nach_gvs=2, vd_limit=40, nach_finan=10,
-                                       name_potre="По прибору", **common)
+                                       pok_new=20, koef_pok=Decimal("1.5"), nach_gvs=2, poter_gvs=1, vd_limit=40,
+                                       nach_finan=10, name_potre="По прибору", **common)
         # По нагрузке: 0,1 × 24 × 30 × 0,5 = 36 Гкал.
         self.b = Potreb.objects.create(potreb_id=2, nom_dog=2, cod_gor=self.ryb, tip_rasot=3,
                                        q_otoppr=Decimal("0.1"), **common)
@@ -253,9 +254,12 @@ class RaschetTests(TestCase):
                                        tip_rasot=1, pok_new=10, koef_pok=1, q_otop=Decimal("0.3"), **common)
         self.s = Potreb.objects.create(potreb_id=5, nom_dog=51, nom_dogab=50, nom_pribor=1, cod_gor=self.dub,
                                        tip_rasot=1, q_otop=Decimal("0.1"), **common)
-        # Договор расторгнут: дней отопления 0, по нагрузке ничего не начисляется.
-        self.x = Potreb.objects.create(potreb_id=6, nom_dog=6, cod_gor=self.ryb, tip_rasot=3, d_stat=63,
-                                       q_otoppr=Decimal("0.1"), **common)
+        # Договор расторгнут: расчёт его не трогает.
+        self.x = Potreb.objects.create(potreb_id=6, nom_dog=6, cod_gor=self.ryb, tip_rasot=3,
+                                       q_otoppr=Decimal("0.1"), nac_vsego=5, **{**common, "d_stat": 63})
+        # ГВС по прибору: (1100 − 1000) × 0,0533 = 5,33 Гкал.
+        self.g = Potreb.objects.create(potreb_id=7, nom_dog=7, cod_gor=self.dub, tip_rasot=3, tip_rasgvs=1,
+                                       pok_newg=1100, pok_oldg=1000, **common)
 
     def login(self, role):
         user = get_user_model().objects.create_user(role, password="x")
@@ -275,17 +279,20 @@ class RaschetTests(TestCase):
         self.assertEqual(Danrasch.objects.get(cod_gorod=1).qpras, Decimal("54.00"))
         self.assertEqual((a.nach_otopl, b.nach_otopl, c.nach_otopl),
                          (Decimal("15.000"), Decimal("16.670"), Decimal("12.330")))
-        self.assertEqual(a.nac_vsego, Decimal("17.000"))
+        self.assertEqual(a.nac_vsego, Decimal("18.000"))  # 15 + ГВС 2 + потери ГВС 1
         self.assertEqual((h.nach_otsub, s.nach_otsub, h.q_otopobsh), (Decimal("7.500"), Decimal("2.500"),
                                                                       Decimal("0.40000")))
         self.assertEqual((h.nach_otopl, s.nach_otopl), (Decimal("7.500"), Decimal("2.500")))
-        # 10 + 17 × 2 ≥ 40, но 10 + 17 ≤ 40.
+        # 10 + 18 × 2 ≥ 40, но 10 + 18 ≤ 40.
         self.assertEqual(list(Limit.objects.values_list("potreb_id", "koment")), [(1, "Лимит заканчивается")])
         x = Potreb.objects.get(pk=self.x.pk)
-        self.assertEqual((x.dnotop, x.nach_otnag, x.nac_vsego), (Decimal("0.0"), Decimal("0.000"), Decimal("0.000")))
+        self.assertEqual((x.dnotop, x.nach_otnag, x.nac_vsego), (Decimal("30.0"), None, Decimal("5.000")))
+        g = Potreb.objects.get(pk=self.g.pk)
+        self.assertEqual((g.nach_gvs, g.nac_vsego), (Decimal("5.330"), Decimal("5.330")))
         self.assertEqual(SpTeplpoteri.objects.count(), 6)  # записи потерь создаются, как в старой программе
         page = self.client.get("/abonents/raschet/itog/")
         self.assertContains(page, "рассчитано абонентов 6")
+        self.assertContains(page, "Без заключённого договора (не рассчитывались): 1")
         self.assertContains(page, "Лимит заканчивается")
 
     def test_viewer_cannot_run(self):
@@ -301,7 +308,7 @@ class RaschetTests(TestCase):
         self.assertRedirects(response, "/abonents/raschet/dannye/")
         d = Danrasch.objects.get(cod_gorod=1)
         self.assertEqual(d.tkoef, Decimal("0.400"))  # (18 − 4) / (18 + 17)
-        self.assertEqual(set(Potreb.objects.filter(cod_gor=1, d_stat=None).values_list("dnotop", flat=True)),
+        self.assertEqual(set(Potreb.objects.filter(cod_gor=1, d_stat=60).values_list("dnotop", flat=True)),
                          {Decimal("31.0")})
         self.assertEqual(Potreb.objects.get(potreb_id=6).dnotop, Decimal("0.0"))
         self.assertEqual(set(Potreb.objects.filter(cod_gor=2).values_list("dnotop", flat=True)), {Decimal("30.0")})

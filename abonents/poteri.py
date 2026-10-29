@@ -34,6 +34,8 @@ def raschet(sp, p):
     sp.vs_poteri = total
 
     delta = (p.pok_new or 0) - (p.pok_old or 0)
-    p.poter_pr = total if (delta > 0 or p.nalich_pot == 1) and p.tip_rasot == 1 else 0
+    # В программе 2026 года, если потери по прибору не начисляются, в них
+    # записываются тепловые потери ГВС.
+    p.poter_pr = total if (delta > 0 or p.nalich_pot == 1) and p.tip_rasot == 1 else (p.poter_gvs or 0)
     p.poter_nag = total if ((p.q_otoppr or 0) > 0 or p.nalich_pot == 1) and p.tip_rasot == 3 else 0
     return total

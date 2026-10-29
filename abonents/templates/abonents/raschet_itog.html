@@ -4,7 +4,7 @@
 <p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a> / <a href="{% url 'abonents:raschet' %}">Расчет</a> /</p>
 <h1>Итоги расчета</h1>
 {% if info %}<p>Расчет {{ info.time }}: рассчитано абонентов {{ info.potreb }}.
-  {% if info.otkluchen %}У отключённых абонентов (договор расторгнут или приостановлен) дни отопления заменены на 0: л/№ {{ info.otkluchen|join:", " }}.{% endif %}
+  {% if info.otkluchen %}Без заключённого договора (не рассчитывались): {{ info.otkluchen|length }}.{% endif %}
   {% if info.created_poteri %}Созданы записи потерь по участкам для л/№ {{ info.created_poteri|join:", " }}.{% endif %}</p>
   {% if info.zero_division %}<p class="msg warning">Деление на ноль (начислено 0, проверьте данные):
     {% for pid, what in info.zero_division %}<a href="{% url 'abonents:karta' pid %}">л/№ {{ pid }}</a> — {{ what }}{% if not forloop.last %}; {% endif %}{% endfor %}</p>{% endif %}

@@ -30,7 +30,7 @@ MONTHS = ["Январь", "Февраль", "Март", "Апрель", "Май"
           "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]
 
 # Обнуляются после закрытия месяца (REPLACE … WITH 0 ALL).
-ZERO = ["nach_otsub", "nach_otopl", "nacs_priso", "nach_gvs", "nac_vsego", "nach_otnag", "nach_otpr",
+ZERO = ["nach_otsub", "nach_otopl", "nacs_priso", "nach_gvs", "nac_vsego", "nach_otnag", "nach_otpr", "poter_gvs",
         "nac_pogaz", "poter_pr", "poter_nag", "gkl_perer", "predopl", "dn_pereras", "tkf_perer",
         "dngvs", "dnotop", "poterschob", "poternagob"]
 # Все поля potreb, которые меняет переход (их же возвращает отмена).

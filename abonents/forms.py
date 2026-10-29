@@ -1,3 +1,4 @@
+import datetime
 from decimal import ROUND_HALF_UP, Decimal
 
 from django import forms
@@ -99,8 +100,20 @@ class KartaForm(DbfFormMixin, forms.ModelForm):
     def save(self, commit=True):
         obj = super().save(commit=False)
         if "d_stat" in self.changed_data:
-            # Расшифровка статуса хранится рядом с кодом, как в старой программе.
+            # Как список «Статус договора» старой карты: расшифровка хранится
+            # рядом с кодом, дата смены статуса — в d_dog, начала действия
+            # (возобновлен) — в dn_dog, окончания (приостановлен, расторгнут) — в dk_dog.
+            today = datetime.date.today()
             obj.d_stat_val = dict(layout.D_STAT).get(obj.d_stat, "")
+            if obj.d_stat == 0:
+                obj.d_dog = obj.dn_dog = obj.dk_dog = None
+            elif obj.d_stat == 60:
+                obj.d_dog = today
+            elif obj.d_stat == 62:
+                obj.dn_dog = today
+            elif obj.d_stat in layout.OTKLUCHEN:
+                obj.dk_dog = today
+            obj.data_otkot = today
         if "id_koteln" in self.changed_data:
             # Как форма nov_abonent: название котельной хранится и в самой записи.
             kotel = GvsKot.objects.filter(id_kot=obj.id_koteln).first()
@@ -159,6 +172,9 @@ class TeploschForm(DbfFormMixin, forms.ModelForm):
 class NovAbonentForm(DbfFormMixin, forms.ModelForm):
     """Ввод нового абонента (форма nov_abonent)."""
 
+    kodt_flag = forms.BooleanField(
+        label="Использовать в информации счет тариф для населения с возмещением", required=False)
+
     def __init__(self, *args, city=None, **kwargs):
         super().__init__(*args, **kwargs)
         cities = Danrasch.objects.exclude(cod_gorod=None).order_by("cod_gorod")
@@ -211,6 +227,8 @@ class NovAbonentForm(DbfFormMixin, forms.ModelForm):
             elif isinstance(f, (models.CharField, models.TextField)):
                 setattr(p, f.attname, "")
         p.cod_gor_id = self.cleaned_data["cod_gor"]
+        p.gorod_val = Danrasch.objects.filter(cod_gorod=p.cod_gor_id).values_list("name_gorod", flat=True).first() or ""
+        p.kodt = 1 if self.cleaned_data.get("kodt_flag") else 0
         p.accept = 1  # «Акцепт» 0 не допускается
         kotel = GvsKot.objects.filter(id_kot=p.id_koteln).first() if p.id_koteln else None
         p.name_kot = kotel.name_kot if kotel else ""
@@ -233,11 +251,13 @@ class DanRaschForm(DbfFormMixin, forms.ModelForm):
 
     class Meta:
         model = Danrasch
-        fields = ["t_vozd", "t_proekt", "dnotop", "dngvs", "qpfakt"]
+        fields = ["t_vozd", "t_proekt", "dnotop", "dngvs", "qpfakt", "gkl_pod", "gkl_bezpod"]
         labels = {
             "t_vozd": "Фактическая t наружного воздуха, °С", "t_proekt": "Расчетная t для проектирования, °С",
             "dnotop": "Количество дней подачи отопления", "dngvs": "Количество дней подачи ГВС",
             "qpfakt": "Q факт, Гкал",
+            "gkl_pod": "Полезный отпуск населению абонентскому с господдержкой, Гкал",
+            "gkl_bezpod": "Полезный отпуск населению абонентскому без господдержки, Гкал",
         }
 
     def clean(self):

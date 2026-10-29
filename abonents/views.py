@@ -392,13 +392,13 @@ def dan_rasch(request):
                     changes["dngvs"] = d.dngvs or 0
                 if changes:
                     # У отключённых абонентов (договор расторгнут или приостановлен) 0 дней.
-                    in_city.exclude(d_stat__in=raschet.OTKLUCHEN).update(**changes)
-                    in_city.filter(d_stat__in=raschet.OTKLUCHEN).update(**{name: 0 for name in changes})
+                    in_city.exclude(d_stat__in=layout.OTKLUCHEN).update(**changes)
+                    in_city.filter(d_stat__in=layout.OTKLUCHEN).update(**{name: 0 for name in changes})
                 # Как кнопка «Выход» старой формы: название котельной в записях абонентов.
                 for kot in GvsKot.objects.filter(kod_gor=city):
                     in_city.filter(id_koteln=kot.id_kot).exclude(name_kot=kot.name_kot).update(name_kot=kot.name_kot)
             messages.success(request, f"Сохранено. t коэффициент: {formats.localize(d.tkoef)}"
-                             + (f"; дни записаны {in_city.exclude(d_stat__in=raschet.OTKLUCHEN).count()} абонентам, "
+                             + (f"; дни записаны {in_city.exclude(d_stat__in=layout.OTKLUCHEN).count()} абонентам, "
                                 f"у отключённых 0" if changes else ""))
             return redirect("abonents:dan_rasch")
     return render(request, "abonents/dan_rasch.html", {

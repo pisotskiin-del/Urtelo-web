@@ -5,9 +5,14 @@
 таблицы potreb. Каждое записанное значение округляется до знаков поля, как
 при REPLACE в DBF, и следующие шаги читают уже округлённое значение.
 
+Как в программе 2026 года (urteplo.exe): рассчитываются только абоненты с
+заключённым договором (SET FILTER TO d_stat=60), остальные записи расчёт не
+трогает и не видит; ГВС по прибору считается по показаниям счетчика ГВС;
+к оплате прибавляются тепловые потери ГВС.
+
 Отличия от старой программы:
-- у отключённых абонентов (договор расторгнут или приостановлен, d_stat 63 и
-  61) дней отопления 0 (решено 28.10.2026);
+- договоры со статусом «Возобновлен» (62) тоже рассчитываются (в старой
+  программе фильтр пропускал их, а это заключённый договор);
 - предоплатой не пользуются (28.10.2026), поэтому ветки «Выставить
   предоплату» и «Удалить предоплату» не перенесены: в старой форме эти
   флажки всегда недоступны. pr_tiprasch старая программа всегда ставит 2."""
@@ -19,10 +24,11 @@ from django.db import transaction
 
 from catalogs.models import Danrasch, Limit, Potreb, SpTeplpoteri
 
-from .layout import OTKLUCHEN
+from .layout import RASCHET
 from .poteri import SECTIONS, section_loss
 
 ZERO = Decimal(0)
+GVS_GKAL = Decimal("0.0533")  # Гкал на единицу показаний счетчика ГВС
 POSLE = ["posle_prib", "posle_pri1", "posle_pri2", "posle_pri3", "posle_pri4"]
 PRIS_NAG = [f"pris_nag{i}" for i in range(1, 9)]
 
@@ -59,7 +65,7 @@ class Result:
     zero_division: list = field(default_factory=list)    # (л/№, что считалось)
     limits: list = field(default_factory=list)          # записи таблицы limit
     cities: list = field(default_factory=list)          # итоги по городам
-    otkluchen: list = field(default_factory=list)       # л/№ отключённых, у которых обнулены дни
+    otkluchen: list = field(default_factory=list)       # л/№, которые не рассчитывались (договор не заключён)
 
 
 def _div(a, b, result, rec, what):
@@ -99,6 +105,8 @@ def compute(recs, cities, sp_by_ln):
     cities — danrasch по коду города, sp_by_ln — потери по участкам по л/№
     (недостающие добавляются). Возвращает итоги и какие поля изменены."""
     result = Result()
+    result.otkluchen = [p.potreb_id for p in recs if p.d_stat not in RASCHET]
+    recs = [p for p in recs if p.d_stat in RASCHET]
     result.potreb = len(recs)
     pt = Table(Potreb)
     st = Table(SpTeplpoteri)
@@ -118,9 +126,6 @@ def compute(recs, cities, sp_by_ln):
 
     # 1. Потери по участкам, обнуление итогов, начисление по прибору и по нагрузке.
     for p in recs:
-        if p.d_stat in OTKLUCHEN and n(p.dnotop) != 0:
-            put(p, "dnotop", 0)
-            result.otkluchen.append(p.potreb_id)
         sp = sp_by_ln.get(p.potreb_id)
         if sp is None:
             sp = SpTeplpoteri(ln=p.potreb_id)
@@ -162,6 +167,8 @@ def compute(recs, cities, sp_by_ln):
             put(p, "nach_otpr", 0)
         put(p, "s_obshaya", 0)
         put(p, "q_otopobsh", 0)
+        if p.tip_rasgvs == 1:
+            put(p, "nach_gvs", (n(p.pok_newg) - n(p.pok_oldg)) * GVS_GKAL)
 
     # 2. Абоненты (не главные по договору), у которых потери начисляются.
     for p in recs:
@@ -257,7 +264,7 @@ def compute(recs, cities, sp_by_ln):
                                         + poteri_ob - n(p.nacs_priso)))
         else:
             put(p, "nach_otopl", round2(n(p.nach_otsub) + otopnag + n(p.gkl_perer) + poteri_ob))
-        put(p, "nac_vsego", n(p.nach_gvs) + n(p.nach_otopl))
+        put(p, "nac_vsego", n(p.nach_gvs) + n(p.nach_otopl) + n(p.poter_gvs))
 
     # 9. Объекты одного договора (otnos_dog): к оплате собирается на абоненте.
     for p in recs:
