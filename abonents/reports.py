@@ -719,9 +719,11 @@ def to_xlsx(report, out):
     bold = Font(bold=True)
     width = max(len(t.cols) for t in report.tables)
     r = 0
+    import textwrap
     for line in report.approve:
-        r += 1
-        ws.cell(r, max(1, width - 2), line)
+        for part in textwrap.wrap(line, 45) or [""]:
+            r += 1
+            ws.cell(r, max(1, width - 2), part)
     r += 1
     ws.cell(r, 1, report.title).font = Font(bold=True, size=13)
     for line in report.lines:
