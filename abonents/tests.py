@@ -128,6 +128,17 @@ class KartaTests(KartaBase):
         html = self.client.get("/abonents/").content.decode()
         self.assertIn("<b>Октябрь 2026</b>", html)
         self.assertNotIn('class="gsearch"', html)
+        self.assertIn("Система расчётов", html)
+
+    def test_only_active_checkbox(self):
+        Potreb.objects.filter(potreb_id=5).update(d_stat=60)
+        Potreb.objects.filter(potreb_id=7).update(d_stat=63)
+        self.login("Наблюдатель")
+        r = self.client.get("/abonents/?gorod=1&aktiv=0&aktiv=1")
+        self.assertEqual(r.context["page"].paginator.count, 1)
+        # Галочка запоминается.
+        self.assertEqual(self.client.get("/abonents/?gorod=1").context["page"].paginator.count, 1)
+        self.assertEqual(self.client.get("/abonents/?gorod=1&aktiv=0").context["page"].paginator.count, 3)
 
     def test_search(self):
         self.login("Наблюдатель")

@@ -19,6 +19,11 @@
     <form method="get"><input type="hidden" name="gorod" value="{{ city }}">
       <label>№ договора <input name="dog" value="{{ dog }}" inputmode="numeric" size="6"></label><button title="Найти">{% icon "search" %}</button>
     </form>
+    <form method="get" class="aktiv-form"><input type="hidden" name="gorod" value="{{ city }}">
+      {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}{% if dog %}<input type="hidden" name="dog" value="{{ dog }}">{% endif %}
+      <input type="hidden" name="aktiv" value="0">
+      <label class="check"><input type="checkbox" name="aktiv" value="1"{% if aktiv %} checked{% endif %} onchange="this.form.submit()"> Только активные лицевые счета</label>
+    </form>
     <form method="get">
       <label>Лицевой № <input name="ls" inputmode="numeric" size="6" title="Ищет во всех городах"></label><button title="Открыть карту">{% icon "open" %}</button>
     </form>

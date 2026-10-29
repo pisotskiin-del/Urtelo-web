@@ -65,7 +65,13 @@ def index(request):
             return redirect("abonents:karta", potreb_id=found.potreb_id)
         messages.warning(request, "Абонент с таким лицевым № не найден")
 
+    # Галочка «Только активные лицевые счета» запоминается до выхода.
+    if "aktiv" in request.GET:
+        request.session["aktiv"] = request.GET.get("aktiv") == "1"
+    aktiv = request.session.get("aktiv", False)
     qs = Potreb.objects.filter(cod_gor=city).select_related("cod_gor").order_by("pk")
+    if aktiv:
+        qs = qs.filter(d_stat__in=layout.RASCHET)
     if dog is not None:
         qs = qs.filter(nom_dog=dog)
     if sub is not None:
@@ -86,7 +92,7 @@ def index(request):
     return render(request, "abonents/index.html", {
         "cities": cities, "city": city, "rows": rows, "page": page,
         "dog": request.GET.get("dog", ""), "q": name, "sub": sub,
-        "query": params.urlencode(), "filtered": dog is not None or sub is not None or bool(name),
+        "query": params.urlencode(), "aktiv": aktiv, "filtered": dog is not None or sub is not None or bool(name),
     })
 
 
