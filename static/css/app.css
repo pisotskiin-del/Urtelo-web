@@ -408,3 +408,7 @@ table.rep tr.total td { font-weight:700; background:#e8eef7; }
 @page { size:A4 portrait; margin:12mm; }
 @page land { size:A4 landscape; margin:10mm; }
 @media print { .report.landscape { page:land; } }
+/* Ссылка на расшифровку ячейки отчета: выглядит как число, подчеркивается при наведении. */
+table.rep a.drill { color:inherit; text-decoration:none; border-bottom:1px dotted var(--muted); }
+table.rep a.drill:hover { color:var(--accent, #2563eb); border-bottom-color:currentColor; }
+@media print { table.rep a.drill { border-bottom:0; } }

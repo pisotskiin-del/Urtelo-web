@@ -589,6 +589,30 @@ def otchety(request):
 
 @login_required
 @view_required
+def polez_rasshifr(request):
+    """Расшифровка ячейки «Полезного отпуска»: список абонентов, из которых
+    она сложилась (ссылки на карты), на экране и в Excel."""
+    report = reports.polez_rasshifr(request.GET)
+    if report is None:
+        raise Http404
+    if request.GET.get("xlsx"):
+        import io
+        buf = io.BytesIO()
+        reports.to_xlsx(report, buf)
+        response = HttpResponse(buf.getvalue(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        response["Content-Disposition"] = 'attachment; filename="polez_rasshifr.xlsx"'
+        return response
+    table = report.tables[0]
+    table.sections[0].links = [[None, reverse("abonents:karta", args=[r[1]])] + [None] * (len(r) - 2)
+                               for r in table.sections[0].rows]
+    query = request.GET.copy()
+    query["xlsx"] = "1"
+    back = reverse("abonents:otchet", args=["polez_otpusk"]) + (f"?vid={request.GET['vid']}" if request.GET.get("vid") else "")
+    return render(request, "abonents/rasshifr.html", {"report": report, "xlsx_query": query.urlencode(), "back": back})
+
+
+@login_required
+@view_required
 def otchet(request, key):
     """Отчет на экране, для печати и в Excel (?xlsx=1)."""
     rdef = reports.BY_KEY.get(key)

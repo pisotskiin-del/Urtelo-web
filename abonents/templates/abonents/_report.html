@@ -1,0 +1,28 @@
+{% load ui %}<article class="card report{% if report.landscape %} landscape{% endif %}">
+  {% if report.approve %}<div class="rep-approve">{% for line in report.approve %}<p>{{ line }}</p>{% endfor %}</div>{% endif %}
+  <header class="rep-head">
+    <h2>{{ report.title }}</h2>
+    {% for line in report.lines %}<p>{{ line }}</p>{% endfor %}
+  </header>
+  {% for t in report.tables %}
+  {% if t.title %}<h3>{{ t.title }}</h3>{% endif %}
+  <div class="scroll"><table class="grid rep">
+    <thead>
+      {% if t.head %}{% for hrow in t.head %}<tr>{% for title, cs, rs in hrow %}<th colspan="{{ cs }}" rowspan="{{ rs }}" class="grp">{{ title }}</th>{% endfor %}</tr>{% endfor %}
+      {% else %}{% if t.groups %}<tr>{% for g, span in t.groups %}<th colspan="{{ span }}" class="grp">{{ g }}</th>{% endfor %}</tr>{% endif %}
+      <tr>{% for c in t.cols %}<th{% if c.kind != "text" %} class="num"{% endif %}>{{ c.title }}</th>{% endfor %}</tr>{% endif %}
+    </thead>
+    <tbody>
+    {% for s in t.sections %}
+      {% if s.title %}<tr class="sec"><td colspan="{{ t.cols|length }}">{{ s.title }}</td></tr>{% endif %}
+      {% for row in s.rows %}<tr>{% rcells row t.cols s.links forloop.counter0 as cells %}{% for v, c, link in cells %}<td{% if c.kind != "text" %} class="num"{% else %} class="wrap"{% endif %}>{% if link %}<a class="drill" href="{{ link }}" title="Из чего сложилось">{% rcell v c %}</a>{% else %}{% rcell v c %}{% endif %}</td>{% endfor %}</tr>
+      {% empty %}<tr><td colspan="{{ t.cols|length }}" class="muted">Нет записей</td></tr>{% endfor %}
+      {% if s.foot %}<tr class="foot">{% rcells s.foot t.cols s.foot_links as cells %}{% for v, c, link in cells %}<td{% if c.kind != "text" %} class="num"{% endif %}>{% if link %}<a class="drill" href="{{ link }}" title="Из чего сложилось">{% rcell v c %}</a>{% else %}{% rcell v c %}{% endif %}</td>{% endfor %}</tr>{% endif %}
+    {% endfor %}
+    </tbody>
+    {% if t.total %}<tfoot><tr class="total">{% for v, c in t.total|withcols:t.cols %}<td{% if c.kind != "text" %} class="num"{% endif %}>{% rcell v c %}</td>{% endfor %}</tr></tfoot>{% endif %}
+  </table></div>
+  {% endfor %}
+  {% for note in report.notes %}<p class="rep-note">{{ note }}</p>{% endfor %}
+  {% if report.signatures %}<div class="rep-sign">{% for s in report.signatures %}<p>{{ s }}</p>{% endfor %}</div>{% endif %}
+</article>

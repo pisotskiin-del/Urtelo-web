@@ -578,6 +578,18 @@ class ReportsTests(KartaBase):
         cell = next(c for row in ws.iter_rows() for c in row if c.value == "Местный")
         self.assertIn(f"{cell.coordinate}:{cell.offset(column=1).coordinate}", merged)
         self.assertNotIn("Местный, диз.", [c.value for row in ws.iter_rows() for c in row])
+        # Расшифровка ячейки: местный бюджет, дизель, П/У Рыбницы — школа л/№ 21.
+        url = t.sections[1].links[0][8]
+        self.login("Наблюдатель")
+        page = self.client.get(url)
+        self.assertContains(page, "Школа")
+        self.assertContains(page, 'href="/abonents/21/"')
+        self.assertEqual(page.context["report"].tables[0].total[-1], Decimal("6"))
+        # Итого по филиалу, ВСЕГО — все записи, сумма как в ячейке.
+        rep_all = reports.polez_rasshifr({"uch": "0", "row": "all", "col": "13", "vid": ""})
+        self.assertEqual(rep_all.tables[0].total[-1], Decimal("21.0"))
+        self.assertEqual(self.client.get(url + "&xlsx=1").status_code, 200)
+        self.assertEqual(self.client.get("/abonents/otchety/polez_otpusk/rasshifr/?col=99").status_code, 404)
         rep, _ = reports.build(reports.BY_KEY["polez_otpusk"], self.ryb, {"vid": "otopl"})
         self.assertEqual(rep.tables[0].sections[-1].foot[-1], Decimal("18"))
 

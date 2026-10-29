@@ -59,6 +59,15 @@ def rcell(value, col):
     return value
 
 
+@register.simple_tag
+def rcells(row, cols, links=None, index=None):
+    """Тройки (значение, колонка, ссылка на расшифровку) строки отчета.
+    links — ссылки строки или (с index) ссылки всех строк раздела."""
+    if links is not None and index is not None:
+        links = links[index] if index < len(links) else None
+    return list(zip(row, cols, links or [None] * len(cols)))
+
+
 @register.filter
 def withcols(row, cols):
     """Пары (значение, колонка) строки отчета."""

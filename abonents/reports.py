@@ -13,7 +13,7 @@ from django.db.models import Q
 from catalogs.models import (Akcept, Danrasch, GvsKot, Kategorpot, Limit, Minist, Potreb, SetUrdevice,
                              SetUrdevicelist, Tarif)
 
-from .layout import RASCHET
+from .layout import RASCHET, TIP_RASOT
 
 LINE = "__________________________________"
 
@@ -51,6 +51,8 @@ class Section:
     title: str = ""
     rows: list = field(default_factory=list)
     foot: list = None       # строка итога группы
+    links: list = None      # ссылки на расшифровку ячеек: по строке список url или None
+    foot_links: list = None
 
 
 @dataclass
@@ -455,44 +457,36 @@ def polez_otpusk(city, opts):
     «Итого по филиалу»."""
     vid = opts.get("vid")
 
-    def val(p):
-        if vid == "otopl":
-            return n(p.nach_otopl)
-        if vid == "gvs":
-            return _gvs(p)
-        return n(p.nach_otopl) + _gvs(p)
-
     def shown(row):
         return [None if i in POLEZ_VSEGO else v for i, v in enumerate(row)]
+
+    def links(gorod, row_key, row):
+        return [None if i == 0 or row[i] is None else _polez_url(gorod, row_key, i, vid) for i in range(len(row))]
 
     sections, pu_rows, nagr_rows = [], [], []
     for c in Danrasch.objects.exclude(cod_gorod=None).order_by("cod_gorod"):
         recs = list(_active(Potreb.objects.filter(cod_gor=c.cod_gorod)))
-        gpod, gbez = n(c.gkl_pod), n(c.gkl_bezpod)
-        k_pod = gpod / (gpod + gbez) if gpod + gbez > 0 else Decimal(0)
-        k_bez = gbez / (gpod + gbez) if gpod + gbez > 0 else Decimal(0)
+        k = _polez_doli(c)
         rows = []
-        for label, pu in (("П/У", True), ("Нагр.", False)):
-            def s(kat=None, diz=False, any_topl=False):
-                return sum((val(p) for p in recs
-                            if ((p.tip_rasot == 1) if pu else p.tip_rasot in (2, 3))
-                            and (kat is None or p.id_kategor == kat)
-                            and (any_topl or bool(p.vid_topl) == diz)), Decimal(0))
-            hoz = s(1, any_topl=pu)
-            nas_abon = s(6)
-            nas = [s(4), nas_abon * k_pod, nas_abon * k_bez, s(5)]
-            bud = [s(2), s(2, True), s(3), s(3, True)]
-            vsego_nas = s(4) + s(5) + nas_abon
-            vsego_bud = sum(bud, Decimal(0))
-            rows.append([label] + nas + [vsego_nas, hoz] + bud + [s(7), vsego_bud, s() + bud[1] + bud[3]])
+        for label, row_key in (("П/У", "pu"), ("Нагр.", "nagr")):
+            row = [label]
+            for col in range(1, len(POLEZ_COLS)):
+                row.append(sum((_polez_val(p, vid) * f for p in recs
+                                if _polez_row(p) == row_key and (f := _polez_part(p, col, k)) is not None),
+                               Decimal(0)))
+            rows.append(row)
         sec = Section(rows=[shown(r) for r in rows])
+        sec.links = [links(c.cod_gorod, key, r) for key, r in zip(("pu", "nagr"), sec.rows)]
         sec.foot = _sum_row(POLEZ_COLS, rows, f"Всего по г.{(c.name_gorod or '').strip()}")
+        sec.foot_links = links(c.cod_gorod, "all", sec.foot)
         sections.append(sec)
         pu_rows.append(rows[0])
         nagr_rows.append(rows[1])
     pu, nagr = _sum_row(POLEZ_COLS, pu_rows, "П/У"), _sum_row(POLEZ_COLS, nagr_rows, "Нагр.")
     itog = Section(rows=[shown(pu), shown(nagr)])
+    itog.links = [links(0, key, r) for key, r in zip(("pu", "nagr"), itog.rows)]
     itog.foot = _sum_row(POLEZ_COLS, [pu, nagr], "Итого по филиалу")
+    itog.foot_links = links(0, "all", itog.foot)
     tar = _tarif()
 
     def t(i, d=False):
@@ -525,6 +519,111 @@ def _utverjdau(city):
     from .models import Podpisant
     dolj, fio = _signer(Podpisant.UTVERJDAU, city)
     return ["УТВЕРЖДАЮ:"] + ([dolj] if dolj else []) + [f"______________ {fio}", _approve()[1]]
+
+
+def _polez_val(p, vid):
+    """Что суммирует полезный отпуск по записи при выбранной услуге."""
+    if vid == "otopl":
+        return n(p.nach_otopl)
+    if vid == "gvs":
+        return _gvs(p)
+    return n(p.nach_otopl) + _gvs(p)
+
+
+def _polez_row(p):
+    """Строка отчета: П/У — расчет по прибору, Нагр. — по нагрузке."""
+    return "pu" if p.tip_rasot == 1 else "nagr" if p.tip_rasot in (2, 3) else None
+
+
+def _polez_doli(city):
+    """Доли населения абонентского с господдержкой и без нее."""
+    gpod, gbez = n(city.gkl_pod), n(city.gkl_bezpod)
+    if gpod + gbez > 0:
+        return gpod / (gpod + gbez), gbez / (gpod + gbez)
+    return Decimal(0), Decimal(0)
+
+
+def _polez_part(p, col, doli):
+    """Множитель, с которым запись входит в колонку col полезного отпуска,
+    или None, если не входит. Правила — как в кнопке «Полезный отпуск»
+    старой программы (см. polez_otpusk)."""
+    kat, diz = p.id_kategor, bool(p.vid_topl)
+    rules = {
+        1: kat == 4 and not diz,
+        2: kat == 6 and not diz,
+        3: kat == 6 and not diz,
+        4: kat == 5 and not diz,
+        5: kat in (4, 5, 6) and not diz,
+        6: kat == 1 and (p.tip_rasot == 1 or not diz),
+        7: kat == 2 and not diz,
+        8: kat == 2 and diz,
+        9: kat == 3 and not diz,
+        10: kat == 3 and diz,
+        11: kat == 7 and not diz,
+        12: kat in (2, 3),
+        13: not diz or kat in (2, 3),
+    }
+    if not rules.get(col):
+        return None
+    return {2: doli[0], 3: doli[1]}.get(col, Decimal(1))
+
+
+POLEZ_ROWS = {"pu": "П/У", "nagr": "Нагр.", "all": "П/У и Нагр."}
+
+
+def _polez_url(gorod, row_key, col, vid):
+    from urllib.parse import urlencode
+    from django.urls import reverse
+    return reverse("abonents:polez_rasshifr") + "?" + urlencode(
+        {"uch": gorod, "row": row_key, "col": col, "vid": vid or ""})
+
+
+def polez_rasshifr(params):
+    """Расшифровка ячейки полезного отпуска: записи, из которых она сложилась."""
+    try:
+        col = int(params.get("col", ""))
+        uch = int(params.get("uch", "0"))
+    except ValueError:
+        return None
+    row_key = params.get("row")
+    vid = params.get("vid") or ""
+    if not 1 <= col < len(POLEZ_COLS) or row_key not in POLEZ_ROWS or vid not in dict(VID_USLUGA):
+        return None
+    cities = {c.cod_gorod: c for c in Danrasch.objects.exclude(cod_gorod=None)}
+    if uch and uch not in cities:
+        return None
+    qs = _active(Potreb.objects.filter(cod_gor__in=[uch] if uch else list(cities)))
+    names, sposob = _kategor(), dict(TIP_RASOT)
+    cols = [Col("Участок"), Col("Л/№", "int"), Col("№ дог.", "int"), Col("Наименование"), Col("Объект"),
+            Col("Категория"), Col("Способ расчета"), Col("Диз. топливо"),
+            Col("Отопление", "num", 3, total=True), Col("ГВС", "num", 3, total=True),
+            Col("Потери ГВС", "num", 3, total=True), Col("Доля", "num", 4), Col("В ячейку", "num", 3, total=True)]
+    rows, links = [], []
+    for p in qs.order_by("cod_gor", "id_kategor", "potreb_id"):
+        if row_key != "all" and _polez_row(p) != row_key or _polez_row(p) is None:
+            continue
+        f = _polez_part(p, col, _polez_doli(cities[p.cod_gor_id]))
+        v = _polez_val(p, vid)
+        if f is None or v == 0:
+            continue
+        rows.append([(cities[p.cod_gor_id].name_gorod or "").strip(), p.potreb_id, p.nom_dog, p.name_potre,
+                     p.glav_potre, names.get(p.id_kategor, p.id_kategor), sposob.get(p.tip_rasot, p.tip_rasot),
+                     "да" if p.vid_topl else "", n(p.nach_otopl) if vid != "gvs" else Decimal(0),
+                     n(p.nach_gvs) if vid != "otopl" else Decimal(0), n(p.poter_gvs) if vid != "otopl" else Decimal(0),
+                     f if col in (2, 3) else None, v * f])
+    title = POLEZ_COLS[col].title
+    if col in (7, 8):
+        title = "Местный бюджет" + (", дизельное топливо" if col == 8 else "")
+    if col in (9, 10):
+        title = "Республиканский бюджет" + (", дизельное топливо" if col == 10 else "")
+    lines = [f"Колонка: {title}", f"Строка: {POLEZ_ROWS[row_key]}",
+             "Участок: " + ((cities[uch].name_gorod or "").strip() if uch else "все (итого по филиалу)")]
+    if vid:
+        lines.append(dict(VID_USLUGA)[vid])
+    total = _sum_row(cols, rows, "Итого")
+    total[-2] = None
+    return Report("Расшифровка: полезный отпуск", lines, [Table(cols, [Section(rows=rows)], total=total)],
+                  notes=[f"Записей: {len(rows)}"], landscape=True)
 
 
 NAG_MINIST = (1, 2, 3, 4, 7, 8, 9, 10, 19)

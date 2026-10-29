@@ -13,6 +13,7 @@ urlpatterns = [
     path("nov-mes/", views.nov_mes_view, name="nov_mes"),
     path("nov-mes/<int:pk>/1c/", views.abot_1c, name="abot_1c"),
     path("otchety/", views.otchety, name="otchety"),
+    path("otchety/polez_otpusk/rasshifr/", views.polez_rasshifr, name="polez_rasshifr"),
     path("otchety/<slug:key>/", views.otchet, name="otchet"),
     path("<int:potreb_id>/", views.karta, name="karta"),
     path("<int:potreb_id>/edit/", views.karta_edit, name="edit"),
