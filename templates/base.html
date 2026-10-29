@@ -18,9 +18,7 @@
   <a class="brand" href="{% url 'abonents:index' %}"><img class="brand-mark" src="{% static 'img/teplo.svg' %}" alt="">
     <span class="bt"><b>Теплоснабжение</b><small>Учёт абонентов и расчётов</small></span></a>
   {% if user.is_authenticated %}
-  {% if perms.catalogs.view_potreb %}<form class="gsearch" method="get" action="{% url 'abonents:index' %}" role="search">
-    <input name="q" placeholder="Поиск абонентов по наименованию…" value="{{ request.GET.q|default:'' }}" aria-label="Поиск абонентов">
-    <button title="Найти">{% icon "search" %}</button></form>{% endif %}
+  <div class="topmes">{% if raschet_mes %}<small>Расчетный месяц</small><b>{{ raschet_mes }}</b>{% endif %}</div>
   <div class="user">
     <span class="ava">{% icon "user" %}</span>
     <span class="who">{{ user.get_full_name|default:user.username }}{% if user_roles %}<small>{{ user_roles|join:", " }}</small>{% endif %}</span>

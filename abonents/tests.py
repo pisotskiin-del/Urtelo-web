@@ -123,6 +123,12 @@ class KartaTests(KartaBase):
         self.assertFalse(form.is_valid())
         self.assertIn("accept", form.errors)
 
+    def test_topbar_shows_month_instead_of_search(self):
+        self.login("Наблюдатель")
+        html = self.client.get("/abonents/").content.decode()
+        self.assertIn("<b>Октябрь 2026</b>", html)
+        self.assertNotIn('class="gsearch"', html)
+
     def test_search(self):
         self.login("Наблюдатель")
         self.assertRedirects(self.client.get("/abonents/", {"gorod": 1, "dog": 8}), "/abonents/9/")
