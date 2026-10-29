@@ -419,28 +419,32 @@ def _tarif():
 
 
 POLEZ_COLS = [Col("Категории потребителей"),
-              Col("Ведомст. жильё", "num", 3, total=True),
-              Col("Население абонентское (с господд.)", "num", 3, total=True),
-              Col("Население абонентское (без господд.)", "num", 3, total=True),
-              Col("Население хозрасчет", "num", 3, total=True),
-              Col("Всего население", "num", 3, total=True),
-              Col("Всего хозрасчёт", "num", 3, total=True),
-              Col("Местный", "num", 3, total=True), Col("Местный (диз.)", "num", 3, total=True),
-              Col("Республ.", "num", 3, total=True), Col("Республ. (диз.)", "num", 3, total=True),
-              Col("Организация СКиИОД", "num", 3, total=True),
-              Col("Всего бюджет", "num", 3, total=True),
-              Col("ВСЕГО", "num", 3, total=True)]
+              Col("Ведомст. жильё", "num", 2, total=True),
+              Col("Население абонентское (с господд.)", "num", 2, total=True),
+              Col("Население абонентское (без господд.)", "num", 2, total=True),
+              Col("Население хозрасчет", "num", 2, total=True),
+              Col("Всего население (Гкал)", "num", 2, total=True),
+              Col("Всего хозрасчёт (Гкал)", "num", 2, total=True),
+              Col("Местный", "num", 2, total=True), Col("Местный, диз.", "num", 2, total=True),
+              Col("Республ.", "num", 2, total=True), Col("Республ., диз.", "num", 2, total=True),
+              Col("Организация СКиИОД", "num", 2, total=True),
+              Col("Всего бюджет (Гкал)", "num", 2, total=True),
+              Col("ВСЕГО (Гкал)", "num", 2, total=True)]
+# Колонки «Всего…», которые в строках «П/У» и «Нагр.» старый отчет оставляет пустыми.
+POLEZ_VSEGO = (5, 12, 13)
 
 
 def polez_otpusk(city, opts):
-    """Кнопка «Полезный отпуск» (polez_otpusk): отпуск тепловой энергии по
+    """Кнопка «Полезный отпуск» (polez_otpusk.frx): отпуск тепловой энергии по
     категориям потребителей по всем участкам — по приборам учета (П/У,
     tip_rasot=1) и по нагрузке (tip_rasot 2, 3). Бюджет разделен по виду
     топлива (дизельное — отдельные колонки), население абонентское — на «с
     господдержкой» и «без» в пропорции Гкал, указанных в исходных данных
     участка. Сложение и отборы повторяют старую программу: хозрасчёт по
     прибору берется без учета вида топлива, а дизельное топливо для
-    населения и СКиИОД в отчет не входит."""
+    населения и СКиИОД в отчет не входит. Оформление — как в старом отчете:
+    строки П/У и Нагр. по каждому городу, «Всего по г.», в конце П/У, Нагр. и
+    «Итого по филиалу»."""
     vid = opts.get("vid")
 
     def val(p):
@@ -450,7 +454,10 @@ def polez_otpusk(city, opts):
             return _gvs(p)
         return n(p.nach_otopl) + _gvs(p)
 
-    sections, total_rows = [], []
+    def shown(row):
+        return [None if i in POLEZ_VSEGO else v for i, v in enumerate(row)]
+
+    sections, pu_rows, nagr_rows = [], [], []
     for c in Danrasch.objects.exclude(cod_gorod=None).order_by("cod_gorod"):
         recs = list(_active(Potreb.objects.filter(cod_gor=c.cod_gorod)))
         gpod, gbez = n(c.gkl_pod), n(c.gkl_bezpod)
@@ -470,26 +477,29 @@ def polez_otpusk(city, opts):
             vsego_nas = s(4) + s(5) + nas_abon
             vsego_bud = sum(bud, Decimal(0))
             rows.append([label] + nas + [vsego_nas, hoz] + bud + [s(7), vsego_bud, s() + bud[1] + bud[3]])
-        sec = Section(f"г. {(c.name_gorod or '').strip()}", rows)
+        sec = Section(rows=[shown(r) for r in rows])
         sec.foot = _sum_row(POLEZ_COLS, rows, f"Всего по г.{(c.name_gorod or '').strip()}")
         sections.append(sec)
-        total_rows += rows
+        pu_rows.append(rows[0])
+        nagr_rows.append(rows[1])
+    pu, nagr = _sum_row(POLEZ_COLS, pu_rows, "П/У"), _sum_row(POLEZ_COLS, nagr_rows, "Нагр.")
+    itog = Section(rows=[shown(pu), shown(nagr)])
+    itog.foot = _sum_row(POLEZ_COLS, [pu, nagr], "Итого по филиалу")
     tar = _tarif()
 
     def t(i, d=False):
         return tar.get(i, (Decimal(0), Decimal(0)))[1 if d else 0]
     tarif_row = ["Тариф (руб)", t(9), t(12), t(11), t(9), t(9), t(1), t(2), t(2, True), t(2), t(2, True),
                  t(10), None, None]
-    groups = [("", 1), ("Население (Гкал)", 5), ("", 1), ("Бюджет (Гкал)", 6), ("", 1)]
+    groups = [("", 1), ("Население (Гкал)", 4), ("", 2), ("Бюджет (Гкал)", 4), ("", 3)]
     lines = ["тепловой энергии по категориям потребителей",
              f"за {(city.name_mes or '').strip()} {city.god} г."] + ([dict(VID_USLUGA)[vid]] if vid else [])
     return Report("ПОЛЕЗНЫЙ ОТПУСК", lines,
-                  [Table(POLEZ_COLS, [Section(rows=[tarif_row])] + sections, groups=groups,
-                         total=_sum_row(POLEZ_COLS, total_rows, "Итого по филиалу"))],
-                  signatures=[f"Ведущий специалист __________________________________ {FIO_NACH}"],
+                  [Table(POLEZ_COLS, [Section(rows=[tarif_row])] + sections + [itog], groups=groups)],
+                  signatures=["Ведущий специалист" + "\u2003" * 12 + FIO_NACH],
                   landscape=True,
-                  approve=["УТВЕРЖДАЮ:", "Начальник Рыбницкого участка по эксплуатации котельных",
-                           'и тепловых сетей МГУП "Тирастеплоэнерго"', "______________ А.Г.Тищенко",
+                  approve=["УТВЕРЖДАЮ:", "Начальник Рыбницкого участка", "по эксплуатации котельных и тепловых",
+                           'сетей МГУП "Тирастеплоэнерго"', "______________ А.Г.Тищенко",
                            _approve()[1]])
 
 

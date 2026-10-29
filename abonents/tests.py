@@ -551,11 +551,15 @@ class ReportsTests(KartaBase):
         pu, nagr = t.sections[1].rows
         self.assertEqual(pu[6], Decimal("11.0"))      # хозрасчет: 8 + 2,5 + потери ГВС 0,5
         self.assertEqual(pu[8], Decimal("6"))         # местный бюджет, дизельное топливо
-        self.assertEqual(pu[-1], Decimal("17.0"))
+        self.assertIsNone(pu[-1])                     # «ВСЕГО» только в строке города
+        self.assertEqual(t.sections[1].foot[-1], Decimal("21.0"))
+        self.assertEqual(t.sections[1].foot[0], "Всего по г.Рыбница")
         self.assertEqual(nagr[2:4], [Decimal("3"), Decimal("1")])   # население абонентское 3:1
-        self.assertEqual(t.total[-1], Decimal("21.0"))
+        itog = t.sections[-1]
+        self.assertEqual([r[0] for r in itog.rows], ["П/У", "Нагр."])
+        self.assertEqual((itog.foot[0], itog.foot[-1]), ("Итого по филиалу", Decimal("21.0")))
         rep, _ = reports.build(reports.BY_KEY["polez_otpusk"], self.ryb, {"vid": "otopl"})
-        self.assertEqual(rep.tables[0].total[-1], Decimal("18"))
+        self.assertEqual(rep.tables[0].sections[-1].foot[-1], Decimal("18"))
 
     def test_minist_and_pribory(self):
         from abonents import reports
