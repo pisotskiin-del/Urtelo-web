@@ -91,13 +91,28 @@ def convert(field, value, encoding="cp1251"):
     return value
 
 
-def import_table(model, directory, encoding=None, truncate=True):
+def load_fixes(path):
+    """Правила исправления данных: {файл DBF в нижнем регистре: {КОЛОНКА: правило}}."""
+    import json
+
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    return {
+        table.lower(): {col.upper(): rule for col, rule in cols.items()}
+        for table, cols in data.items() if not table.startswith("_")
+    }
+
+
+def import_table(model, directory, encoding=None, truncate=True, fixes=None):
     """Перенести одну таблицу. Возвращает (записей в DBF, записей в БД,
-    {поле DBF: число нечитаемых значений, заменённых на пустые})."""
+    {поле DBF: число нечитаемых значений, заменённых на пустые},
+    {поле DBF: число значений, исправленных по правилам fixes})."""
     path = _find_file(Path(directory), model.dbf_source)
     table = open_dbf(path, encoding=encoding)
     dbf_names = {f.name.upper() for f in table.fields}
     present = {f: col for f, col in column_map(model).items() if col in dbf_names}
+    rules = {f: (fixes or {}).get(model.dbf_source.lower(), {}).get(col) for f, col in present.items()}
+    rules = {f: rule for f, rule in rules.items() if rule}
+    fixed = {present[f]: 0 for f in rules}
 
     unique_fields = [f for f in present if f.unique and not f.primary_key]
     seen = {f: {} for f in unique_fields}
@@ -118,6 +133,10 @@ def import_table(model, directory, encoding=None, truncate=True):
             obj = model(**{
                 f.attname: convert(f, upper.get(col), table.encoding) for f, col in present.items()
             })
+            for f, rule in rules.items():
+                if getattr(obj, f.attname) in rule["from"]:
+                    setattr(obj, f.attname, rule["to"])
+                    fixed[present[f]] += 1
             for f in unique_fields:
                 value = getattr(obj, f.attname)
                 if value is None:
@@ -144,7 +163,7 @@ def import_table(model, directory, encoding=None, truncate=True):
             )
         if batch:
             model.objects.bulk_create(batch)
-    return source_count, model.objects.count(), dict(table.parse_errors)
+    return source_count, model.objects.count(), dict(table.parse_errors), fixed
 
 
 def _find_file(directory, name):

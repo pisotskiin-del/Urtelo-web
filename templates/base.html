@@ -1,29 +1,90 @@
-{% load static %}<!doctype html>
+{% load static ui %}<!doctype html>
 <html lang="ru">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Теплоснабжение{% endblock %}</title>
-  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <title>{% block title %}Система расчётов с юридическими потребителями{% endblock %}</title>
+  <link rel="icon" href="{% static 'img/teplo.svg' %}" type="image/svg+xml">
+  <link rel="icon" href="{% static 'img/teplo.ico' %}" sizes="any">
+  <link rel="manifest" href="{% static 'manifest.webmanifest' %}">
+  <meta name="theme-color" content="#13284b">
+  <link rel="stylesheet" href="{% static_v 'css/app.css' %}">
 </head>
 <body>
+{% include "_icons.html" %}
+<script>try { if (localStorage.getItem("side-mini") === "1") document.documentElement.classList.add("side-mini"); } catch (e) {}</script>
 <header class="topbar">
-  <a class="brand" href="{% url 'catalogs:index' %}">Теплоснабжение</a>
+  {% if user.is_authenticated %}<button class="burger" type="button" onclick="toggleSide()" title="Свернуть / развернуть меню">{% icon "menu" %}</button>{% endif %}
+  <a class="brand" href="{% url 'abonents:index' %}"><img class="brand-logo" src="{% static 'img/logo.png' %}" alt="ГУП «Тирастеплоэнерго»">
+    <span class="bt"><b>Система расчётов</b><small>с юридическими потребителями</small></span></a>
   {% if user.is_authenticated %}
-  <nav>
-    <a href="{% url 'catalogs:index' %}">Справочники</a>
-    {% if user.is_staff %}<a href="{% url 'admin:index' %}">Администрирование</a>{% endif %}
-  </nav>
+  <div class="topmes">{% if raschet_mes %}<small>Расчетный месяц</small><b>{{ raschet_mes }}</b>{% endif %}</div>
   <div class="user">
-    {{ user.get_full_name|default:user.username }}
-    {% if user_roles %}<span class="role">{{ user_roles|join:", " }}</span>{% endif %}
-    <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="link">Выйти</button></form>
+    <span class="ava">{% icon "user" %}</span>
+    <span class="who">{{ user.get_full_name|default:user.username }}{% if user_roles %}<small>{{ user_roles|join:", " }}</small>{% endif %}</span>
+    <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="link">{% icon "logout" %} Выход</button></form>
   </div>
   {% endif %}
 </header>
+<div class="layout">
+{% if user.is_authenticated %}
+{% with app=request.resolver_match.app_name url=request.resolver_match.url_name %}
+<nav class="sidebar">
+  {% if perms.catalogs.view_potreb %}<a href="{% url 'abonents:index' %}" title="Абоненты" {% if app == "abonents" and url != "raschet" and url != "raschet_itog" and url != "dan_rasch" and url != "nov_mes" and url != "otchety" and url != "otchet" and url != "new" %}class="active"{% endif %}>{% icon "users" %}<span class="t">Абоненты</span></a>
+  {% if perms.catalogs.add_potreb %}<a href="{% url 'abonents:new' %}" title="Новый абонент" {% if url == "new" %}class="active"{% endif %}>{% icon "plus" %}<span class="t">Новый абонент</span></a>{% endif %}
+  <a href="{% url 'abonents:raschet' %}" title="Расчет" {% if url == "raschet" or url == "raschet_itog" %}class="active"{% endif %}>{% icon "calc" %}<span class="t">Расчет</span></a>
+  <a href="{% url 'abonents:dan_rasch' %}" title="Исходные данные для расчета" {% if url == "dan_rasch" %}class="active"{% endif %}>{% icon "sliders" %}<span class="t">Исходные данные</span></a>
+  <a href="{% url 'abonents:nov_mes' %}" title="Переход на новый месяц" {% if url == "nov_mes" %}class="active"{% endif %}>{% icon "calendar" %}<span class="t">Новый месяц</span></a>
+  <a href="{% url 'abonents:otchety' %}" title="Отчеты и печать" {% if url == "otchety" or url == "otchet" %}class="active"{% endif %}>{% icon "file" %}<span class="t">Отчеты</span></a>{% endif %}
+  <a href="{% url 'catalogs:index' %}" title="Справочники" {% if app == "catalogs" %}class="active"{% endif %}>{% icon "book" %}<span class="t">Справочники</span></a>
+  {% if user.is_staff %}<a href="{% url 'admin:index' %}" title="Администрирование">{% icon "settings" %}<span class="t">Администрирование</span></a>{% endif %}
+  <span class="sp"></span>
+  <button class="collapse" type="button" onclick="toggleSide()">{% icon "back" %}<span class="t">Свернуть</span></button>
+</nav>
+{% endwith %}
+{% endif %}
 <main>
   {% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
   {% block content %}{% endblock %}
 </main>
+</div>
+<script>
+function toggleSide() {
+  var on = document.documentElement.classList.toggle("side-mini");
+  try { localStorage.setItem("side-mini", on ? "1" : "0"); } catch (e) {}
+}
+// Высокая таблица (список абонентов) занимает остаток экрана: всё, что ниже
+// неё (листалка, подсказки), остаётся видно без прокрутки страницы.
+(function () {
+  function fit() {
+    var t = document.querySelector(".scroll.tall");
+    if (!t) return;
+    if (window.innerWidth <= 900) { t.style.maxHeight = ""; return; }
+    var below = 0, el = t.nextElementSibling;
+    for (; el; el = el.nextElementSibling) {
+      var cs = getComputedStyle(el);
+      below += el.offsetHeight + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom);
+    }
+    var main = t.closest("main"), pad = main ? parseFloat(getComputedStyle(main).paddingBottom) : 0;
+    var h = window.innerHeight - t.getBoundingClientRect().top - window.scrollY - below - pad - 4;
+    t.style.maxHeight = Math.max(240, h) + "px";
+  }
+  window.addEventListener("load", fit);
+  window.addEventListener("resize", fit);
+  document.addEventListener("DOMContentLoaded", fit);
+})();
+// Горячие клавиши: «/» — к поиску; PageUp/PageDown в карте — предыдущая/следующая запись.
+document.addEventListener("keydown", function (e) {
+  var t = e.target, typing = t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName);
+  if (typing || e.ctrlKey || e.altKey || e.metaKey) return;
+  if (e.key === "/" || e.code === "Slash") {  // и в русской раскладке (та же клавиша даёт «.»)
+    var s = document.querySelector("[data-hotkey-search]");
+    if (s) { e.preventDefault(); s.focus(); s.select(); }
+  } else if (e.key === "PageUp" || e.key === "PageDown") {
+    var a = document.getElementById(e.key === "PageUp" ? "nav-prev" : "nav-next");
+    if (a) { e.preventDefault(); location.href = a.href; }
+  }
+});
+</script>
 </body>
 </html>

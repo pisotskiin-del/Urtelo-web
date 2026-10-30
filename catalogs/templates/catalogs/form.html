@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load ui %}
 {% block title %}{% if obj %}Изменение{% else %}Новая запись{% endif %}{% endblock %}
 {% block content %}
 <p class="crumbs"><a href="{% url 'catalogs:index' %}">Справочники</a> / <a href="{% url 'catalogs:list' slug %}">{{ meta.verbose_name_plural }}</a> /</p>
@@ -6,7 +6,7 @@
 <form method="post" class="card form">{% csrf_token %}
   {{ form.as_div }}
   <div class="actions">
-    <button class="primary">Сохранить</button>
+    <button class="primary">{% icon "save" %} Сохранить</button>
     <a href="{% if obj %}{% url 'catalogs:detail' slug obj.pk %}{% else %}{% url 'catalogs:list' slug %}{% endif %}">Отмена</a>
   </div>
 </form>

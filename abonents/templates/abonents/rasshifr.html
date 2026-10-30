@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Расшифровка{% endblock %}
+{% block content %}
+<div class="no-print">
+<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a><span class="sep">›</span><a href="{% url 'abonents:otchety' %}">Отчеты</a><span class="sep">›</span><a href="{{ back }}">Полезный отпуск</a><span class="sep">›</span>Расшифровка</p>
+<div class="page-head"><h1>Расшифровка ячейки</h1>
+  <div class="actions">
+    <button type="button" onclick="window.print()">{% icon "file" %} Печать</button>
+    <a class="button" href="?{{ xlsx_query }}">{% icon "chart" %} Excel</a>
+  </div>
+</div>
+<p class="muted">Записи с заключённым договором, из которых сложилось значение ячейки. Щелчок по лицевому № открывает карту.</p>
+</div>
+{% include "abonents/_report.html" %}
+{% endblock %}

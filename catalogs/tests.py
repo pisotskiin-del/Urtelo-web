@@ -5,7 +5,8 @@ from django.contrib.auth.models import Group
 from django.core.management import call_command
 from django.test import TestCase
 
-from catalogs.models import Minist, SmtpNas, Tarif
+from abonents.models import TarifGorod
+from catalogs.models import Minist, SmtpNas
 from catalogs.registry import catalog_models
 
 
@@ -23,7 +24,8 @@ class RoleTests(TestCase):
     def test_menu_directories_are_listed_in_menu_order(self):
         names = [m._meta.model_name for m in catalog_models()]
         self.assertEqual(names[:3], ["danrasch", "minist", "gvskot"])
-        self.assertEqual(len(names), 14)
+        self.assertEqual(len(names), 15)
+        self.assertEqual(names[-1], "podpisant")
         self.assertNotIn("sul", names)
         self.assertNotIn("smtpnas", names)
 
@@ -41,9 +43,15 @@ class RoleTests(TestCase):
 
     def test_operator_can_add_but_not_delete(self):
         self.login("Оператор")
-        response = self.client.post("/catalogs/tarif/new/", {"id_tar": 99, "name_tar": "Проверка", "zn_tar": "100.5"})
+        response = self.client.post("/catalogs/tarifgorod/new/",
+                                    {"gorod": 2, "id_tar": 99, "name_tar": "Проверка", "zn_tar": "100.5"})
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(Tarif.objects.filter(id_tar=99).exists())
+        self.assertTrue(TarifGorod.objects.filter(gorod=2, id_tar=99).exists())
+        # Тот же код у того же участка второй раз не добавить, у другого — можно.
+        response = self.client.post("/catalogs/tarifgorod/new/", {"gorod": 2, "id_tar": 99, "zn_tar": "1"})
+        self.assertEqual(response.status_code, 200)
+        response = self.client.post("/catalogs/tarifgorod/new/", {"gorod": 3, "id_tar": 99, "zn_tar": "1"})
+        self.assertEqual(response.status_code, 302)
         minist = Minist.objects.first()
         self.assertEqual(self.client.post(f"/catalogs/minist/{minist.pk}/delete/").status_code, 403)
 

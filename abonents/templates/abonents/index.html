@@ -1,0 +1,54 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Абоненты<p class="legend"><span><span class="chip warn">Приостановлен</span> <span class="chip off">Расторгнут</span> — строки выделены серым</span>
+  <span><kbd>/</kbd> поиск по наименованию</span><span><kbd>PgUp</kbd> <kbd>PgDn</kbd> в карте — предыдущая и следующая запись</span></p>
+{% endblock %}
+{% block content %}
+<div class="head"><h1>Абоненты</h1></div>
+<div class="toolbar">
+  <nav class="tabs">
+    {% for c in cities %}<a href="?gorod={{ c.cod_gorod }}" {% if c.cod_gorod == city %}class="active"{% endif %}>{{ c.name_gorod }}</a>{% endfor %}
+  </nav>
+  <div class="finder">
+    <form method="get"><input type="hidden" name="gorod" value="{{ city }}">
+      <label>Наименование <input class="wide-input" name="q" value="{{ q }}" placeholder="Часть названия, нажмите /" data-hotkey-search></label><button title="Найти">{% icon "search" %}</button>
+    </form>
+    <form method="get"><input type="hidden" name="gorod" value="{{ city }}">
+      <label>№ договора <input name="dog" value="{{ dog }}" inputmode="numeric" size="6"></label><button title="Найти">{% icon "search" %}</button>
+    </form>
+    <form method="get" class="aktiv-form"><input type="hidden" name="gorod" value="{{ city }}">
+      {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}{% if dog %}<input type="hidden" name="dog" value="{{ dog }}">{% endif %}
+      <input type="hidden" name="aktiv" value="0">
+      <label class="check"><input type="checkbox" name="aktiv" value="1"{% if aktiv %} checked{% endif %} onchange="this.form.submit()"> Только активные лицевые счета</label>
+    </form>
+    <form method="get">
+      <label>Лицевой № <input name="ls" inputmode="numeric" size="6" title="Ищет во всех городах"></label><button title="Открыть карту">{% icon "open" %}</button>
+    </form>
+  </div>
+</div>
+<p class="found">Найдено: <b>{{ page.paginator.count }}</b>{% if sub %} · субабоненты абонента № {{ sub }}{% endif %}
+  {% if filtered %}<a href="?gorod={{ city }}">× Сбросить поиск</a>{% endif %}</p>
+<div class="scroll tall">
+<table class="grid">
+  <thead><tr><th>Л/№</th><th>№ договора</th><th>№ сч.</th><th>Наименование</th><th>Наименование объекта</th><th>Адрес объекта</th><th>Категория</th></tr></thead>
+  <tbody>
+  {% for p, kategor, address in rows %}
+    <tr class="clickable{% if p.d_stat == 61 or p.d_stat == 63 %} otkl{% endif %}" onclick="location.href='{% url 'abonents:karta' p.potreb_id %}'">
+      <td class="num id"><a href="{% url 'abonents:karta' p.potreb_id %}">{{ p.potreb_id }}</a></td>
+      <td class="num">{{ p.nom_dog|default_if_none:"" }}</td><td class="num">{{ p.inf_pribor|default_if_none:"" }}</td>
+      <td class="wrap">{{ p.name_potre|default_if_none:"" }}{% if p.d_stat == 61 %} <span class="chip warn">Приостановлен</span>{% elif p.d_stat == 63 %} <span class="chip off">Расторгнут</span>{% endif %}</td><td class="wrap">{{ p.glav_potre|default_if_none:"" }}</td>
+      <td>{{ address }}</td><td>{{ kategor }}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="7" class="muted">По вашему условию ничего не найдено</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="pager">
+  {% if page.has_previous %}<a href="?{{ query }}&page={{ page.previous_page_number }}">← Назад</a>{% endif %}
+  Страница {{ page.number }} из {{ page.paginator.num_pages }}
+  {% if page.has_next %}<a href="?{{ query }}&page={{ page.next_page_number }}">Вперёд →</a>{% endif %}
+</p>
+<p class="legend"><span><span class="chip warn">Приостановлен</span> <span class="chip off">Расторгнут</span> — строки выделены серым</span>
+  <span><kbd>/</kbd> поиск по наименованию</span><span><kbd>PgUp</kbd> <kbd>PgDn</kbd> в карте — предыдущая и следующая запись</span></p>
+{% endblock %}

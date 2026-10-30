@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Итоги расчета{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a> / <a href="{% url 'abonents:raschet' %}">Расчет</a> /</p>
+<h1>Итоги расчета</h1>
+{% if info %}<p>Расчет {{ info.time }}: рассчитано абонентов {{ info.potreb }}.
+  {% if info.otkluchen %}Без заключённого договора (не рассчитывались): {{ info.otkluchen|length }}.{% endif %}
+  {% if info.created_poteri %}Созданы записи потерь по участкам для л/№ {{ info.created_poteri|join:", " }}.{% endif %}</p>
+  {% if info.zero_division %}<p class="msg warning">Деление на ноль (начислено 0, проверьте данные):
+    {% for pid, what in info.zero_division %}<a href="{% url 'abonents:karta' pid %}">л/№ {{ pid }}</a> — {{ what }}{% if not forloop.last %}; {% endif %}{% endfor %}</p>{% endif %}
+{% endif %}
+<div class="scroll">
+<table class="grid narrow-grid">
+  <thead><tr><th>Гкал</th>{% for c in cities %}<th class="num">{{ c.name_gorod }}</th>{% endfor %}</tr></thead>
+  <tbody>
+    <tr><td>Q факт</td>{% for c in cities %}<td class="num">{{ c.qpfakt|default_if_none:0|floatformat:2 }}</td>{% endfor %}</tr>
+    <tr><td>Q по расчету</td>{% for c in cities %}<td class="num">{{ c.qpras|default_if_none:0|floatformat:2 }}</td>{% endfor %}</tr>
+    {% for label, values in table %}<tr><td>{{ label }}</td>{% for v, url in values %}<td class="num">{% if v %}<a href="{{ url }}" title="По абонентам">{{ v|floatformat:3 }}</a>{% else %}{{ v|floatformat:3 }}{% endif %}</td>{% endfor %}</tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="muted">В итоги входят только заключённые и возобновлённые договоры. Щелчок по числу — список абонентов, из которых оно сложилось.</p>
+{% if stale %}<p class="msg warning">Остались суммы «Предъявлено к оплате» у лицевых счетов без заключённого договора (расчет их не трогает, в итоги они не входят):
+  {% for p in stale %}<a href="{% url 'abonents:karta' p.potreb_id %}">л/№ {{ p.potreb_id }}</a> — {{ p.nac_vsego|floatformat:3 }}{% if not forloop.last %}; {% endif %}{% endfor %}</p>{% endif %}
+<h2>Лимиты</h2>
+{% if limits %}
+<div class="scroll">
+<table class="grid">
+  <thead><tr><th>Л/№</th><th>Наименование</th><th class="num">Выделенный лимит</th><th class="num">Выставлено с начала фин. года</th><th class="num">Предъявлено к оплате</th><th></th></tr></thead>
+  <tbody>
+  {% for l in limits %}
+    <tr><td class="num"><a href="{% url 'abonents:karta' l.potreb_id %}">{{ l.potreb_id }}</a></td><td class="wrap">{{ l.name_dog }}</td>
+      <td class="num">{{ l.vd_limit|floatformat:3 }}</td><td class="num">{{ l.nach_finan|floatformat:3 }}</td><td class="num">{{ l.nac_vsego|floatformat:3 }}</td>
+      <td{% if l.koment == "Превышение лимита" %} class="error"{% endif %}>{{ l.koment }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}<p class="muted">Абонентов, у которых заканчивается или превышен лимит, нет.</p>{% endif %}
+{% endblock %}

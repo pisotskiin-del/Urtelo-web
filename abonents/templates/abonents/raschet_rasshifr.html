@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Расшифровка итогов{% endblock %}
+{% block content %}
+<div class="no-print">
+<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a><span class="sep">›</span><a href="{% url 'abonents:raschet' %}">Расчет</a><span class="sep">›</span><a href="{% url 'abonents:raschet_itog' %}">Итоги расчета</a><span class="sep">›</span>Расшифровка</p>
+<div class="page-head"><h1>Расшифровка итогов</h1>
+  <div class="actions"><button type="button" onclick="window.print()">{% icon "file" %} Печать</button></div>
+</div>
+</div>
+{% include "abonents/_report.html" %}
+{% endblock %}
