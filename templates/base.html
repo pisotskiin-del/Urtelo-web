@@ -77,7 +77,7 @@ function toggleSide() {
 document.addEventListener("keydown", function (e) {
   var t = e.target, typing = t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName);
   if (typing || e.ctrlKey || e.altKey || e.metaKey) return;
-  if (e.key === "/") {
+  if (e.key === "/" || e.code === "Slash") {  // и в русской раскладке (та же клавиша даёт «.»)
     var s = document.querySelector("[data-hotkey-search]");
     if (s) { e.preventDefault(); s.focus(); s.select(); }
   } else if (e.key === "PageUp" || e.key === "PageDown") {
