@@ -15,7 +15,7 @@ CATALOG_ORDER = [
     "gvskot",             # Котельные (форма koteln)
     "spbank",             # Банки (форма sp_bank)
     "kategorpot",         # Категории потребителя
-    "tarif",              # Тарифы
+    "tarifgorod",         # Тарифы (по участкам; общий tarif.dbf — в админке)
     "udnorm",             # Удельные нормы (форма udnorma)
     "teplpot",            # Тепловые потери (форма poteri)
     "akcept",             # Акцепт
@@ -30,7 +30,7 @@ CATALOG_ORDER = [
     "podpisant",          # Подписанты документов (новый, в старой программе были вписаны в отчеты)
 ]
 # Справочники веб-программы, которых нет в базе старой программы.
-EXTRA_MODELS = [("abonents", "Podpisant")]
+EXTRA_MODELS = [("abonents", "Podpisant"), ("abonents", "TarifGorod")]
 
 # Поля, которые не показываются ни в справочниках, ни в админке.
 SECRET_FIELDS = {"password"}

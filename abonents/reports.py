@@ -11,7 +11,7 @@ from decimal import Decimal
 from django.db.models import Q
 
 from catalogs.models import (Akcept, Danrasch, GvsKot, Kategorpot, Limit, Minist, Potreb, SetUrdevice,
-                             SetUrdevicelist, Tarif)
+                             SetUrdevicelist)
 
 from .layout import RASCHET, TIP_RASOT
 
@@ -424,8 +424,9 @@ def potreb_kategor(city, opts):
 
 # --- Отчеты, добавленные в программе 2026 года --------------------------------
 
-def _tarif():
-    return {t.id_tar: (n(t.zn_tar), n(t.diz_tar)) for t in Tarif.objects.exclude(id_tar=None)}
+def _tarif(city):
+    from .models import TarifGorod
+    return {k: (n(z), n(d)) for k, (z, d) in TarifGorod.dlya(city).items()}
 
 
 POLEZ_COLS = [Col("Категории потребителей"),
@@ -488,7 +489,7 @@ def polez_otpusk(city, opts):
     itog.links = [links(0, key, r) for key, r in zip(("pu", "nagr"), itog.rows)]
     itog.foot = _sum_row(POLEZ_COLS, [pu, nagr], "Итого по филиалу")
     itog.foot_links = links(0, "all", itog.foot)
-    tar = _tarif()
+    tar = _tarif(city)  # тарифы выбранного участка
 
     def t(i, d=False):
         return tar.get(i, (Decimal(0), Decimal(0)))[1 if d else 0]

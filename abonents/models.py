@@ -77,3 +77,35 @@ class Podpisant(models.Model):
         p = next((r for r in rows if code is not None and r.gorod == code), None) or \
             next((r for r in rows if r.gorod is None), None)
         return ((p.doljnost or "").strip(), (p.fio or "").strip()) if p else ("", "")
+
+
+class TarifGorod(models.Model):
+    """Тарифы по участкам. В старой программе был один справочник tarif.dbf
+    на все участки; здесь у каждого участка свои значения, а код тарифа тот
+    же, что в tarif.dbf: по коду тариф берут отчеты и выгрузка в 1С."""
+
+    # Код участка как в danrasch.cod_gorod (не ссылка, как у Podpisant).
+    gorod = models.IntegerField("Участок", choices=UCHASTKI)
+    id_tar = models.IntegerField("Код")
+    name_tar = models.CharField("Наименование", max_length=30, blank=True)
+    zn_tar = models.DecimalField("Тариф (Г)", max_digits=6, decimal_places=2, null=True, blank=True)
+    diz_tar = models.DecimalField("Тариф (Д)", max_digits=6, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Тариф"
+        verbose_name_plural = "Тарифы"
+        ordering = ["gorod", "id_tar"]
+        constraints = [models.UniqueConstraint(fields=["gorod", "id_tar"], name="tarif_gorod_kod")]
+
+    def __str__(self):
+        return f"{self.get_gorod_display()}: {self.id_tar} {self.name_tar}".strip()
+
+    @classmethod
+    def dlya(cls, city):
+        """{код: (тариф, тариф для дизеля)} участка. Кода, которого у участка
+        нет, берется из общего справочника старой программы (tarif.dbf)."""
+        from catalogs.models import Tarif
+        code = getattr(city, "cod_gorod", city)
+        out = {t.id_tar: (t.zn_tar or 0, t.diz_tar or 0) for t in Tarif.objects.exclude(id_tar=None)}
+        out.update({t.id_tar: (t.zn_tar or 0, t.diz_tar or 0) for t in cls.objects.filter(gorod=code)})
+        return out

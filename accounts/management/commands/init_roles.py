@@ -10,7 +10,7 @@ class Command(BaseCommand):
     help = "Создать или обновить роли (группы) и их права на справочники."
 
     def handle(self, *args, **opts):
-        catalog_models = list(apps.get_app_config("catalogs").get_models()) + [apps.get_model("abonents", "Podpisant")]
+        catalog_models = list(apps.get_app_config("catalogs").get_models()) + [apps.get_model("abonents", m) for m in ("Podpisant", "TarifGorod")]
         for role, actions in ROLE_ACTIONS.items():
             group, _ = Group.objects.get_or_create(name=role)
             perms = []

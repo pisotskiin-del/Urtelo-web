@@ -22,9 +22,9 @@ from decimal import ROUND_HALF_UP, Decimal
 from django.db import transaction
 from django.utils import timezone
 
-from catalogs.models import Abot, Arhiv, Danrasch, GvsKot, PolezOtpusk, PolezTarif, Potreb, Tarif
+from catalogs.models import Abot, Arhiv, Danrasch, GvsKot, PolezOtpusk, PolezTarif, Potreb
 
-from .models import MesArhiv
+from .models import MesArhiv, TarifGorod
 
 MONTHS = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август",
           "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]
@@ -75,6 +75,13 @@ class Result:
     nac_vsego: Decimal
 
 
+def _tarif_uch(cache, gorod):
+    """Тарифы участка из справочника «Тарифы» (по участкам)."""
+    if gorod not in cache:
+        cache[gorod] = TarifGorod.dlya(gorod)
+    return cache[gorod]
+
+
 def _rows(model):
     return list(model.objects.order_by("pk").values())
 
@@ -97,7 +104,7 @@ def run(user=""):
     arh.save()
 
     # 2. abot для 1С.
-    tarifs = {t.id_tar: t.zn_tar or 0 for t in Tarif.objects.all()}
+    tarifs = {}  # {участок: {код: (тариф, тариф для дизеля)}}
     cities = {d.cod_gorod: d.name_gorod for d in Danrasch.objects.all()}
     abot = []
     for p in potrebs:
@@ -107,7 +114,7 @@ def run(user=""):
         acc = p.accept or 0
         abot.append(Abot(
             kod=p.cod_buhg, kodabon=KODABON_BASE + (p.cod_ac or 0), name=p.name_potre, akcept=acc - 1 if acc else 0,
-            tarif=tarifs.get(tar, 0), ras_kol=_q(Abot, "ras_kol", p.nac_vsego), koduslug=usl, nameuslug="",
+            tarif=_tarif_uch(tarifs, p.cod_gor_id).get(tar, (0, 0))[0], ras_kol=_q(Abot, "ras_kol", p.nac_vsego), koduslug=usl, nameuslug="",
             tarifue=0, city=p.cod_gor_id, ras_chet=p.ras_chet, fisk_cod=p.fisk_cod, perc_peni=p.perc_peni or 0,
             koduslug1=usl1, name_city=cities.get(p.cod_gor_id, ""), name_kateg=kateg,
             n_dog=str(p.nom_dog or "").rjust(10), dat_dog=p.data_dog))

@@ -430,7 +430,11 @@ class NovMesTests(KartaBase):
         super().setUp()
         from catalogs.models import Abot, Arhiv, Tarif
         self.Abot, self.Arhiv = Abot, Arhiv
+        from abonents.models import TarifGorod
         Tarif.objects.create(id_tar=1, zn_tar=Decimal("412.50"))
+        # Тариф берется у участка абонента (Рыбница), а не общий и не другого участка.
+        TarifGorod.objects.create(gorod=1, id_tar=1, zn_tar=Decimal("420.00"))
+        TarifGorod.objects.create(gorod=2, id_tar=1, zn_tar=Decimal("999.00"))
         Danrasch.objects.update(nom_mes=12, name_mes="Декабрь", god=2025)
         Potreb.objects.filter(potreb_id=5).update(nach_finan=Decimal("100"), nach_otopi=Decimal("40"),
                                                   vd_limit=Decimal("200"), ost_limit=Decimal("100"),
@@ -454,8 +458,8 @@ class NovMesTests(KartaBase):
         self.assertEqual(GvsKot.objects.get().nagr_kot, 0)
         abot = self.Abot.objects.order_by("ras_kol")
         self.assertEqual([(x.ras_kol, x.koduslug, x.koduslug1, x.tarif, x.akcept, x.name_kateg, x.name_city) for x in abot],
-                         [(Decimal("2.00"), 4, 4, Decimal("412.50"), 2, "Хозрасчет", "Рыбница"),
-                          (Decimal("10.50"), 4, 4, Decimal("412.50"), 2, "Хозрасчет", "Рыбница")])
+                         [(Decimal("2.00"), 4, 4, Decimal("420.00"), 2, "Хозрасчет", "Рыбница"),
+                          (Decimal("10.50"), 4, 4, Decimal("420.00"), 2, "Хозрасчет", "Рыбница")])
         self.assertEqual(list(self.Arhiv.objects.values_list("nom_mes", "god")), [(12, 2025)])
 
         nov_mes.undo()
@@ -560,7 +564,10 @@ class ReportsTests(KartaBase):
     def test_polez_otpusk(self):
         from abonents import reports
         from catalogs.models import Tarif
+        from abonents.models import TarifGorod
         Tarif.objects.create(id_tar=1, zn_tar=Decimal("985.76"), diz_tar=0)
+        Tarif.objects.create(id_tar=2, zn_tar=Decimal("1"), diz_tar=0)
+        TarifGorod.objects.create(gorod=1, id_tar=2, zn_tar=Decimal("691.32"))   # тариф участка важнее общего
         Kategorpot.objects.create(id_kotegor=2, name_kateg="Местный бюджет")
         Danrasch.objects.filter(cod_gorod=1).update(gkl_pod=Decimal("3"), gkl_bezpod=Decimal("1"))
         Potreb.objects.filter(potreb_id=5).update(poter_gvs=Decimal("0.5"))
@@ -571,6 +578,7 @@ class ReportsTests(KartaBase):
         t = rep.tables[0]
         self.assertEqual(t.sections[0].rows[0][0], "Тариф (руб)")
         self.assertEqual(t.sections[0].rows[0][6], Decimal("985.76"))
+        self.assertEqual(t.sections[0].rows[0][7:9], [Decimal("691.32"), Decimal("691.32")])
         pu, nagr = t.sections[1].rows
         self.assertEqual(pu[6], Decimal("11.0"))      # хозрасчет: 8 + 2,5 + потери ГВС 0,5
         self.assertEqual(pu[7], Decimal("6"))         # местный бюджет вместе с дизельным топливом
