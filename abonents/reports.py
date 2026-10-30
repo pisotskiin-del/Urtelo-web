@@ -53,6 +53,8 @@ class Section:
     foot: list = None       # строка итога группы
     links: list = None      # ссылки на расшифровку ячеек: по строке список url или None
     foot_links: list = None
+    mark_rows: bool = False  # строки выделены цветом и выше обычных (строка тарифов)
+    mark_foot: bool = False  # так же выделенный итог (итог по филиалу)
 
 
 @dataclass
@@ -488,6 +490,7 @@ def polez_otpusk(city, opts):
     itog = Section(rows=[shown(pu), shown(nagr)])
     itog.links = [links(0, key, r) for key, r in zip(("pu", "nagr"), itog.rows)]
     itog.foot = _sum_row(POLEZ_COLS, [pu, nagr], "Итого по филиалу")
+    itog.mark_foot = True
     itog.foot_links = links(0, "all", itog.foot)
     tar = _tarif(city)  # тарифы выбранного участка
 
@@ -503,7 +506,7 @@ def polez_otpusk(city, opts):
     lines = ["тепловой энергии по категориям потребителей",
              f"за {(city.name_mes or '').strip()} {city.god} г."] + ([dict(VID_USLUGA)[vid]] if vid else [])
     return Report("ПОЛЕЗНЫЙ ОТПУСК", lines,
-                  [Table(POLEZ_COLS, [Section(rows=[tarif_row])] + sections + [itog], head=head)],
+                  [Table(POLEZ_COLS, [Section(rows=[tarif_row], mark_rows=True)] + sections + [itog], head=head)],
                   signatures=[_ved_spec(city, "\u2003" * 12)],
                   landscape=True,
                   approve=_utverjdau(city))
@@ -808,7 +811,7 @@ def build(rdef, city, params):
 def to_xlsx(report, out):
     """Выгрузка отчета в Excel."""
     from openpyxl import Workbook
-    from openpyxl.styles import Alignment, Border, Font, Side
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
 
     wb = Workbook()
@@ -824,25 +827,34 @@ def to_xlsx(report, out):
         for part in textwrap.wrap(line, 45) or [""]:
             r += 1
             ws.cell(r, max(1, width - 2), part)
-    r += 1
-    ws.cell(r, 1, report.title).font = Font(bold=True, size=13)
-    for line in report.lines:
+    mark = PatternFill("solid", fgColor="DCE6F2")
+    # Заголовок отчета — по середине над таблицей.
+    for k, line in enumerate([report.title] + list(report.lines)):
         r += 1
-        ws.cell(r, 1, line)
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=width)
+        cell = ws.cell(r, 1, line)
+        cell.alignment = Alignment(horizontal="center")
+        if k == 0:
+            cell.font = Font(bold=True, size=13)
     widths = {}
 
-    def put(row, values, cols, font=None):
+    def put(row, values, cols, font=None, marked=False, center=False):
+        if marked:
+            ws.row_dimensions[row].height = 24
         for i, (v, c) in enumerate(zip(values, cols), 1):
             cell = ws.cell(row, i, v)
             cell.border = box
             if font:
                 cell.font = font
+            if marked:
+                cell.fill, cell.font = mark, bold
+                cell.alignment = Alignment(vertical="center", horizontal="center" if center and i > 1 else None)
             if c.kind == "num" and v is not None and v != "":
                 cell.number_format = "0." + "0" * c.places if c.places else "0"
             elif c.kind == "date" and v:
                 cell.number_format = "DD.MM.YYYY"
             if c.kind == "text":
-                widths[i] = max(widths.get(i, 8), min(60, len(str(v or "")) + 4))
+                widths[i] = max(widths.get(i, 8), min(60, len(str(v or "")) + 6))
             else:
                 widths[i] = max(widths.get(i, 8), 14)
 
@@ -891,10 +903,10 @@ def to_xlsx(report, out):
                 ws.cell(r, 1, s.title).font = bold
             for row in s.rows:
                 r += 1
-                put(r, row, t.cols)
+                put(r, row, t.cols, marked=s.mark_rows, center=True)
             if s.foot:
                 r += 1
-                put(r, s.foot, t.cols, bold)
+                put(r, s.foot, t.cols, bold, marked=s.mark_foot)
         if t.total:
             r += 1
             put(r, t.total, t.cols, bold)

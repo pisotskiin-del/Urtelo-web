@@ -15,9 +15,9 @@
     <tbody>
     {% for s in t.sections %}
       {% if s.title %}<tr class="sec"><td colspan="{{ t.cols|length }}">{{ s.title }}</td></tr>{% endif %}
-      {% for row in s.rows %}<tr>{% rcells row t.cols s.links forloop.counter0 as cells %}{% for v, c, link in cells %}<td{% if c.kind != "text" %} class="num"{% else %} class="wrap"{% endif %}>{% if link %}<a class="drill" href="{{ link }}" title="Из чего сложилось">{% rcell v c %}</a>{% else %}{% rcell v c %}{% endif %}</td>{% endfor %}</tr>
+      {% for row in s.rows %}<tr{% if s.mark_rows %} class="mark"{% endif %}>{% rcells row t.cols s.links forloop.counter0 as cells %}{% for v, c, link in cells %}<td{% if c.kind != "text" %} class="num"{% else %} class="wrap"{% endif %}>{% if link %}<a class="drill" href="{{ link }}" title="Из чего сложилось">{% rcell v c %}</a>{% else %}{% rcell v c %}{% endif %}</td>{% endfor %}</tr>
       {% empty %}<tr><td colspan="{{ t.cols|length }}" class="muted">Нет записей</td></tr>{% endfor %}
-      {% if s.foot %}<tr class="foot">{% rcells s.foot t.cols s.foot_links as cells %}{% for v, c, link in cells %}<td{% if c.kind != "text" %} class="num"{% endif %}>{% if link %}<a class="drill" href="{{ link }}" title="Из чего сложилось">{% rcell v c %}</a>{% else %}{% rcell v c %}{% endif %}</td>{% endfor %}</tr>{% endif %}
+      {% if s.foot %}<tr class="foot{% if s.mark_foot %} mark{% endif %}">{% rcells s.foot t.cols s.foot_links as cells %}{% for v, c, link in cells %}<td{% if c.kind != "text" %} class="num"{% endif %}>{% if link %}<a class="drill" href="{{ link }}" title="Из чего сложилось">{% rcell v c %}</a>{% else %}{% rcell v c %}{% endif %}</td>{% endfor %}</tr>{% endif %}
     {% endfor %}
     </tbody>
     {% if t.total %}<tfoot><tr class="total">{% for v, c in t.total|withcols:t.cols %}<td{% if c.kind != "text" %} class="num"{% endif %}>{% rcell v c %}</td>{% endfor %}</tr></tfoot>{% endif %}

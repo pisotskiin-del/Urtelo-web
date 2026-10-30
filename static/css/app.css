@@ -389,6 +389,9 @@ table.rep th.grp { text-align:center; vertical-align:middle; border-bottom:1px s
 table.rep tr.sec td { background:#eef3fa; font-weight:600; color:var(--navy, #14284b); }
 table.rep tr.foot td { font-weight:600; background:#f8fafc; }
 table.rep tr.total td { font-weight:700; background:#e8eef7; }
+/* Выделенные строки отчета: тарифы и итог по филиалу в полезном отпуске. */
+table.rep tr.mark td { font-weight:700; background:#dce6f2; height:30px; vertical-align:middle; }
+table.rep tr.mark:not(.foot) td.num { text-align:center; }
 .rep-note { font-weight:600; margin:12px 0 0; }
 .rep-sign { margin-top:28px; }
 .rep-sign p { margin:14px 0; }
@@ -402,6 +405,7 @@ table.rep tr.total td { font-weight:700; background:#e8eef7; }
   table.rep { font-size:10pt; }
   table.rep th, table.rep td { padding:2px 4px; }
   table.rep tr.sec td, table.rep tr.foot td, table.rep tr.total td { background:none; }
+  table.rep tr.mark td { background:#dce6f2; height:7mm; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   table.rep thead { display:table-header-group; }
   table.rep tr { page-break-inside:avoid; }
   /* Рамка без «схлопывания»: у каждой ячейки своя правая и нижняя линия,
