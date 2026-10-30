@@ -416,7 +416,7 @@ ITOG_FIELDS = [
     ("nach_otpr", "Начислено по прибору"), ("nach_otnag", "Начислено по расчету"),
     ("nac_pogaz", "Начислено по факту"), ("poter_pr", "Потери по прибору"), ("poter_nag", "Потери по нагрузке"),
     ("gkl_perer", "Перерасчет"), ("nach_otopl", "Отопление, факт. потребление"), ("nach_gvs", "ГВС"),
-    ("nac_vsego", "Предъявлено к оплате"),
+    ("poter_gvs", "Тепловые потери ГВС"), ("nac_vsego", "Предъявлено к оплате"),
 ]
 
 
@@ -448,17 +448,61 @@ def raschet_view(request):
 @login_required
 @permission_required("catalogs.view_potreb", raise_exception=True)
 def raschet_itog(request):
-    """Итоги расчета по городам и абоненты, у которых заканчивается лимит
-    (таблица limit, её заполняет расчет)."""
+    """Итоги расчета по городам (только рассчитанные лицевые счета, каждое
+    число открывает расшифровку по абонентам) и абоненты, у которых
+    заканчивается лимит (таблица limit, её заполняет расчет)."""
     cities = _cities()
-    sums = {row["cod_gor"]: row for row in Potreb.objects.values("cod_gor").annotate(
+    qs = Potreb.objects.filter(d_stat__in=layout.RASCHET)
+    sums = {row["cod_gor"]: row for row in qs.values("cod_gor").annotate(
         **{name: Sum(name) for name, _ in ITOG_FIELDS})}
-    columns = [(c, [sums.get(c.cod_gorod, {}).get(name) or 0 for name, _ in ITOG_FIELDS]) for c in cities]
-    table = [(label, [values[i] for _, values in columns]) for i, (_, label) in enumerate(ITOG_FIELDS)]
+    url = reverse("abonents:raschet_rasshifr")
+    table = [(label, [(sums.get(c.cod_gorod, {}).get(name) or 0, f"{url}?gorod={c.cod_gorod}&pole={name}")
+                      for c in cities]) for name, label in ITOG_FIELDS]
+    # Суммы у лицевых счетов, которые расчет не трогает (договор не заключён):
+    # остались от прежних расчетов и в итоги не входят.
+    stale = Potreb.objects.exclude(d_stat__in=layout.RASCHET).exclude(nac_vsego=0).exclude(nac_vsego=None)
     return render(request, "abonents/raschet_itog.html", {
         "cities": cities, "table": table, "info": request.session.get("raschet_itog"),
-        "limits": Limit.objects.order_by("potreb_id"),
+        "limits": Limit.objects.order_by("potreb_id"), "stale": stale.order_by("cod_gor", "potreb_id"),
     })
+
+
+@login_required
+@view_required
+def raschet_rasshifr(request):
+    """Расшифровка числа из итогов расчета: абоненты города, у которых это
+    поле не 0."""
+    labels = dict(ITOG_FIELDS)
+    pole = request.GET.get("pole")
+    city = Danrasch.objects.filter(cod_gorod=_int(request.GET.get("gorod"))).first()
+    if pole not in labels or city is None:
+        raise Http404
+    qs = (Potreb.objects.filter(cod_gor=city.cod_gorod, d_stat__in=layout.RASCHET)
+          .exclude(**{pole: 0}).exclude(**{pole: None}).order_by("potreb_id"))
+    cols = [reports.Col("Л/№", "int"), reports.Col("№ дог."), reports.Col("Наименование"), reports.Col("Объект"),
+            reports.Col("Принадлежность"), reports.Col("Способ расчета")]
+    extra = [("nach_otopl", "Отопление"), ("nach_gvs", "ГВС"), ("poter_gvs", "Потери ГВС")] if pole == "nac_vsego" else []
+    cols += [reports.Col(t, "num", 3, total=True) for _, t in extra]
+    if pole == "nac_vsego":
+        cols.append(reports.Col("С объектов договора", "num", 3, total=True))
+    cols.append(reports.Col(labels[pole], "num", 3, total=True))
+    katabon, sposob = dict(layout.ID_KATABON), dict(layout.TIP_RASOT)
+    rows = []
+    for p in qs:
+        row = [p.potreb_id, p.nom_dog, p.name_potre, p.glav_potre, katabon.get(p.id_katabon, p.id_katabon),
+               sposob.get(p.tip_rasot, p.tip_rasot)]
+        row += [getattr(p, f) or 0 for f, _ in extra]
+        if pole == "nac_vsego":
+            row.append((p.nac_vsego or 0) - sum((getattr(p, f) or 0 for f, _ in extra), Decimal(0)))
+        row.append(getattr(p, pole))
+        rows.append(row)
+    sec = reports.Section(rows=rows)
+    sec.links = [[reverse("abonents:karta", args=[r[0]])] + [None] * (len(r) - 1) for r in rows]
+    report = reports.Report(f"Итоги расчета: {labels[pole]}", [f"г. {(city.name_gorod or '').strip()}",
+                            f"за {(city.name_mes or '').strip()} {city.god} г."],
+                            [reports.Table(cols, [sec], total=reports._sum_row(cols, rows, "Итого", label_col=2))],
+                            notes=[f"Абонентов: {len(rows)}"], landscape=True)
+    return render(request, "abonents/raschet_rasshifr.html", {"report": report})
 
 
 @login_required

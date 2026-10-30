@@ -314,6 +314,16 @@ class RaschetTests(TestCase):
         self.assertContains(page, "рассчитано абонентов 6")
         self.assertContains(page, "Без заключённого договора (не рассчитывались): 1")
         self.assertContains(page, "Лимит заканчивается")
+        # л/№ x (договор расторгнут, к оплате 5 от прежнего расчета) в итоги не входит,
+        # но показан отдельно.
+        self.assertContains(page, "Остались суммы «Предъявлено к оплате»")
+        itog = {label: values for label, values in page.context["table"]}
+        ryb_vsego, url = itog["Предъявлено к оплате"][0]
+        self.assertIn("pole=nac_vsego", url)
+        rep = self.client.get(url).context["report"]
+        self.assertEqual(rep.tables[0].total[-1], ryb_vsego)
+        self.assertNotIn(self.x.potreb_id, [r[0] for r in rep.tables[0].sections[0].rows])
+        self.assertEqual(self.client.get("/abonents/raschet/itog/rasshifr/?gorod=1&pole=zzz").status_code, 404)
 
     def test_viewer_cannot_run(self):
         self.login("Наблюдатель")

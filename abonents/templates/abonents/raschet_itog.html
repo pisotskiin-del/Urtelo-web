@@ -15,10 +15,13 @@
   <tbody>
     <tr><td>Q факт</td>{% for c in cities %}<td class="num">{{ c.qpfakt|default_if_none:0|floatformat:2 }}</td>{% endfor %}</tr>
     <tr><td>Q по расчету</td>{% for c in cities %}<td class="num">{{ c.qpras|default_if_none:0|floatformat:2 }}</td>{% endfor %}</tr>
-    {% for label, values in table %}<tr><td>{{ label }}</td>{% for v in values %}<td class="num">{{ v|floatformat:3 }}</td>{% endfor %}</tr>{% endfor %}
+    {% for label, values in table %}<tr><td>{{ label }}</td>{% for v, url in values %}<td class="num">{% if v %}<a href="{{ url }}" title="По абонентам">{{ v|floatformat:3 }}</a>{% else %}{{ v|floatformat:3 }}{% endif %}</td>{% endfor %}</tr>{% endfor %}
   </tbody>
 </table>
 </div>
+<p class="muted">В итоги входят только заключённые и возобновлённые договоры. Щелчок по числу — список абонентов, из которых оно сложилось.</p>
+{% if stale %}<p class="msg warning">Остались суммы «Предъявлено к оплате» у лицевых счетов без заключённого договора (расчет их не трогает, в итоги они не входят):
+  {% for p in stale %}<a href="{% url 'abonents:karta' p.potreb_id %}">л/№ {{ p.potreb_id }}</a> — {{ p.nac_vsego|floatformat:3 }}{% if not forloop.last %}; {% endif %}{% endfor %}</p>{% endif %}
 <h2>Лимиты</h2>
 {% if limits %}
 <div class="scroll">
