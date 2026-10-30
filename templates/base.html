@@ -53,6 +53,26 @@ function toggleSide() {
   var on = document.documentElement.classList.toggle("side-mini");
   try { localStorage.setItem("side-mini", on ? "1" : "0"); } catch (e) {}
 }
+// Высокая таблица (список абонентов) занимает остаток экрана: всё, что ниже
+// неё (листалка, подсказки), остаётся видно без прокрутки страницы.
+(function () {
+  function fit() {
+    var t = document.querySelector(".scroll.tall");
+    if (!t) return;
+    if (window.innerWidth <= 900) { t.style.maxHeight = ""; return; }
+    var below = 0, el = t.nextElementSibling;
+    for (; el; el = el.nextElementSibling) {
+      var cs = getComputedStyle(el);
+      below += el.offsetHeight + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom);
+    }
+    var main = t.closest("main"), pad = main ? parseFloat(getComputedStyle(main).paddingBottom) : 0;
+    var h = window.innerHeight - t.getBoundingClientRect().top - window.scrollY - below - pad - 4;
+    t.style.maxHeight = Math.max(240, h) + "px";
+  }
+  window.addEventListener("load", fit);
+  window.addEventListener("resize", fit);
+  document.addEventListener("DOMContentLoaded", fit);
+})();
 // Горячие клавиши: «/» — к поиску; PageUp/PageDown в карте — предыдущая/следующая запись.
 document.addEventListener("keydown", function (e) {
   var t = e.target, typing = t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName);

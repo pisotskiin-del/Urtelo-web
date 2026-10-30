@@ -78,7 +78,7 @@ kbd { font:12px/1 ui-monospace, Consolas, monospace; padding:2px 5px; border:1px
 
 /* Таблицы */
 .scroll { overflow:auto; border:1px solid var(--line); border-radius:var(--radius); background:var(--card); box-shadow:var(--shadow); }
-.scroll.tall { max-height:calc(100vh - 290px); min-height:320px; }
+.scroll.tall { max-height:calc(100vh - 330px); min-height:240px; }
 table.grid { width:100%; border-collapse:separate; border-spacing:0; background:var(--card); font-variant-numeric:tabular-nums; }
 .grid th, .grid td { padding:7px 12px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; }
 .grid th { position:sticky; top:0; z-index:2; background:#f7f9fc; font-size:12px; font-weight:600; color:var(--muted);
