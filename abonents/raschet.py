@@ -106,11 +106,18 @@ def compute(recs, cities, sp_by_ln):
     (недостающие добавляются). Возвращает итоги и какие поля изменены."""
     result = Result()
     result.otkluchen = [p.potreb_id for p in recs if p.d_stat not in RASCHET]
+    skipped = [p for p in recs if p.d_stat not in RASCHET]
     recs = [p for p in recs if p.d_stat in RASCHET]
     result.potreb = len(recs)
     pt = Table(Potreb)
     st = Table(SpTeplpoteri)
     put = pt.put
+    # У счета без договора не должно оставаться «Предъявлено к оплате»: туда
+    # мог попасть итог договора от прежнего расчета (шаг 9 собирает его на
+    # последнем абоненте договора), а сам счет больше не рассчитывается.
+    for p in skipped:
+        if n(p.nac_vsego) != 0:
+            put(p, "nac_vsego", 0)
 
     by_id = {}
     for r in recs:

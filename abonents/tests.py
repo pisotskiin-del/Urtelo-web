@@ -306,7 +306,9 @@ class RaschetTests(TestCase):
         # 10 + 18 × 2 ≥ 40, но 10 + 18 ≤ 40.
         self.assertEqual(list(Limit.objects.values_list("potreb_id", "koment")), [(1, "Лимит заканчивается")])
         x = Potreb.objects.get(pk=self.x.pk)
-        self.assertEqual((x.dnotop, x.nach_otnag, x.nac_vsego), (Decimal("30.0"), None, Decimal("5.000")))
+        # Расторгнутый счет не рассчитывается, но «Предъявлено к оплате» у него обнуляется:
+        # иначе там остается итог договора от прежнего расчета.
+        self.assertEqual((x.dnotop, x.nach_otnag, x.nac_vsego), (Decimal("30.0"), None, Decimal("0.000")))
         g = Potreb.objects.get(pk=self.g.pk)
         self.assertEqual((g.nach_gvs, g.nac_vsego), (Decimal("5.330"), Decimal("5.330")))
         self.assertEqual(SpTeplpoteri.objects.count(), 6)  # записи потерь создаются, как в старой программе
@@ -314,9 +316,11 @@ class RaschetTests(TestCase):
         self.assertContains(page, "рассчитано абонентов 6")
         self.assertContains(page, "Без заключённого договора (не рассчитывались): 1")
         self.assertContains(page, "Лимит заканчивается")
-        # л/№ x (договор расторгнут, к оплате 5 от прежнего расчета) в итоги не входит,
-        # но показан отдельно.
-        self.assertContains(page, "Остались суммы «Предъявлено к оплате»")
+        # Сумма у счета без договора (например, после загрузки из DBF) в итоги не входит,
+        # но показана отдельно.
+        self.assertNotContains(page, "Остались суммы «Предъявлено к оплате»")
+        Potreb.objects.filter(pk=self.x.pk).update(nac_vsego=Decimal("5"))
+        self.assertContains(self.client.get("/abonents/raschet/itog/"), "Остались суммы «Предъявлено к оплате»")
         itog = {label: values for label, values in page.context["table"]}
         ryb_vsego, url = itog["Предъявлено к оплате"][0]
         self.assertIn("pole=nac_vsego", url)
