@@ -435,20 +435,21 @@ POLEZ_COLS = [Col("Категории потребителей"),
               Col("Население хозрасчет", "num", 2, total=True),
               Col("Всего население (Гкал)", "num", 2, total=True),
               Col("Всего хозрасчёт (Гкал)", "num", 2, total=True),
-              Col("Местный", "num", 2, total=True), Col("Местный, диз.", "num", 2, total=True),
-              Col("Республ.", "num", 2, total=True), Col("Республ., диз.", "num", 2, total=True),
+              Col("Местный", "num", 2, total=True),
+              Col("Республ.", "num", 2, total=True),
               Col("Организация СКиИОД", "num", 2, total=True),
               Col("Всего бюджет (Гкал)", "num", 2, total=True),
               Col("ВСЕГО (Гкал)", "num", 2, total=True)]
 # Колонки «Всего…», которые в строках «П/У» и «Нагр.» старый отчет оставляет пустыми.
-POLEZ_VSEGO = (5, 12, 13)
+POLEZ_VSEGO = (5, 10, 11)
 
 
 def polez_otpusk(city, opts):
     """Кнопка «Полезный отпуск» (polez_otpusk.frx): отпуск тепловой энергии по
     категориям потребителей по всем участкам — по приборам учета (П/У,
-    tip_rasot=1) и по нагрузке (tip_rasot 2, 3). Бюджет разделен по виду
-    топлива (дизельное — отдельные колонки), население абонентское — на «с
+    tip_rasot=1) и по нагрузке (tip_rasot 2, 3). Бюджет местный и
+    республиканский — по одной колонке вместе с дизельным топливом, как в
+    последнем варианте старого отчета; население абонентское — на «с
     господдержкой» и «без» в пропорции Гкал, указанных в исходных данных
     участка. Сложение и отборы повторяют старую программу: хозрасчёт по
     прибору берется без учета вида топлива, а дизельное топливо для
@@ -491,14 +492,13 @@ def polez_otpusk(city, opts):
 
     def t(i, d=False):
         return tar.get(i, (Decimal(0), Decimal(0)))[1 if d else 0]
-    tarif_row = ["Тариф (руб)", t(9), t(12), t(11), t(9), t(9), t(1), t(2), t(2, True), t(2), t(2, True),
-                 t(10), None, None]
+    tarif_row = ["Тариф (руб)", t(9), t(12), t(11), t(9), t(9), t(1), t(2), t(2), t(10), None, None]
     head = [[("Категории потребителей", 1, 2), ("Население (Гкал)", 4, 1), ("Всего население (Гкал)", 1, 2),
-             ("Всего хозрасчёт (Гкал)", 1, 2), ("Бюджет (Гкал)", 4, 1), ("Организация СКиИОД", 1, 2),
+             ("Всего хозрасчёт (Гкал)", 1, 2), ("Бюджет (Гкал)", 2, 1), ("Организация СКиИОД", 1, 2),
              ("Всего бюджет (Гкал)", 1, 2), ("ВСЕГО (Гкал)", 1, 2)],
             [("Ведомст. жильё", 1, 1), ("Население абонентское (с господд.)", 1, 1),
              ("Население абонентское (без господд.)", 1, 1), ("Население хозрасчет", 1, 1),
-             ("Местный", 2, 1), ("Республ.", 2, 1)]]
+             ("Местный", 1, 1), ("Республ.", 1, 1)]]
     lines = ["тепловой энергии по категориям потребителей",
              f"за {(city.name_mes or '').strip()} {city.god} г."] + ([dict(VID_USLUGA)[vid]] if vid else [])
     return Report("ПОЛЕЗНЫЙ ОТПУСК", lines,
@@ -555,13 +555,11 @@ def _polez_part(p, col, doli):
         4: kat == 5 and not diz,
         5: kat in (4, 5, 6) and not diz,
         6: kat == 1 and (p.tip_rasot == 1 or not diz),
-        7: kat == 2 and not diz,
-        8: kat == 2 and diz,
-        9: kat == 3 and not diz,
-        10: kat == 3 and diz,
-        11: kat == 7 and not diz,
-        12: kat in (2, 3),
-        13: not diz or kat in (2, 3),
+        7: kat == 2,
+        8: kat == 3,
+        9: kat == 7 and not diz,
+        10: kat in (2, 3),
+        11: not diz or kat in (2, 3),
     }
     if not rules.get(col):
         return None
@@ -611,11 +609,7 @@ def polez_rasshifr(params):
                      "да" if p.vid_topl else "", n(p.nach_otopl) if vid != "gvs" else Decimal(0),
                      n(p.nach_gvs) if vid != "otopl" else Decimal(0), n(p.poter_gvs) if vid != "otopl" else Decimal(0),
                      f if col in (2, 3) else None, v * f])
-    title = POLEZ_COLS[col].title
-    if col in (7, 8):
-        title = "Местный бюджет" + (", дизельное топливо" if col == 8 else "")
-    if col in (9, 10):
-        title = "Республиканский бюджет" + (", дизельное топливо" if col == 10 else "")
+    title = {7: "Местный бюджет", 8: "Республиканский бюджет"}.get(col, POLEZ_COLS[col].title)
     lines = [f"Колонка: {title}", f"Строка: {POLEZ_ROWS[row_key]}",
              "Участок: " + ((cities[uch].name_gorod or "").strip() if uch else "все (итого по филиалу)")]
     if vid:

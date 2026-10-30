@@ -573,7 +573,7 @@ class ReportsTests(KartaBase):
         self.assertEqual(t.sections[0].rows[0][6], Decimal("985.76"))
         pu, nagr = t.sections[1].rows
         self.assertEqual(pu[6], Decimal("11.0"))      # хозрасчет: 8 + 2,5 + потери ГВС 0,5
-        self.assertEqual(pu[8], Decimal("6"))         # местный бюджет, дизельное топливо
+        self.assertEqual(pu[7], Decimal("6"))         # местный бюджет вместе с дизельным топливом
         self.assertIsNone(pu[-1])                     # «ВСЕГО» только в строке города
         self.assertEqual(t.sections[1].foot[-1], Decimal("21.0"))
         self.assertEqual(t.sections[1].foot[0], "Всего по г.Рыбница")
@@ -582,25 +582,26 @@ class ReportsTests(KartaBase):
         self.assertEqual([r[0] for r in itog.rows], ["П/У", "Нагр."])
         self.assertEqual((itog.foot[0], itog.foot[-1]), ("Итого по филиалу", Decimal("21.0")))
         # Шапка в два яруса, как в старом отчете, и так же в Excel.
-        self.assertEqual(t.head[1][4], ("Местный", 2, 1))
+        self.assertEqual(t.head[1][4], ("Местный", 1, 1))
+        self.assertEqual(len(t.sections[0].rows[0]), len(reports.POLEZ_COLS))
         from io import BytesIO
         from openpyxl import load_workbook
         buf = BytesIO()
         reports.to_xlsx(rep, buf)
         ws = load_workbook(BytesIO(buf.getvalue())).active
         merged = {str(m) for m in ws.merged_cells.ranges}
-        cell = next(c for row in ws.iter_rows() for c in row if c.value == "Местный")
+        cell = next(c for row in ws.iter_rows() for c in row if c.value == "Бюджет (Гкал)")
         self.assertIn(f"{cell.coordinate}:{cell.offset(column=1).coordinate}", merged)
         self.assertNotIn("Местный, диз.", [c.value for row in ws.iter_rows() for c in row])
-        # Расшифровка ячейки: местный бюджет, дизель, П/У Рыбницы — школа л/№ 21.
-        url = t.sections[1].links[0][8]
+        # Расшифровка ячейки: местный бюджет, П/У Рыбницы — школа л/№ 21.
+        url = t.sections[1].links[0][7]
         self.login("Наблюдатель")
         page = self.client.get(url)
         self.assertContains(page, "Школа")
         self.assertContains(page, 'href="/abonents/21/"')
         self.assertEqual(page.context["report"].tables[0].total[-1], Decimal("6"))
         # Итого по филиалу, ВСЕГО — все записи, сумма как в ячейке.
-        rep_all = reports.polez_rasshifr({"uch": "0", "row": "all", "col": "13", "vid": ""})
+        rep_all = reports.polez_rasshifr({"uch": "0", "row": "all", "col": "11", "vid": ""})
         self.assertEqual(rep_all.tables[0].total[-1], Decimal("21.0"))
         self.assertEqual(self.client.get(url + "&xlsx=1").status_code, 200)
         self.assertEqual(self.client.get("/abonents/otchety/polez_otpusk/rasshifr/?col=99").status_code, 404)
