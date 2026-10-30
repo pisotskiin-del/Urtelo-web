@@ -107,7 +107,9 @@ dl.fields { display:grid; grid-template-columns:minmax(160px, 260px) 1fr; backgr
             border-radius:var(--radius); margin:0; box-shadow:var(--shadow); }
 dl.fields dt, dl.fields dd { margin:0; padding:8px 14px; border-bottom:1px solid var(--line); } dl.fields dt { color:var(--muted); }
 .form > div { margin-bottom:12px; } .form label { margin-bottom:4px; }
-.form input[type=text], .form input[type=number], .form textarea { width:100%; max-width:520px; }
+.form input[type=text], .form textarea { width:100%; max-width:900px; }
+.form input[type=number] { width:100%; max-width:240px; }
+.form textarea { resize:vertical; }
 .search { display:flex; gap:8px; align-items:center; margin-bottom:12px; } .search input { width:320px; max-width:100%; }
 
 /* Вкладки городов и разделов карты */
