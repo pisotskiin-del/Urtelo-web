@@ -87,6 +87,31 @@ class Podpisant(models.Model):
         return ((p.doljnost or "").strip(), (p.fio or "").strip()) if p else ("", "")
 
 
+class Nastroika(models.Model):
+    """Настройки программы (одна запись), меняет Администратор в
+    «Справочниках». Пока — папка для выгрузки в 1С."""
+
+    papka_1c = models.CharField(
+        "Папка для выгрузки в 1С", max_length=255, blank=True,
+        help_text="Сюда при переходе на новый месяц записывается файл Abpt<ГГ><ММ>.dbf. "
+                  "Пусто — файл только скачивается в «Закрытых месяцах».")
+
+    class Meta:
+        verbose_name = "Настройки программы"
+        verbose_name_plural = "Настройки программы"
+        ordering = ["pk"]
+
+    def __str__(self):
+        return "Настройки программы"
+
+    @classmethod
+    def papka(cls):
+        """Папка для 1С: из настроек программы, иначе TEPLO_1C_DIR."""
+        from django.conf import settings
+        n = cls.objects.order_by("pk").first()
+        return ((n.papka_1c if n else "") or getattr(settings, "TEPLO_1C_DIR", "") or "").strip()
+
+
 class TarifGorod(models.Model):
     """Тарифы по участкам. В старой программе был один справочник tarif.dbf
     на все участки; здесь у каждого участка свои значения, а код тарифа тот

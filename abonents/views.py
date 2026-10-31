@@ -44,6 +44,11 @@ def _current_city(request, cities):
     return code
 
 
+def _papka_1c():
+    from .models import Nastroika
+    return Nastroika.papka()
+
+
 def _int(value):
     value = (value or "").strip()
     return int(value) if value.isdigit() else None
@@ -607,7 +612,7 @@ def nov_mes_view(request):
     return render(request, "abonents/nov_mes.html", {
         "mes": mes and nov_mes.MONTHS[mes - 1], "god": god, "next": nxt and f"{nov_mes.MONTHS[nxt[0] - 1]} {nxt[1]}",
         "rows": rows, "can_run": can_run, "arhiv": nov_mes.MesArhiv.objects.filter(istochnik=nov_mes.MesArhiv.WEB).defer("data")[:24],
-        "last": nov_mes.last(), "dir_1c": settings.TEPLO_1C_DIR, "year_reset": nxt and nxt[0] == 1, "season_reset": nxt and nxt[0] == 10,
+        "last": nov_mes.last(), "dir_1c": _papka_1c(), "year_reset": nxt and nxt[0] == 1, "season_reset": nxt and nxt[0] == 10,
     })
 
 

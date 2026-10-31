@@ -7,6 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("abonents", "0006_podpisant_akt"),
+        ("abonents", "0006_nastroika"),
     ]
 
     operations = [

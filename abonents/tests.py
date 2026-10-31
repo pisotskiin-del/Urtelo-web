@@ -1046,3 +1046,31 @@ class KredoRealTests(KartaBase):
                          [(5, Decimal("13.0600")), (9, Decimal("6.3240")), (9, Decimal("4.1900"))])
         self.assertEqual([s.otmetit for s in stroki], [True, True, False])
         self.assertFalse(stroki[0].dubl)
+
+
+class NastroikaTests(KartaBase):
+    """Папка для 1С в «Справочниках» → «Настройки программы»."""
+
+    def test_papka_1c(self):
+        from django.test import override_settings
+        from abonents.models import Nastroika
+        n = Nastroika.objects.get()
+        n.papka_1c = r"\\server-ff\Abon_teplo1C"
+        n.save()
+        self.assertEqual(Nastroika.papka(), r"\\server-ff\Abon_teplo1C")
+        n.papka_1c = ""
+        n.save()
+        with override_settings(TEPLO_1C_DIR=r"D:\1c"):
+            self.assertEqual(Nastroika.papka(), r"D:\1c")
+
+    def test_prava(self):
+        from abonents.models import Nastroika
+        pk = Nastroika.objects.get().pk
+        self.login("Оператор")
+        self.assertEqual(self.client.get("/catalogs/nastroika/").status_code, 200)
+        self.assertEqual(self.client.get(f"/catalogs/nastroika/{pk}/edit/").status_code, 403)
+        self.client.logout()
+        self.login("Администратор")
+        r = self.client.post(f"/catalogs/nastroika/{pk}/edit/", {"papka_1c": r"\\srv\1c"})
+        self.assertIn(r.status_code, (200, 302))
+        self.assertEqual(Nastroika.objects.get().papka_1c, r"\\srv\1c")

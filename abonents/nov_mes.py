@@ -214,10 +214,11 @@ def write_abot(arh, target):
 
 
 def export_1c(arh):
-    """Положить файл в папку для 1С, если она задана (TEPLO_1C_DIR, у
-    бухгалтерии \\\\SERVER-FF\\Abon_teplo1C). Возвращает путь или None."""
-    from django.conf import settings
-    folder = getattr(settings, "TEPLO_1C_DIR", "")
+    """Положить файл в папку для 1С, если она задана («Справочники» →
+    «Настройки программы», у бухгалтерии \\\\server-ff\\Abon_teplo1C).
+    Возвращает путь или None."""
+    from .models import Nastroika
+    folder = Nastroika.papka()
     if not folder:
         return None
     path = Path(folder) / abot_filename(arh.nom_mes, arh.god)

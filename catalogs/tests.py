@@ -24,8 +24,8 @@ class RoleTests(TestCase):
     def test_menu_directories_are_listed_in_menu_order(self):
         names = [m._meta.model_name for m in catalog_models()]
         self.assertEqual(names[:3], ["danrasch", "minist", "gvskot"])
-        self.assertEqual(len(names), 15)
-        self.assertEqual(names[-1], "podpisant")
+        self.assertEqual(len(names), 16)
+        self.assertEqual(names[-2:], ["podpisant", "nastroika"])
         self.assertNotIn("sul", names)
         self.assertNotIn("smtpnas", names)
 
