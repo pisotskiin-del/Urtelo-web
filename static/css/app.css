@@ -497,3 +497,13 @@ table.dok-signs td { width:50%; vertical-align:top; padding:0 12px 0 0; }
 .sidebar a.sub .i { width:18px; height:18px; }
 .side-mini .sidebar .side-grp summary::after { display:none; }
 .side-mini .sidebar a.sub { padding-left:14px; }
+
+/* Вкладки карточки абонента «Отопление», «ГВС», «Исходные данные»: крупные
+   кнопки, выбранная — залита синим, чтобы не сливались с формой. */
+.tabs.karta-tabs { gap:8px; border-bottom:2px solid var(--accent); padding:0; margin:18px 0 16px; }
+.tabs.karta-tabs a { font-size:17px; font-weight:600; padding:11px 22px; color:var(--text); background:#fff;
+  border:1px solid var(--line-strong); border-bottom:0; border-radius:10px 10px 0 0; margin-bottom:0; }
+.tabs.karta-tabs a .i { width:20px; height:20px; color:var(--accent); }
+.tabs.karta-tabs a:hover { background:var(--accent-weak); }
+.tabs.karta-tabs a.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+.tabs.karta-tabs a.active .i { color:#fff; }
