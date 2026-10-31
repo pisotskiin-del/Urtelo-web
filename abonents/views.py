@@ -842,3 +842,99 @@ def pismo_pdf(request, pk):
     response = HttpResponse(path.read_bytes(), content_type="application/pdf")
     response["Content-Disposition"] = f'inline; filename="{path.name}"'
     return response
+
+
+def _kredo_poluchit(cod_gor, user, xml=None):
+    """Получить показания (из сервиса или файла) и сохранить ответ."""
+    from . import kredo
+    from .models import KredoPriem
+    city = Danrasch.objects.get(cod_gorod=cod_gor)
+    if not city.nom_mes or not city.god:
+        raise kredo.KredoError("У участка не задан текущий месяц")
+    istochnik = KredoPriem.FAIL if xml is not None else KredoPriem.KREDO
+    if xml is None:
+        xml = kredo.zaprosit_pokazaniya(cod_gor, city.nom_mes, city.god)
+    rows = kredo.razobrat(xml)
+    return KredoPriem.objects.create(user=user, cod_gor=cod_gor, nom_mes=city.nom_mes, god=city.god,
+                                     istochnik=istochnik, xml=xml, strok=len(rows))
+
+
+@login_required
+@view_required
+def kredo_view(request):
+    """Обмен с КРЭДО: приём последних показаний приборов учёта за текущий
+    месяц участка (форма rric старой программы)."""
+    from . import kredo
+    from .models import KredoPriem
+    cities = _cities()
+    code = _current_city(request, cities)
+    city = next((c for c in cities if c.cod_gorod == code), None)
+    if city is None:
+        raise Http404
+    can_change = request.user.has_perm("catalogs.change_potreb")
+    if request.method == "POST":
+        if not can_change:
+            raise PermissionDenied
+        try:
+            xml = None
+            if request.POST.get("action") == "fail":
+                f = request.FILES.get("fail")
+                if not f:
+                    raise kredo.KredoError("Не выбран файл")
+                raw = f.read()
+                try:
+                    xml = raw.decode("utf-8-sig")
+                except UnicodeDecodeError:
+                    xml = raw.decode("cp1251")
+            z = _kredo_poluchit(code, request.user.get_username(), xml)
+        except kredo.KredoError as e:
+            messages.error(request, f"КРЭДО: {e}")
+            return redirect(f"{reverse('abonents:kredo')}?gorod={code}")
+        messages.success(request, f"Информацию о показаниях приборов учета получил: строк {z.strok}")
+        return redirect("abonents:kredo_priem", pk=z.pk)
+    try:
+        nast = kredo.nastrojki(code)
+    except kredo.KredoError as e:
+        nast = None
+        messages.warning(request, str(e))
+    return render(request, "abonents/kredo.html", {
+        "cities": cities, "city": city, "nast": nast, "can_change": can_change,
+        "priemy": KredoPriem.objects.filter(cod_gor=code)[:30],
+    })
+
+
+@login_required
+@view_required
+def kredo_priem(request, pk):
+    """Полученные показания рядом с картами лицевых и их разнос."""
+    from . import kredo
+    from .models import KredoPriem
+    z = get_object_or_404(KredoPriem, pk=pk)
+    city = Danrasch.objects.filter(cod_gorod=z.cod_gor).first()
+    stroki = kredo.sverit(kredo.razobrat(z.xml))
+    tekushchij = city is not None and (city.nom_mes, city.god) == (z.nom_mes, z.god)
+    can_change = request.user.has_perm("catalogs.change_potreb") and tekushchij
+    if request.method == "POST":
+        if not can_change:
+            raise PermissionDenied
+        nomera = {int(x) for x in request.POST.getlist("n") if x.isdigit()}
+        menshe = [s for s in stroki if s.nomer in nomera and s.status == kredo.MENSHE]
+        if not nomera:
+            messages.warning(request, "Не отмечено ни одной строки")
+        elif menshe and not request.POST.get("podtv"):
+            messages.error(request, "Текущее показание счетчика не может быть меньше предыдущего: "
+                                    "подтвердите разнос таких строк")
+        else:
+            with transaction.atomic():
+                izm = kredo.raznesti(stroki, nomera)
+                z.razneseno = timezone.now()
+                z.razn_user = request.user.get_username()
+                z.izmeneniya = list(z.izmeneniya or []) + izm
+                z.save(update_fields=["razneseno", "razn_user", "izmeneniya"])
+            messages.success(request, f"Показания приборов учета по лицевым счетам разнесены: {len(izm)}")
+        return redirect("abonents:kredo_priem", pk=z.pk)
+    from collections import Counter
+    return render(request, "abonents/kredo_priem.html", {
+        "z": z, "city": city, "stroki": stroki, "can_change": can_change, "tekushchij": tekushchij,
+        "itogi": [(t, n) for k, t in kredo.STATUSY.items() if (n := Counter(s.status for s in stroki)[k])],
+    })

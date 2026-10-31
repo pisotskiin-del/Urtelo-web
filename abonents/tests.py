@@ -908,3 +908,110 @@ class PochtaTests(DokumentyTests):
         self.login("Наблюдатель")
         self.assertEqual(self.client.post("/abonents/rassylka/?gorod=1", {"dog": ["6"]}).status_code, 403)
         self.assertEqual(self.client.post("/abonents/dogovor/1/6/schet/", {"action": "send"}).status_code, 403)
+
+
+KREDO_XML = """<?xml version="1.0" encoding="windows-1251"?>
+<NewDataSet>
+  <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" id="NewDataSet">
+    <xs:element name="Table"><xs:complexType><xs:sequence>
+      <xs:element name="p_kod" type="xs:string"/><xs:element name="cur_pok" type="xs:decimal"/>
+    </xs:sequence></xs:complexType></xs:element>
+  </xs:schema>
+  <Table><p_kod>5</p_kod><d_num>A-1</d_num><prev_pok>12.5</prev_pok><cur_pok>20,25</cur_pok><waitable>0</waitable><date_pok>2026-10-25T00:00:00+03:00</date_pok></Table>
+  <Table><P_KOD>7 </P_KOD><D_NUM>B-2</D_NUM><PREV_POK>1</PREV_POK><CUR_POK>0.5</CUR_POK><DATE_POK>24.10.2026</DATE_POK></Table>
+  <Table><p_kod>99999</p_kod><cur_pok>1</cur_pok></Table>
+</NewDataSet>"""
+
+
+class FakeInvoker:
+    def __init__(self, otvet):
+        self.otvet, self.calls = otvet, []
+
+    def exec_proc(self, name, params):
+        self.calls.append((name, params))
+        return self.otvet
+
+
+class KredoTests(KartaBase):
+    """Приём показаний приборов из КРЭДО и разнос по лицевым."""
+
+    def setUp(self):
+        super().setUp()
+        Danrasch.objects.filter(cod_gorod=1).update(nom_mes=10)
+        Potreb.objects.filter(potreb_id=7).update(pok_new=Decimal("3"))
+
+    def test_razobrat(self):
+        from abonents import kredo
+        rows = kredo.razobrat(KREDO_XML)
+        self.assertEqual([r["p_kod"] for r in rows], ["5", "7", "99999"])
+        self.assertEqual(rows[0]["cur_pok"], Decimal("20.25"))
+        self.assertEqual(rows[0]["date_pok"], date(2026, 10, 25))
+        self.assertEqual(rows[1]["date_pok"], date(2026, 10, 24))
+        attr = kredo.razobrat('<root><row p_kod="5" cur_pok="13" date_pok="2026-10-01"/></root>')
+        self.assertEqual(attr[0]["cur_pok"], Decimal("13"))
+        with self.assertRaises(kredo.KredoError):
+            kredo.razobrat("не xml")
+
+    def test_zapros(self):
+        from abonents import kredo
+        inv = FakeInvoker("<r/>")
+        kredo.zaprosit_pokazaniya(1, 2, 2028, inv)
+        self.assertEqual(inv.calls, [("Kredo_DeviceMeters_Info",
+                                      "@comorg=210,@org_id=null,@start_date=01.02.2028,@end_date=29.02.2028")])
+        with self.assertRaises(kredo.KredoError) as e:
+            kredo.zaprosit_pokazaniya(1, 10, 2026, FakeInvoker("<root><error>Нет прав</error></root>"))
+        self.assertIn("Нет прав", str(e.exception))
+
+    def test_sverka(self):
+        from abonents import kredo
+        st = {s.r["p_kod"]: s for s in kredo.sverit(kredo.razobrat(KREDO_XML))}
+        self.assertEqual(st["5"].status, kredo.NOVOE)
+        self.assertTrue(st["5"].otmetit)
+        self.assertEqual(st["5"].rashod, Decimal("7.75"))
+        self.assertEqual(st["7"].status, kredo.MENSHE)
+        self.assertEqual(st["99999"].status, kredo.NET)
+
+    def test_stranica_i_raznos(self):
+        from unittest import mock
+        from abonents import kredo
+        from abonents.models import KredoPriem
+        self.login("Оператор")
+        with mock.patch.object(kredo, "ComInvoker", lambda cod_gor: FakeInvoker(KREDO_XML)):
+            r = self.client.post("/abonents/kredo/?gorod=1", {"action": "kredo"}, follow=True)
+        z = KredoPriem.objects.get()
+        self.assertEqual((z.cod_gor, z.nom_mes, z.god, z.strok), (1, 10, 2026, 3))
+        self.assertContains(r, "строк 3")
+        self.assertContains(r, "меньше показания в карте")
+        self.assertContains(r, "B-2")
+        # Меньшее показание без подтверждения не разносится.
+        r = self.client.post(f"/abonents/kredo/{z.pk}/", {"n": ["0", "1"]}, follow=True)
+        self.assertContains(r, "подтвердите")
+        self.assertEqual(Potreb.objects.get(potreb_id=5).pok_new, Decimal("12.5"))
+        r = self.client.post(f"/abonents/kredo/{z.pk}/", {"n": ["0"]}, follow=True)
+        self.assertContains(r, "разнесены: 1")
+        a = Potreb.objects.get(potreb_id=5)
+        self.assertEqual((a.pok_new, a.date_pok), (Decimal("20.25"), date(2026, 10, 25)))
+        self.client.post(f"/abonents/kredo/{z.pk}/", {"n": ["1", "2"], "podtv": "1"})
+        self.assertEqual(Potreb.objects.get(potreb_id=7).pok_new, Decimal("0.5"))
+        z.refresh_from_db()
+        self.assertEqual([i[0] for i in z.izmeneniya], [5, 7])
+        self.assertIsNotNone(z.razneseno)
+
+    def test_bez_pywin32_i_iz_faila(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from abonents.models import KredoPriem
+        self.login("Оператор")
+        r = self.client.post("/abonents/kredo/?gorod=1", {"action": "kredo"}, follow=True)
+        self.assertContains(r, "КРЭДО:")
+        self.assertFalse(KredoPriem.objects.exists())
+        f = SimpleUploadedFile("otvet.xml", KREDO_XML.encode("cp1251"))
+        r = self.client.post("/abonents/kredo/?gorod=1", {"action": "fail", "fail": f}, follow=True)
+        self.assertEqual(KredoPriem.objects.get().istochnik, KredoPriem.FAIL)
+        self.assertContains(r, "новое показание")
+
+    def test_prosmotr_bez_prava(self):
+        self.login("Наблюдатель")
+        r = self.client.get("/abonents/kredo/?gorod=1")
+        self.assertEqual(r.status_code, 200)
+        self.assertNotContains(r, "Получить показания")
+        self.assertEqual(self.client.post("/abonents/kredo/?gorod=1", {"action": "kredo"}).status_code, 403)

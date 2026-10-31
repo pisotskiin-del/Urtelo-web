@@ -151,3 +151,14 @@ TEPLO_PDF_FONT_BOLD = env("TEPLO_PDF_FONT_BOLD", "")
 TEPLO_SMTP_PASSWORD = env("TEPLO_SMTP_PASSWORD", "")
 # Первый номер документа в реестре отправленных писем (продолжить нумерацию старой программы).
 TEPLO_PISMO_NOMER = int(env("TEPLO_PISMO_NOMER", "1") or 1)
+
+# Обмен с КРЭДО (РРИЦ) через COM-объект RRIC_COM_OBJECT (только Windows, pywin32).
+# Сертификаты клиента — в хранилище «Личные» пользователя Windows, под которым работает
+# программа; здесь — их отпечатки по участкам.
+TEPLO_KREDO_ENDPOINT = env("TEPLO_KREDO_ENDPOINT", "http://www.rric.org:7742/RRIC_EP_SERVICE/WcfService")
+TEPLO_KREDO_SERVICE_CERT = env("TEPLO_KREDO_SERVICE_CERT", "Rric Wcf Service")
+TEPLO_KREDO_THUMB = {
+    1: env("TEPLO_KREDO_THUMB_RYB", "eb89da47d567beee800118756e9b31568bf95072"),
+    2: env("TEPLO_KREDO_THUMB_DUB", "e968ac9950fc5bd24953ec529980a8eac2e57e10"),
+    3: env("TEPLO_KREDO_THUMB_KAM", "aedfd090498ab56b99b683782bba47fcd98d473c"),
+}

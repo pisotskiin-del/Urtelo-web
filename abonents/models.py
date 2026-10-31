@@ -156,3 +156,32 @@ class Pismo(models.Model):
         from django.conf import settings
         last = cls.objects.aggregate(m=models.Max("nomer"))["m"]
         return last + 1 if last else int(getattr(settings, "TEPLO_PISMO_NOMER", 1) or 1)
+
+
+class KredoPriem(models.Model):
+    """Полученные из КРЭДО показания приборов учёта (кнопки «Прием
+    информации о последних показаниях…» и «Разнести…» формы rric). Ответ
+    сервиса хранится целиком; при разносе записывается, что изменено."""
+
+    KREDO, FAIL = "kredo", "fail"
+
+    created = models.DateTimeField("Получено", auto_now_add=True)
+    user = models.CharField("Кто получил", max_length=150, blank=True)
+    cod_gor = models.IntegerField("Участок")
+    nom_mes = models.IntegerField("Месяц")
+    god = models.IntegerField("Год")
+    istochnik = models.CharField("Источник", max_length=5, default=KREDO,
+                                 choices=[(KREDO, "Сервис КРЭДО"), (FAIL, "Файл XML")])
+    xml = models.TextField("Ответ сервиса")
+    strok = models.IntegerField("Строк", default=0)
+    razneseno = models.DateTimeField("Разнесено", null=True, blank=True)
+    razn_user = models.CharField("Кто разнёс", max_length=150, blank=True)
+    izmeneniya = models.JSONField("Изменения", default=list, blank=True)
+
+    class Meta:
+        verbose_name = "Показания из КРЭДО"
+        verbose_name_plural = "Показания из КРЭДО"
+        ordering = ["-pk"]
+
+    def __str__(self):
+        return f"{self.created:%d.%m.%Y %H:%M} участок {self.cod_gor}, {self.nom_mes:02d}.{self.god}"

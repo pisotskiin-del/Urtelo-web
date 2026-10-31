@@ -29,4 +29,6 @@ urlpatterns = [
     path("rassylka/", views.rassylka, name="rassylka"),
     path("pisma/", views.pisma, name="pisma"),
     path("pisma/<int:pk>/pdf/", views.pismo_pdf, name="pismo_pdf"),
+    path("kredo/", views.kredo_view, name="kredo"),
+    path("kredo/<int:pk>/", views.kredo_priem, name="kredo_priem"),
 ]
