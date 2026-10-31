@@ -478,3 +478,7 @@ table.dok-signs td { width:50%; vertical-align:top; padding:0 12px 0 0; }
 .kv .pok-inline button { flex:0 0 auto; min-height:0; height:24px; padding:0 8px; line-height:1; font-size:13px;
   background:var(--accent); border-color:var(--accent); color:#fff; }
 .kv .pok-inline button[hidden] { display:none; }
+
+/* Статус лицевого в карточке: расторгнут — красный, приостановлен — оранжевый */
+.chip.rastorg { background:var(--danger); color:#fff; font-weight:600; }
+.chip.priost { background:#e8770e; color:#fff; font-weight:600; }
