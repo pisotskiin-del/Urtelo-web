@@ -8,7 +8,11 @@ from django.db import models
 class MesArhiv(models.Model):
     """Архив закрытого месяца (в старой программе — файлы Arhiv\\PoMMГГГГ.dbf,
     DaMMГГГГ.dbf, OtMMГГГГ.dbf, taMMГГГГ.dbf). Хранит состояние таблиц на момент
-    перехода на новый месяц; по нему можно отменить последний переход."""
+    перехода на новый месяц; по нему можно отменить последний переход.
+    Месяцы, закрытые в старой программе, загружаются из файлов Arhiv командой
+    arhiv_import (источник «dbf»): они нужны отчетам за период, отменять их нельзя."""
+
+    WEB, DBF = "web", "dbf"
 
     nom_mes = models.IntegerField("Месяц")
     god = models.IntegerField("Год")
@@ -17,6 +21,8 @@ class MesArhiv(models.Model):
     potreb_count = models.IntegerField("Абонентов", default=0)
     nac_vsego = models.DecimalField("Начислено всего", max_digits=14, decimal_places=3, default=0)
     data = models.BinaryField("Таблицы (gzip JSON)")
+    istochnik = models.CharField("Источник", max_length=3, default=WEB,
+                                 choices=[(WEB, "Новая программа"), (DBF, "Архив старой программы")])
 
     class Meta:
         verbose_name = "Архив месяца"

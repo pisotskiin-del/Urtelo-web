@@ -605,7 +605,7 @@ def nov_mes_view(request):
     rows = [(c, sums.get(c.cod_gorod, {})) for c in cities]
     return render(request, "abonents/nov_mes.html", {
         "mes": mes and nov_mes.MONTHS[mes - 1], "god": god, "next": nxt and f"{nov_mes.MONTHS[nxt[0] - 1]} {nxt[1]}",
-        "rows": rows, "can_run": can_run, "arhiv": nov_mes.MesArhiv.objects.defer("data")[:24],
+        "rows": rows, "can_run": can_run, "arhiv": nov_mes.MesArhiv.objects.filter(istochnik=nov_mes.MesArhiv.WEB).defer("data")[:24],
         "last": nov_mes.last(), "dir_1c": settings.TEPLO_1C_DIR, "year_reset": nxt and nxt[0] == 1, "season_reset": nxt and nxt[0] == 10,
     })
 

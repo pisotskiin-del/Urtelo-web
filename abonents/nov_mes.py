@@ -160,7 +160,8 @@ def run(user=""):
 
 
 def last():
-    return MesArhiv.objects.order_by("-pk").first()
+    """Последний месяц, закрытый в новой программе (его можно отменить)."""
+    return MesArhiv.objects.filter(istochnik=MesArhiv.WEB).order_by("-pk").first()
 
 
 @transaction.atomic
@@ -214,7 +215,7 @@ def write_abot(arh, target):
 
 def export_1c(arh):
     """Положить файл в папку для 1С, если она задана (TEPLO_1C_DIR, у
-    бухгалтерии \\SERVER-FF\Abon_teplo1C). Возвращает путь или None."""
+    бухгалтерии \\\\SERVER-FF\\Abon_teplo1C). Возвращает путь или None."""
     from django.conf import settings
     folder = getattr(settings, "TEPLO_1C_DIR", "")
     if not folder:

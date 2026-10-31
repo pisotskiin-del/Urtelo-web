@@ -447,24 +447,28 @@ POLEZ_COLS = [Col("Категории потребителей"),
 POLEZ_VSEGO = (5, 10, 11)
 
 
+def polez_rows(city, recs, vid=None):
+    """Строки П/У и Нагр. полезного отпуска участка city по записям recs
+    (уже отобранным действующим). Подпись и Гкал по колонкам POLEZ_COLS."""
+    k = _polez_doli(city)
+    rows = []
+    for label, row_key in (("П/У", "pu"), ("Нагр.", "nagr")):
+        row = [label]
+        for col in range(1, len(POLEZ_COLS)):
+            row.append(sum((_polez_val(p, vid) * f for p in recs
+                            if _polez_row(p) == row_key and (f := _polez_part(p, col, k)) is not None),
+                           Decimal(0)))
+        rows.append(row)
+    return rows
+
+
 def polez_data(vid=None):
     """Полезный отпуск по участкам: [(код участка, название, [строка П/У,
     строка Нагр.])], строка — подпись и Гкал по колонкам POLEZ_COLS. Это же
     кладется в архив месяца при переходе на новый месяц."""
-    out = []
-    for c in Danrasch.objects.exclude(cod_gorod=None).order_by("cod_gorod"):
-        recs = list(_active(Potreb.objects.filter(cod_gor=c.cod_gorod)))
-        k = _polez_doli(c)
-        rows = []
-        for label, row_key in (("П/У", "pu"), ("Нагр.", "nagr")):
-            row = [label]
-            for col in range(1, len(POLEZ_COLS)):
-                row.append(sum((_polez_val(p, vid) * f for p in recs
-                                if _polez_row(p) == row_key and (f := _polez_part(p, col, k)) is not None),
-                               Decimal(0)))
-            rows.append(row)
-        out.append((c.cod_gorod, (c.name_gorod or "").strip(), rows))
-    return out
+    return [(c.cod_gorod, (c.name_gorod or "").strip(),
+             polez_rows(c, list(_active(Potreb.objects.filter(cod_gor=c.cod_gorod))), vid))
+            for c in Danrasch.objects.exclude(cod_gorod=None).order_by("cod_gorod")]
 
 
 def polez_otpusk(city, opts):
@@ -752,6 +756,163 @@ def device_pov(city, opts):
                   [Table(cols, [Section(rows=rows)])], notes=[f"Всего: {len(rows)}"])
 
 
+# --- Отчеты за период по закрытым месяцам (форма arhiv) ----------------------
+
+MONTH = "month"     # параметр «месяц»: значение ГГГГ-ММ
+NUMBER = "number"   # параметр «число» (лицевой №)
+
+
+def _ym(value):
+    g, m = value.split("-")
+    return int(m), int(g)
+
+
+def _period(opts):
+    from . import arhiv
+    nach, kon = _ym(opts["s"]), _ym(opts["po"])
+    if (nach[1], nach[0]) > (kon[1], kon[0]):
+        nach, kon = kon, nach
+    spisok = arhiv.mesyacy(nach, kon)
+    text = arhiv.nazvanie(*nach) + ("" if nach == kon else " — " + arhiv.nazvanie(*kon))
+    return spisok, text
+
+
+def _net_arhiva(missing):
+    return [f"Нет архива за: {', '.join(missing)}"] if missing else []
+
+
+def arh_polez(city, opts):
+    """Полезный отпуск за период (polez_nak): по каждому закрытому месяцу и
+    участку — те же колонки, что в «Полезном отпуске» (П/У и нагрузка вместе),
+    итог месяца и итог за период."""
+    from . import arhiv
+    vid = opts.get("vid") or None
+    spisok, text = _period(opts)
+    cols = [Col("Месяц, участок")] + POLEZ_COLS[1:]
+    sections, itogi, missing = [], [], []
+    for mes, god, m in arhiv.zagruzit(spisok):
+        if m is None:
+            missing.append(arhiv.nazvanie(mes, god))
+            continue
+        rows = []
+        for d in sorted(m.danrasch, key=lambda d: d.cod_gorod or 0):
+            if d.cod_gorod is None:
+                continue
+            pu, nagr = polez_rows(d, m.dejstvuyushchie(d.cod_gorod), vid)
+            rows.append([(d.name_gorod or "").strip()] + [a + b for a, b in zip(pu[1:], nagr[1:])])
+        sec = Section(title=m.nazvanie, rows=rows)
+        sec.foot = _sum_row(cols, rows, f"Итого за {m.nazvanie}")
+        itogi.append(sec.foot)
+        sections.append(sec)
+    total = _sum_row(cols, itogi, "Итого за период")
+    lines = ["тепловой энергии по категориям потребителей", f"за {text}"] + \
+        ([dict(VID_USLUGA)[vid]] if vid else [])
+    return Report("ПОЛЕЗНЫЙ ОТПУСК ЗА ПЕРИОД", lines, [Table(cols, sections, total=total)],
+                  notes=_net_arhiva(missing), signatures=[_ved_spec(city, "\u2003" * 12)],
+                  landscape=True, approve=_utverjdau(city))
+
+
+def arh_ras_ab(city, opts):
+    """Расчет количества тепловой энергии, отпущенной абоненту, за период
+    (ras_abonenta, формы arhiv и fak_otp): по месяцам из архива."""
+    from . import arhiv
+    spisok, text = _period(opts)
+    try:
+        ls = int(opts.get("ls") or 0)
+    except ValueError:
+        ls = 0
+    cols = [Col("Период потребления"), Col("Фактич. темп-ра", "num", 1), Col("Темпер. коэф.", "num", 3),
+            Col("Теплов. нагр.", "num", 4), Col("Перерасч. Гкал", "num", 3, total=True),
+            Col("Кол. дней", "num", 0), Col("Начисл. нагруз.", "num", 3, total=True),
+            Col("Потери нагруз.", "num", 3, total=True), Col("Начисл. прибор", "num", 4, total=True),
+            Col("Потери прибор", "num", 3, total=True), Col("Отопл. Гкал", "num", 3, total=True),
+            Col("ГВС Гкал", "num", 3, total=True), Col("Всего Гкал", "num", 3, total=True)]
+    rows, missing, head = [], [], None
+    for mes, god, m in arhiv.zagruzit(spisok):
+        p = m.licevoj(ls) if m else None
+        if p is None:
+            missing.append(arhiv.nazvanie(mes, god))
+            continue
+        head = p
+        d = m.gorod(p.cod_gor_id)
+        rows.append([m.nazvanie, d.t_vozd if d else None, d.tkoef if d else None, p.q_otoppr, n(p.gkl_perer),
+                     p.dnotop, n(p.nach_otnag), n(p.poter_nag), n(p.nach_otpr), n(p.poter_pr),
+                     n(p.nach_otopl), n(p.nach_gvs), n(p.nach_otopl) + n(p.nach_gvs)])
+    head = Potreb.objects.filter(potreb_id=ls).first() or head
+    lines = []
+    if head is not None:
+        lines.append(f"{(head.name_potre or '').strip()} ({(head.glav_potre or '').strip()})")
+        lines.append(f"по договору № {head.nom_dog or ''} от {head.data_dog:%d.%m.%Y}" if head.data_dog
+                     else f"по договору № {head.nom_dog or ''}")
+    lines.append(f"Л/№ {ls}, {text}" if ls else "Укажите лицевой №")
+    notes = [f"Нет лицевого № {ls} в архиве за: {', '.join(missing)}"] if ls and missing else []
+    return Report("РАСЧЕТ количества тепловой энергии, отпущенной абоненту", lines,
+                  [Table(cols, [Section(rows=rows)], total=_sum_row(cols, rows, "ИТОГО:"))],
+                  notes=notes, signatures=[_ved_spec(city, "\u2003" * 12)], landscape=True)
+
+
+def arh_potreb_god(city, opts):
+    """Данные о фактическом потреблении тепловой энергии за год (potreb_god):
+    бюджетные потребители (местный и республиканский бюджет, кроме категории
+    абонента 3) участка, начислено всего по месяцам. В старой программе год
+    в коде был зашит (2009), здесь — выбранный."""
+    from catalogs.models import Minist
+    from . import arhiv
+    try:
+        god = int(opts.get("god") or 0)
+    except ValueError:
+        god = 0
+    cols = [Col("Наименование потребителя"), Col("№ догов.", "int"), Col("Дата заключ.", "date")] + \
+        [Col(m[:3] + ".", "num", 3, total=True) for m in arhiv.MES] + [Col("Итого за год", "num", 3, total=True)]
+    data, missing = {}, []
+    for mes, _, m in arhiv.zagruzit([(i, god) for i in range(1, 13)]):
+        if m is None:
+            missing.append(arhiv.MES[mes - 1])
+            continue
+        for p in m.potreb:
+            if p.cod_gor_id != city.cod_gorod or p.id_kategor not in (2, 3) or p.id_katabon == 3:
+                continue
+            row = data.setdefault(p.potreb_id, {"p": p, "nac": [Decimal(0)] * 12})
+            row["p"] = p
+            row["nac"][mes - 1] = n(p.nac_vsego)
+    kateg = _kategor()
+    minist = dict(Minist.objects.values_list("cod_minist", "name_minis"))
+    items = sorted(data.values(), key=lambda r: (r["p"].id_kategor or 0, r["p"].cod_minist_id or 0, r["p"].potreb_id))
+    sections, current, key = [], None, None
+    for r in items:
+        p = r["p"]
+        k = (p.id_kategor, p.cod_minist_id)
+        if k != key:
+            title = (kateg.get(p.id_kategor) or "").strip()
+            if p.id_kategor == 3:
+                title += f" — {(minist.get(p.cod_minist_id) or '').strip()}"
+            current = Section(title=title)
+            sections.append(current)
+            key = k
+        current.rows.append([(p.name_potre or "").strip(), p.nom_dog, p.data_dog] + r["nac"] + [sum(r["nac"])])
+    for sec in sections:
+        sec.foot = _sum_row(cols, sec.rows, f"Итого: {sec.title}")
+    total = _sum_row(cols, [r for sec in sections for r in sec.rows], "ИТОГО:")
+    return Report(f"ДАННЫЕ О ФАКТИЧЕСКОМ ПОТРЕБЛЕНИИ ТЕПЛОВОЙ ЭНЕРГИИ ЗА {god} г.", _city_lines(city, month=False),
+                  [Table(cols, sections, total=total)],
+                  notes=[f"Нет архива за: {', '.join(missing)} {god}"] if missing else [],
+                  signatures=[_ved_spec(city, "\u2003" * 12)], landscape=True)
+
+
+def _arh_mes_default():
+    from . import arhiv
+    last = arhiv.poslednij()
+    if last is None:
+        today = datetime.date.today()
+        return f"{today.year:04d}-{today.month:02d}"
+    return f"{last[1]:04d}-{last[0]:02d}"
+
+
+def _arh_gody():
+    from . import arhiv
+    return [(str(g), str(g)) for g in arhiv.gody()] or [(str(datetime.date.today().year), str(datetime.date.today().year))]
+
+
 VID_PRIBOR = [("nach", "Начислено"), ("nenach", "Не начислено")]
 VID_NUL = [("otopl", "Отопление"), ("gvs", "ГВС")]
 
@@ -789,6 +950,15 @@ REPORTS = [
               hint="Перечень потребителей и нагрузка по котельным"),
     ReportDef("potreb_kategor", "Часовые нагрузки по категориям", "Печать", potreb_kategor, per_city=False,
               hint="Нагрузка по участкам и категориям потребителей"),
+    ReportDef("arh_polez", "Полезный отпуск за период", "Архив (за период)", arh_polez, per_city=False,
+              options=[("s", "С", MONTH), ("po", "по", MONTH), ("vid", "Услуга", VID_USLUGA)],
+              hint="По закрытым месяцам, по участкам, с итогом за период"),
+    ReportDef("arh_ras_ab", "Расшифровка отпуска по лицевому", "Архив (за период)", arh_ras_ab, per_city=False,
+              options=[("ls", "Л/№", NUMBER), ("s", "С", MONTH), ("po", "по", MONTH)],
+              hint="Расчет количества тепла, отпущенного абоненту, по месяцам"),
+    ReportDef("arh_potreb_god", "Потребление бюджета за год", "Архив (за период)", arh_potreb_god,
+              options=[("god", "Год", _arh_gody)],
+              hint="Бюджетные потребители: начислено по месяцам года"),
 ]
 BY_KEY = {r.key: r for r in REPORTS}
 
@@ -799,6 +969,8 @@ def options_for(rdef):
     for name, label, choices in rdef.options:
         if choices is None:
             choices = [("", "Все категории")] + [(str(k), v) for k, v in sorted(_kategor().items())]
+        elif callable(choices):
+            choices = choices()
         out.append((name, label, choices))
     return out
 
@@ -812,6 +984,18 @@ def build(rdef, city, params):
                 opts[name] = datetime.date.fromisoformat(value).isoformat()
             except ValueError:
                 opts[name] = datetime.date.today().isoformat()
+            continue
+        if choices == MONTH:
+            value = params.get(name, "")
+            try:
+                m, g = _ym(value)
+                opts[name] = f"{g:04d}-{m:02d}" if 1 <= m <= 12 and g > 1900 else _arh_mes_default()
+            except ValueError:
+                opts[name] = _arh_mes_default()
+            continue
+        if choices == NUMBER:
+            value = (params.get(name) or "").strip()
+            opts[name] = value if value.isdigit() else ""
             continue
         value = params.get(name, choices[0][0])
         opts[name] = value if value in {c for c, _ in choices} else choices[0][0]

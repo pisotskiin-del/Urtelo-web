@@ -1,5 +1,6 @@
 """Тесты карты абонента на выдуманных записях (без данных из DBF)."""
 
+import io
 import re
 from collections import Counter
 from datetime import date
@@ -10,7 +11,7 @@ from django.contrib.auth.models import Group
 from django.core.management import call_command
 from django.test import TestCase
 
-from abonents import layout
+from abonents import layout, reports
 from catalogs.models import Akcept, Danrasch, GvsKot, Kategorpot, Limit, Minist, Potreb, SpTeplpoteri
 
 
@@ -739,3 +740,95 @@ class DokumentyTests(KartaBase):
         r = self.client.get("/abonents/dokumenty/?gorod=1&vid=akt")
         self.assertContains(r, "Договоров: 1")
         self.assertContains(self.client.get("/abonents/5/"), "/abonents/dogovor/1/6/schet/?ls=5")
+
+
+class ArhivTests(KartaBase):
+    """Отчеты за период по закрытым месяцам и загрузка архивов старой программы."""
+
+    def setUp(self):
+        super().setUp()
+        from abonents import nov_mes
+        Danrasch.objects.update(nom_mes=11, name_mes="Ноябрь", god=2026, t_vozd=Decimal("2.5"))
+        Potreb.objects.filter(potreb_id__in=[5, 7, 9]).update(d_stat=60)
+        Potreb.objects.filter(potreb_id=5).update(nach_otopl=Decimal("3"), nach_gvs=Decimal("1"), nac_vsego=Decimal("4"))
+        nov_mes.run("тест")                       # закрыт ноябрь 2026
+        Potreb.objects.filter(potreb_id=5).update(nach_otopl=Decimal("5"), nac_vsego=Decimal("5"))
+        nov_mes.run("тест")                       # закрыт декабрь 2026
+
+    def make_dbf(self, folder, name, spec, rows):
+        import dbf
+        t = dbf.Table(str(folder / name), spec, codepage="cp1251", dbf_type="vfp")
+        t.open(dbf.READ_WRITE)
+        for r in rows:
+            t.append(r)
+        t.close()
+
+    def test_mesyacy(self):
+        from abonents import arhiv
+        self.assertEqual(arhiv.mesyacy((11, 2025), (2, 2026)), [(11, 2025), (12, 2025), (1, 2026), (2, 2026)])
+        self.assertEqual(arhiv.poslednij(), (12, 2026))
+
+    def test_ras_ab_po_mesyacam(self):
+        rep, _ = reports.build(reports.BY_KEY["arh_ras_ab"], self.ryb, {"ls": "5", "s": "2026-10", "po": "2026-12"})
+        rows = rep.tables[0].sections[0].rows
+        self.assertEqual([r[0] for r in rows], ["ноябрь 2026", "декабрь 2026"])
+        self.assertEqual([r[-1] for r in rows], [Decimal("4.000"), Decimal("5.000")])
+        self.assertEqual(rows[0][1], Decimal("2.5"))
+        self.assertEqual(rep.tables[0].total[-1], Decimal("9.000"))
+        self.assertIn("октябрь 2026", rep.notes[0])
+
+    def test_polez_za_period(self):
+        rep, _ = reports.build(reports.BY_KEY["arh_polez"], self.ryb, {"s": "2026-11", "po": "2026-12"})
+        t = rep.tables[0]
+        self.assertEqual([s.title for s in t.sections], ["ноябрь 2026", "декабрь 2026"])
+        # Хозрасчет (категория 1) — колонка «Всего хозрасчёт», ВСЕГО — последняя.
+        self.assertEqual(t.sections[0].foot[-1], Decimal("4.000"))
+        self.assertEqual(t.total[-1], Decimal("9.000"))
+
+    def test_import_i_potreb_god(self):
+        import tempfile
+        from pathlib import Path
+        from django.core.management import call_command
+        from abonents import arhiv
+        folder = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__("shutil").rmtree, folder)
+        spec = ("potreb_id N(6,0); cod_gor N(2,0); nom_dog N(6,0); id_kategor N(2,0); id_katabon N(2,0); "
+                "cod_minist N(3,0); name_potre C(60); nac_vsego N(12,3); nach_otopl N(12,3); tip_rasot N(1,0)")
+        self.make_dbf(folder, "Po032024.dbf", spec, [(21, 1, 30, 2, 1, 1, "Школа № 5", 7.25, 7.25, 2),
+                                                     (22, 1, 31, 2, 3, 1, "Не входит", 1, 1, 2)])
+        self.make_dbf(folder, "Da032024.dbf", "cod_gorod N(2,0); name_gorod C(10); t_vozd N(5,1)", [(1, "Рыбница", -1.5)])
+        self.make_dbf(folder, "po122026.dbf", spec, [(21, 1, 30, 2, 1, 1, "Школа № 5", 99, 99, 2)])
+        out = io.StringIO()
+        call_command("arhiv_import", dir=str(folder), stdout=out)
+        self.assertIn("Загружено месяцев: 1, пропущено (уже есть): 1", out.getvalue())  # 12.2026 закрыт в вебе
+        a = nov_mes_model().objects.get(nom_mes=3, god=2024)
+        self.assertEqual((a.istochnik, a.potreb_count, a.nac_vsego), ("dbf", 2, Decimal("8.250")))
+        from abonents import nov_mes
+        self.assertEqual((nov_mes.last().nom_mes, nov_mes.last().god), (12, 2026))   # отменять можно только свой
+        m = arhiv.zagruzit([(3, 2024)])[0][2]
+        self.assertEqual(len(m.dejstvuyushchie(1)), 2)     # статуса договора в старом архиве нет — все записи
+        rep, _ = reports.build(reports.BY_KEY["arh_potreb_god"], self.ryb, {"god": "2024"})
+        rows = [r for s in rep.tables[0].sections for r in s.rows]
+        self.assertEqual([(r[0], r[5], r[-1]) for r in rows], [("Школа № 5", Decimal("7.250"), Decimal("7.250"))])
+        # Повторный запуск ничего не добавляет.
+        call_command("arhiv_import", dir=str(folder), stdout=io.StringIO())
+        self.assertEqual(nov_mes_model().objects.filter(nom_mes=3, god=2024).count(), 1)
+
+    def test_excel(self):
+        self.login("Наблюдатель")
+        for key in ("arh_polez", "arh_ras_ab", "arh_potreb_god"):
+            r = self.client.get(f"/abonents/otchety/{key}/?xlsx=1&ls=5&s=2026-11&po=2026-12&god=2026")
+            self.assertEqual(r.status_code, 200, key)
+
+    def test_stranica_otcheta(self):
+        self.login("Наблюдатель")
+        r = self.client.get("/abonents/otchety/arh_ras_ab/?ls=5&s=2026-11&po=2026-12")
+        self.assertContains(r, 'type="month"')
+        self.assertContains(r, "декабрь 2026")
+        self.assertContains(self.client.get("/abonents/otchety/"), "Полезный отпуск за период")
+
+
+def nov_mes_model():
+    from abonents.models import MesArhiv
+    return MesArhiv
+
