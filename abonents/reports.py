@@ -984,8 +984,8 @@ def vedom_pisem(city, opts):
                   [Table(cols, [Section(rows=rows)], total=[None, None, None, f"Всего писем: {len(rows)}", None, None, None])])
 
 
-NAGR_KAT = [(1, "Хозрасчет"), (2, "Местный бюджет"), (3, "Республ. бюджет"), (4, "Население бюджет"),
-            (5, "Население хозрасчет"), (6, "Население абонентское"), (7, "Организация СКиИОД")]
+NAGR_KAT = [(1, "Хозрасчет"), (2, "Местный бюджет"), (3, "Республиканский бюджет"), (4, "Население бюджет"),
+            (5, "Население хозрасчет"), (6, "Население абонентское"), (7, "Организации СКиОД")]
 
 
 def nagr_kot_kat(city, opts):
@@ -1000,28 +1000,26 @@ def nagr_kot_kat(city, opts):
         sums[k] = (o + n(p.q_otoppr), g + n(p.q_gvs))
     kotly = list(GvsKot.objects.filter(kod_gor=city.cod_gorod).order_by("id_kot"))
     known = {k.id_kot for k in kotly}
-    cols = [Col("Котельная")]
+    # Шапка как в шаблоне «Нагрузка котельных по категориям.xltx»: по каждой
+    # категории «отопл.» и «ГВС», без колонок «Всего».
+    cols = [Col("Наименование котельной")]
     for _, t in NAGR_KAT:
-        cols += [Col(f"{t}: отопление", "num", 5, total=True), Col(f"{t}: ГВС", "num", 5, total=True)]
-    cols += [Col("Всего: отопление", "num", 5, total=True), Col("Всего: ГВС", "num", 5, total=True)]
+        cols += [Col(f"{t}: отопл.", "num", 5, total=True), Col(f"{t}: ГВС", "num", 5, total=True)]
     rows = []
 
     def row(name, kot):
         r = [name]
-        to = tg = Decimal(0)
         for kat, _ in NAGR_KAT:
-            o, g = sums.get((kot, kat), (Decimal(0), Decimal(0)))
-            r += [o, g]
-            to, tg = to + o, tg + g
-        return r + [to, tg]
+            r += list(sums.get((kot, kat), (Decimal(0), Decimal(0))))
+        return r
     for k in kotly:
         r = row((k.name_kot or "").strip() or f"Котельная {k.id_kot}", k.id_kot)
         if any(r[1:]):
             rows.append(r)
     for kot in sorted({k for k, _ in sums if k not in known}, key=lambda v: (v is None, v or 0)):
         rows.append(row("Котельная не указана" if kot is None else f"Котельная {kot}", kot))
-    head = [[("Котельная", 1, 2)] + [(t, 2, 1) for _, t in NAGR_KAT] + [("Всего", 2, 1)],
-            [("отопл.", 1, 1), ("ГВС", 1, 1)] * (len(NAGR_KAT) + 1)]
+    head = [[("Наименование котельной", 1, 2)] + [(t, 2, 1) for _, t in NAGR_KAT],
+            [("отопл.", 1, 1), ("ГВС", 1, 1)] * len(NAGR_KAT)]
     return Report("Нагрузка котельных по категориям потребителей, Гкал/час",
                   [f"г. {(city.name_gorod or '').strip()} данные на {_today()}"],
                   [Table(cols, [Section(rows=rows)], total=_sum_row(cols, rows, "Итого по участку"), head=head)],
