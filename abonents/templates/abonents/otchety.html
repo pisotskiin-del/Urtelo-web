@@ -11,5 +11,11 @@
   </ul>
 </section>
 {% endfor %}
+<section class="card kgroup"><h2>{% icon "file" %} Документы абонентам</h2>
+  <ul class="rep-list">
+  <li><a href="{% url 'abonents:dokumenty' %}?vid=schet"><b>Информация-счёт</b><small>по всем договорам участка с начислением за месяц</small></a></li>
+  <li><a href="{% url 'abonents:dokumenty' %}?vid=akt"><b>Акт о фактическом потреблении</b><small>по всем договорам участка с начислением за месяц</small></a></li>
+  </ul>
+</section>
 </div>
 {% endblock %}

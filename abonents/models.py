@@ -45,11 +45,13 @@ class Podpisant(models.Model):
     VED_SPEC = "ved"
     ISPOLNITEL = "isp"
     PRIBORY = "pribor"
+    AKT = "akt"
     ROLI = [
         (UTVERJDAU, "Утверждаю (гриф отчета)"),
         (VED_SPEC, "Подпись отчетов (ведущий специалист)"),
         (ISPOLNITEL, "Исполнитель"),
         (PRIBORY, "Отчеты по приборам учета (инспектор, контролер)"),
+        (AKT, "Акт о потреблении: «в лице …» (должность и Ф.И.О. в родительном падеже)"),
     ]
 
     rol = models.CharField("Где подписывает", max_length=10, choices=ROLI)

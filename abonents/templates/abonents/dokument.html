@@ -1,0 +1,31 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{{ title }}{% if not paket and doks %} — договор № {{ doks.0.nom_dog }}{% endif %}{% endblock %}
+{% block content %}
+<div class="no-print">
+<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a><span class="sep">›</span><a href="{{ back }}">Назад</a><span class="sep">›</span>{{ title }}</p>
+<div class="page-head"><h1>{{ title }}{% if paket %}: все договоры участка{% elif doks %} по договору № {{ doks.0.nom_dog }}{% endif %}</h1>
+  <div class="actions">
+    {% if not paket and doks %}
+      {% if vid == "schet" %}<a class="button" href="{% url 'abonents:dokument' doks.0.gorod.cod_gorod doks.0.nom_dog 'akt' %}{% if request.GET.ls %}?ls={{ request.GET.ls }}{% endif %}">Акт</a>
+      {% else %}<a class="button" href="{% url 'abonents:dokument' doks.0.gorod.cod_gorod doks.0.nom_dog 'schet' %}{% if request.GET.ls %}?ls={{ request.GET.ls }}{% endif %}">Информация-счёт</a>{% endif %}
+    {% endif %}
+    <button type="button" onclick="window.print()">{% icon "file" %} Печать / PDF</button>
+  </div>
+</div>
+{% if paket %}
+<form method="get" class="toolbar rep-params">
+  <nav class="tabs">{% for c in cities %}<a href="?gorod={{ c.cod_gorod }}&amp;vid={{ vid }}" {% if c.cod_gorod == city %}class="active"{% endif %}>{{ c.name_gorod }}</a>{% endfor %}</nav>
+  <label>Документ <select name="vid" onchange="this.form.submit()">{% for k, t in vidy %}<option value="{{ k }}"{% if k == vid %} selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
+  <span class="muted">Договоров: {{ doks|length }}. Сохранить в PDF — «Печать / PDF», принтер «Сохранить как PDF».</span>
+</form>
+{% endif %}
+<p class="muted">Сумма = (отопление + ГВС) Гкал × тариф; потери ГВС в сумму не входят.</p>
+</div>
+{% for dok in doks %}
+<section class="dok">
+{% if vid == "akt" %}{% include "abonents/_dok_akt.html" %}{% else %}{% include "abonents/_dok_schet.html" %}{% endif %}
+</section>
+{% empty %}
+<p class="muted">Нет договоров с начислением за текущий месяц.</p>
+{% endfor %}
+{% endblock %}

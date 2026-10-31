@@ -22,7 +22,7 @@ from django.db import transaction
 from catalogs.models import Akcept, Bank, Danrasch, GvsKot, Kategorpot, Limit, Potreb, SpTeplosch, SpTeplpoteri
 from teplo.sqlite_unicode import UnicodeLower
 
-from . import layout, nov_mes, poteri, raschet, reports
+from . import documents, layout, nov_mes, poteri, raschet, reports
 from .forms import DanRaschForm, NovAbonentForm, PoteriForm, TeploschForm, karta_form
 
 view_required = permission_required("catalogs.view_potreb", raise_exception=True)
@@ -683,3 +683,56 @@ def otchet(request, key):
         "cities": cities, "city": code, "xlsx_query": query.urlencode(),
     })
 
+
+DOKUMENTY = {"schet": "Информация-счёт", "akt": "Акт о фактическом потреблении"}
+
+
+def _dok_context(dok):
+    """Подписи и реквизиты для шаблона документа."""
+    from .models import Podpisant
+    from catalogs.models import SmtpNas
+    ved = Podpisant.get(Podpisant.VED_SPEC, dok.gorod)
+    isp = Podpisant.get(Podpisant.ISPOLNITEL, dok.gorod)
+    akt = Podpisant.get(Podpisant.AKT, dok.gorod)
+    smtp = SmtpNas.objects.first()
+    return {"dok": dok, "org": documents.ORG, "ved": ved, "isp": isp,
+            "akt_lico": " ".join(x for x in akt if x) or
+            "ведущего специалиста Рыбницкого участка по эксплуатации котельных и тепловых сетей "
+            "Борсуковского Сергея Васильевича",
+            "dov": (smtp.nom_dov, smtp.data_dov) if smtp and smtp.nom_dov else None}
+
+
+@login_required
+@view_required
+def dokument(request, cod_gor, nom_dog, vid):
+    """«Информация-счёт» (vid=schet) или акт (vid=akt) по договору за текущий
+    месяц участка: на экране и для печати (в PDF — печатью из браузера)."""
+    if vid not in DOKUMENTY:
+        raise Http404
+    dok = documents.sobrat(cod_gor, nom_dog)
+    if dok is None:
+        raise Http404("В договоре нет действующих лицевых счетов")
+    return render(request, "abonents/dokument.html", {
+        **_dok_context(dok), "vid": vid, "title": DOKUMENTY[vid], "doks": [dok],
+        "back": reverse("abonents:karta", args=[int(request.GET["ls"])]) if request.GET.get("ls", "").isdigit()
+        else reverse("abonents:dogovor", args=[cod_gor, nom_dog]),
+    })
+
+
+@login_required
+@view_required
+def dokumenty(request):
+    """Пакет документов участка за месяц: по каждому договору с начислением
+    больше нуля, каждый документ с новой страницы."""
+    vid = request.GET.get("vid", "schet")
+    if vid not in DOKUMENTY:
+        raise Http404
+    cities = _cities()
+    code = _current_city(request, cities)
+    doks = [d for d in (documents.sobrat(code, n) for n in documents.dogovory(code)) if d]
+    ctx = _dok_context(doks[0]) if doks else {"org": documents.ORG}
+    return render(request, "abonents/dokument.html", {
+        **ctx, "vid": vid, "title": DOKUMENTY[vid], "doks": doks, "paket": True,
+        "cities": cities, "city": code, "vidy": DOKUMENTY.items(),
+        "back": reverse("abonents:otchety"),
+    })

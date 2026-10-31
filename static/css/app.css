@@ -441,3 +441,26 @@ table.rep tr.mark:not(.foot) td.num { text-align:center; }
 table.rep a.drill { color:inherit; text-decoration:none; border-bottom:1px dotted var(--muted); }
 table.rep a.drill:hover { color:var(--accent, #2563eb); border-bottom-color:currentColor; }
 @media print { table.rep a.drill { border-bottom:0; } }
+
+/* Документы абоненту: «Информация-счёт» и акт. */
+.dok { background:#fff; color:#000; max-width:190mm; margin:0 auto 24px; padding:12mm 10mm; border:1px solid var(--line, #ddd); font-size:10.5pt; }
+.dok + .dok { page-break-before:always; break-before:page; }
+.dok-org { font-size:9pt; line-height:1.35; margin-bottom:8px; }
+.dok-title { text-align:center; margin:6px 0 10px; line-height:1.4; }
+.dok-title b { font-size:13pt; }
+.dok-row { display:flex; justify-content:space-between; gap:12px; margin:6px 0; flex-wrap:wrap; }
+.dok-text { text-align:justify; text-indent:2em; line-height:1.45; }
+table.dok-tab { width:100%; border-collapse:collapse; font-size:9.5pt; margin:8px 0; }
+table.dok-tab th, table.dok-tab td { border:1px solid #333; padding:2px 4px; vertical-align:top; }
+table.dok-tab th { font-weight:600; text-align:center; }
+table.dok-tab th.left { text-align:left; }
+table.dok-tab td.num, table.dok-tab th.num { text-align:right; white-space:nowrap; }
+table.dok-tab tr.dok-kat td { font-weight:600; background:#f2f2f2; }
+table.dok-tab tr.dok-sub td { font-style:italic; }
+table.dok-tab tr { page-break-inside:avoid; }
+.dok .line { display:inline-block; width:40mm; border-bottom:1px solid #000; }
+.dok-sign { margin-top:16px; }
+.dok-signs { display:flex; justify-content:space-between; gap:24px; margin-top:18px; line-height:1.6; }
+.dok-signs > div { flex:1; }
+.dok-foot { font-size:9pt; margin-top:18px; }
+@media print { .dok { border:0; padding:0; margin:0; max-width:none; } }

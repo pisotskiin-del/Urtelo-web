@@ -1,0 +1,25 @@
+<div class="dok-title"><b>АКТ</b><br>о фактическом потреблении тепловой энергии<br>по договору № {{ dok.nom_dog }} от {{ dok.glav.data_dog|date:"d.m.Y" }}</div>
+<div class="dok-row"><span>г.{{ dok.gorod.name_gorod|default:"" }}</span><span>{{ dok.data|date:"d.m.Y" }}</span></div>
+<p class="dok-text">Мы, нижеподписавшиеся, МГУП "Тирастеплоэнерго", в лице {{ akt_lico }}{% if dov %}, действующего на основании доверенности № {{ dov.0 }} от {{ dov.1|date:"d.m.Y" }},{% else %},{% endif %}
+с одной стороны, и {{ dok.glav.name_potre|default:"" }}, в лице {{ dok.glav.doljn_podp|default:"" }} {{ dok.glav.direktor|default:"" }} с другой стороны,
+составили настоящий акт в том, что в {{ dok.mes_pr }} {{ dok.god }} года было отпущено тепловой энергии:</p>
+<table class="dok-tab">
+  <thead><tr><th>№</th><th>Наименование объекта теплоснабжения</th>{% if not dok.akt_staryi %}<th>Адрес</th>{% endif %}<th>Отопл. Гкал</th><th>Подогр. воды Гкал</th><th>Потери Гкал</th><th>Итого, Гкал</th></tr></thead>
+  {% for k in dok.kategorii %}
+  <tbody>
+    {% for s in k.stroki %}
+    <tr><td class="num">{{ s.p.potreb_id }}</td><td>{{ s.p.nameobakt|default:"" }}</td>{% if not dok.akt_staryi %}<td>{{ s.adres }}</td>{% endif %}
+      <td class="num">{{ s.otopl|floatformat:3 }}</td><td class="num">{{ s.gvs|floatformat:3 }}</td><td class="num">{{ s.poteri|floatformat:3 }}</td><td class="num">{{ s.gkal|floatformat:3 }}</td></tr>
+    {% endfor %}
+    <tr class="dok-sub"><td></td><td>{{ k.name }}</td>{% if not dok.akt_staryi %}<td>{% if k.tarif is not None %}тариф {{ k.tarif|floatformat:2 }} руб.{% endif %}</td>{% endif %}
+      <td class="num">{{ k.otopl|floatformat:3 }}</td><td class="num">{{ k.gvs|floatformat:3 }}</td><td class="num">{{ k.poteri|floatformat:3 }}</td><td class="num">{{ k.gkal|floatformat:3 }}</td></tr>
+  </tbody>
+  {% endfor %}
+  <tfoot><tr><th></th><th class="left" {% if not dok.akt_staryi %}colspan="2"{% endif %}>ИТОГО Гкал:</th>
+    <th class="num">{{ dok.otopl|floatformat:3 }}</th><th class="num">{{ dok.gvs|floatformat:3 }}</th><th class="num">{{ dok.poteri|floatformat:3 }}</th><th class="num">{{ dok.gkal|floatformat:3 }}</th></tr></tfoot>
+</table>
+<div class="dok-signs">
+  <div>{{ ved.0|default:"Ведущий специалист" }} СУиРТЭ<br><br><span class="line"></span> {{ ved.1 }}</div>
+  <div>{{ dok.glav.name_potre|default:"" }}<br>{{ dok.glav.doljn_podp|default:"" }}<br><span class="line"></span> {{ dok.glav.direktor|default:"" }}</div>
+</div>
+<p class="dok-foot">Исполнитель {{ isp.1 }} тел. {{ org.telefon }}</p>

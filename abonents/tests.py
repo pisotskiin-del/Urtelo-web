@@ -674,3 +674,68 @@ class ReportsTests(KartaBase):
         self.assertIn(10.5, values)
         self.assertEqual(self.client.get("/abonents/otchety/net/").status_code, 404)
 
+
+class DokumentyTests(KartaBase):
+    """«Информация-счёт» и акт по договору."""
+
+    def setUp(self):
+        super().setUp()
+        from abonents.models import TarifGorod
+        Kategorpot.objects.create(id_kotegor=4, name_kateg="Население бюджет")
+        Danrasch.objects.filter(cod_gorod=1).update(nom_mes=10)
+        TarifGorod.objects.create(gorod=1, id_tar=1, zn_tar=Decimal("412.37"), diz_tar=Decimal("900.00"))
+        TarifGorod.objects.create(gorod=1, id_tar=3, zn_tar=Decimal("100.00"))
+        TarifGorod.objects.create(gorod=1, id_tar=12, zn_tar=Decimal("50.00"))
+        Potreb.objects.filter(potreb_id__in=[5, 7, 9]).update(d_stat=60)
+        # Отопление с потерями 1.111, ГВС 0.5, потери ГВС не входят в сумму.
+        Potreb.objects.filter(potreb_id=5).update(nach_otopl=Decimal("1.111"), nach_gvs=Decimal("0.5"),
+                                                  poter_gvs=Decimal("9"), poterschob=Decimal("0.1"),
+                                                  nameobakt="Магазин", adres_sd="Ленина", oba_dom="5")
+        Potreb.objects.filter(potreb_id=7).update(nach_otopl=Decimal("2.003"), vid_topl=True)
+
+    def test_summa_po_dogovoru(self):
+        from abonents import documents
+        dok = documents.sobrat(1, 6)
+        self.assertEqual([s.p.potreb_id for s in dok.stroki], [5, 7])
+        a, b = dok.stroki
+        self.assertEqual((a.otopl, a.gvs, a.poteri, a.gkal), (Decimal("1.011"), Decimal("0.5"), Decimal("0.1"), Decimal("1.611")))
+        self.assertEqual(a.tarif, Decimal("412.37"))
+        self.assertEqual(a.itog, Decimal("1.611") * Decimal("412.37"))   # 664.32807
+        self.assertEqual(a.itog_r, Decimal("664.33"))
+        self.assertEqual(b.tarif, Decimal("900.00"))                      # дизельное топливо
+        self.assertEqual(b.itog_r, Decimal("1802.70"))
+        k = dok.kategorii[0]
+        self.assertEqual(k.itog, Decimal("2467.03"))                      # 664.32807 + 1802.7
+        self.assertEqual(k.otklonenie, Decimal("0.00"))
+        self.assertEqual(dok.itog, Decimal("2467.03"))
+        self.assertEqual(dok.mes_pr, "Октябре")
+        self.assertIsNone(documents.sobrat(1, 999))
+
+    def test_tarif_naselenie_s_vozmeshcheniem(self):
+        from abonents import documents
+        self.assertEqual(documents.tarif_kod(1, 4, 0), 3)
+        self.assertEqual(documents.tarif_kod(1, 4, 1), 12)
+        self.assertEqual(documents.tarif_kod(1, 1, 1), 1)
+        self.assertEqual(documents.tarif_kod(2, 1, 0), 4)
+        self.assertEqual(documents.tarif_kod(3, 7, 0), 10)
+
+    def test_ne_dejstvuyushchie_ne_vhodyat(self):
+        from abonents import documents
+        Potreb.objects.filter(potreb_id=7).update(d_stat=63)
+        self.assertEqual([s.p.potreb_id for s in documents.sobrat(1, 6).stroki], [5])
+        self.assertEqual(documents.dogovory(1), [6])   # у договора 8 начисления нет
+
+    def test_stranicy(self):
+        self.login("Наблюдатель")
+        r = self.client.get("/abonents/dogovor/1/6/schet/?ls=5")
+        self.assertContains(r, "Информация-счёт")
+        self.assertContains(r, "664,33")
+        self.assertContains(r, "2467,03")
+        self.assertContains(r, "Магазин ул.Ленина 5")
+        r = self.client.get("/abonents/dogovor/1/6/akt/")
+        self.assertContains(r, "в Октябре 2026 года было отпущено")
+        self.assertEqual(self.client.get("/abonents/dogovor/1/6/xxx/").status_code, 404)
+        self.assertEqual(self.client.get("/abonents/dogovor/1/999/akt/").status_code, 404)
+        r = self.client.get("/abonents/dokumenty/?gorod=1&vid=akt")
+        self.assertContains(r, "Договоров: 1")
+        self.assertContains(self.client.get("/abonents/5/"), "/abonents/dogovor/1/6/schet/?ls=5")
