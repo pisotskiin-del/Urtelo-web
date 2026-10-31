@@ -153,6 +153,8 @@ class Dokument:
     glav: Potreb           # запись, по которой берутся реквизиты договора
     kategorii: list
     data: datetime.date
+    arhiv: bool = False            # закрытый месяц из архива
+    tarif_tekushchij: bool = False  # в архиве месяца нет тарифов — взяты нынешние
 
     @property
     def nom_dog(self):
@@ -226,14 +228,33 @@ def stroka(p, tarify):
                   tarif=t, itog=gkal * t)
 
 
-def sobrat(cod_gor, nom_dog, data=None):
-    """Документ по договору; None, если в договоре нет действующих лицевых."""
+def _iz_arhiva(mesyac, cod_gor, nom_dog):
+    """Лицевые договора, участок и тарифы закрытого месяца (arhiv.Mesyac)."""
     from .models import TarifGorod
-    recs = zapisi(cod_gor, nom_dog)
+    recs = sorted((p for p in mesyac.dejstvuyushchie(cod_gor) if p.nom_dog == nom_dog),
+                  key=lambda p: (p.id_kategor or 0, p.potreb_id or 0))
+    gorod = mesyac.gorod(cod_gor)
+    if gorod is None:   # архив старой программы без Da-файла
+        sejchas = Danrasch.objects.filter(cod_gorod=cod_gor).first()
+        gorod = Danrasch(cod_gorod=cod_gor, name_gorod=sejchas.name_gorod if sejchas else "")
+    gorod.nom_mes, gorod.god = mesyac.mes, mesyac.god
+    tarify = mesyac.tarify(cod_gor)
+    return recs, gorod, tarify if tarify is not None else TarifGorod.dlya(cod_gor), tarify is None
+
+
+def sobrat(cod_gor, nom_dog, data=None, mesyac=None):
+    """Документ по договору за текущий месяц или за закрытый месяц mesyac
+    (arhiv.Mesyac); None, если в договоре нет действующих лицевых."""
+    from .models import TarifGorod
+    tek_tarif = False
+    if mesyac is not None:
+        recs, gorod, tarify, tek_tarif = _iz_arhiva(mesyac, cod_gor, nom_dog)
+    else:
+        recs = zapisi(cod_gor, nom_dog)
+        gorod = Danrasch.objects.filter(cod_gorod=cod_gor).first()
+        tarify = TarifGorod.dlya(cod_gor) if recs else {}
     if not recs:
         return None
-    gorod = Danrasch.objects.filter(cod_gorod=cod_gor).first()
-    tarify = TarifGorod.dlya(cod_gor)
     names = {k.id_kotegor: (k.name_kateg or "").strip() for k in Kategorpot.objects.all()}
     kats = {}
     for p in recs:
@@ -244,17 +265,21 @@ def sobrat(cod_gor, nom_dog, data=None):
             k.plus = KOP
     # Реквизиты договора (наименование, руководитель, дата) — у первого лицевого договора.
     glav = min(recs, key=lambda p: p.potreb_id)
-    return Dokument(gorod=gorod, glav=glav, kategorii=list(kats.values()), data=data or datetime.date.today())
+    return Dokument(gorod=gorod, glav=glav, kategorii=list(kats.values()), data=data or datetime.date.today(),
+                    arhiv=mesyac is not None, tarif_tekushchij=tek_tarif)
 
 
 def po_licevomu(potreb):
     return sobrat(potreb.cod_gor_id, potreb.nom_dog)
 
 
-def dogovory(cod_gor, s_nachisleniem=True):
+def dogovory(cod_gor, s_nachisleniem=True, mesyac=None):
     """Номера договоров участка для пакета документов за месяц: договоры с
     действующими лицевыми и (по умолчанию) начислением больше нуля, как в
     массовой рассылке старой программы (nac_vsego > 0)."""
+    if mesyac is not None:
+        return sorted({p.nom_dog for p in mesyac.dejstvuyushchie(cod_gor)
+                       if p.nom_dog is not None and (not s_nachisleniem or (p.nac_vsego or 0) > 0)})
     qs = Potreb.objects.filter(cod_gor=cod_gor, d_stat__in=RASCHET).exclude(nom_dog=None)
     if s_nachisleniem:
         qs = qs.filter(nac_vsego__gt=0)

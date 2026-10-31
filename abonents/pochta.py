@@ -102,7 +102,7 @@ def otpravit(dok, vid, context, user="", conn=None):
     return pismo
 
 
-def rassylka(cod_gor, nomera, vid, context, user=""):
+def rassylka(cod_gor, nomera, vid, context, user="", mesyac=None):
     """Отправить документы по списку договоров участка одной SMTP-сессией."""
     out = []
     conn = connection()
@@ -112,7 +112,7 @@ def rassylka(cod_gor, nomera, vid, context, user=""):
         conn = None   # ошибка соединения запишется в каждую запись реестра
     try:
         for nom in nomera:
-            dok = documents.sobrat(cod_gor, nom)
+            dok = documents.sobrat(cod_gor, nom, mesyac=mesyac)
             if dok is not None:
                 out.append(otpravit(dok, vid, context, user, conn))
     finally:
@@ -121,7 +121,7 @@ def rassylka(cod_gor, nomera, vid, context, user=""):
     return out
 
 
-def spisok(cod_gor, mes, god, vid):
+def spisok(cod_gor, mes, god, vid, mesyac=None):
     """Договоры участка для рассылки за месяц: [(документ, получатель, отмечен
     по умолчанию, последняя запись реестра за месяц)]. По умолчанию отмечены
     договоры с признаком «Почта» в карте, которым документ ещё не отправлен."""
@@ -129,8 +129,8 @@ def spisok(cod_gor, mes, god, vid):
     for p in Pismo.objects.filter(cod_gor=cod_gor, nom_mes=mes, god=god, vid=vid).order_by("pk"):
         last[p.nom_dog] = p
     out = []
-    for nom in documents.dogovory(cod_gor):
-        dok = documents.sobrat(cod_gor, nom)
+    for nom in documents.dogovory(cod_gor, mesyac=mesyac):
+        dok = documents.sobrat(cod_gor, nom, mesyac=mesyac)
         if dok is None:
             continue
         p = poluchatel(dok)

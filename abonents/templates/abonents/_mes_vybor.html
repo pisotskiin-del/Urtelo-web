@@ -1,0 +1,4 @@
+<label>Месяц <select name="mes" onchange="this.form.submit()">
+  <option value="">текущий</option>
+  {% for k, t in mesyacy %}<option value="{{ k }}"{% if k == mes %} selected{% endif %}>{{ t }} (архив)</option>{% endfor %}
+</select></label>

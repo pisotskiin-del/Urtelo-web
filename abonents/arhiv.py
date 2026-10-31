@@ -82,7 +82,7 @@ class Mesyac:
     def __init__(self, arh):
         self.arh = arh
         self.mes, self.god = arh.nom_mes, arh.god
-        t = arh.tables()
+        t = self.tables = arh.tables()
         self.potreb = _objects(Potreb, t.get("potreb", []))
         self.danrasch = _objects(Danrasch, t.get("danrasch", []))
 
@@ -101,6 +101,22 @@ class Mesyac:
             recs = [p for p in recs if p.d_stat in RASCHET]
         return recs
 
+    def tarify(self, code):
+        """{код: (тариф, тариф для дизеля)} участка на момент закрытия месяца или
+        None, если тарифов в архиве нет. Как TarifGorod.dlya: общий tarif.dbf,
+        поверх него — тарифы участка (их хранят месяцы, закрытые в новой программе)."""
+        obshchie, uch = self.tables.get("tarif") or [], self.tables.get("tarif_gorod") or []
+        if not obshchie and not uch:
+            return None
+        out = {}
+        for row in obshchie:
+            if row.get("id_tar") is not None:
+                out[int(row["id_tar"])] = (row.get("zn_tar") or 0, row.get("diz_tar") or 0)
+        for row in uch:
+            if row.get("gorod") == code and row.get("id_tar") is not None:
+                out[int(row["id_tar"])] = (row.get("zn_tar") or 0, row.get("diz_tar") or 0)
+        return out
+
     def licevoj(self, potreb_id):
         return next((p for p in self.potreb if p.potreb_id == potreb_id), None)
 
@@ -113,3 +129,14 @@ def zagruzit(spisok):
         a = arh.get(key)
         out.append((key[0], key[1], Mesyac(MesArhiv.objects.get(pk=a.pk)) if a else None))
     return out
+
+
+def najti(key):
+    """Mesyac закрытого месяца key = (месяц, год) или None."""
+    a = zakrytye({key}).get(key)
+    return Mesyac(MesArhiv.objects.get(pk=a.pk)) if a else None
+
+
+def vybor():
+    """[("ГГГГ-ММ", «месяц год»)] закрытых месяцев, новые первыми."""
+    return [(f"{g}-{m:02d}", nazvanie(m, g)) for m, g in sorted(zakrytye(), key=lambda k: (k[1], k[0]), reverse=True)]

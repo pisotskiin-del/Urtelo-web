@@ -693,6 +693,29 @@ def otchet(request, key):
 DOKUMENTY = {"schet": "Информация-счёт", "akt": "Акт о фактическом потреблении"}
 
 
+def _arh_mes(request):
+    """Закрытый месяц из параметра ?mes=ГГГГ-ММ: (arhiv.Mesyac, "ГГГГ-ММ"),
+    без параметра — (None, "") — текущий месяц."""
+    from . import arhiv
+    raw = (request.GET.get("mes") or request.POST.get("mes") or "").strip()
+    if not re.fullmatch(r"\d{4}-\d{2}", raw):
+        return None, ""
+    m = arhiv.najti((int(raw[5:]), int(raw[:4])))
+    if m is None:
+        raise Http404("Этого месяца нет в архиве")
+    return m, raw
+
+
+def _mes_vybor():
+    from . import arhiv
+    return arhiv.vybor()
+
+
+def _qs(**kw):
+    from urllib.parse import urlencode
+    return urlencode({k: v for k, v in kw.items() if v not in (None, "")})
+
+
 def _dok_context(dok):
     """Подписи и реквизиты для шаблона документа."""
     from .models import Podpisant
@@ -715,9 +738,10 @@ def dokument(request, cod_gor, nom_dog, vid):
     месяц участка: на экране и для печати (в PDF — печатью из браузера)."""
     if vid not in DOKUMENTY:
         raise Http404
-    dok = documents.sobrat(cod_gor, nom_dog)
+    mesyac, mes = _arh_mes(request)
+    dok = documents.sobrat(cod_gor, nom_dog, mesyac=mesyac)
     if dok is None:
-        raise Http404("В договоре нет действующих лицевых счетов")
+        raise Http404("В договоре нет действующих лицевых счетов" + (" в этом месяце" if mesyac else ""))
     if request.GET.get("pdf"):
         from . import pdf
         path = pdf.save(dok, vid, _dok_context(dok))
@@ -740,8 +764,10 @@ def dokument(request, cod_gor, nom_dog, vid):
         return redirect(request.get_full_path())
     from . import pochta
     poluch = pochta.poluchatel(dok)
+    ls = request.GET.get("ls", "") if request.GET.get("ls", "").isdigit() else ""
     return render(request, "abonents/dokument.html", {
         **_dok_context(dok), "vid": vid, "title": DOKUMENTY[vid], "doks": [dok],
+        "mes": mes, "mesyacy": _mes_vybor(), "ls": ls, "qs": _qs(ls=ls, mes=mes),
         "email": poluch.mail.strip() if poluch else "", "can_send": request.user.has_perm("catalogs.change_potreb"),
         "back": reverse("abonents:karta", args=[int(request.GET["ls"])]) if request.GET.get("ls", "").isdigit()
         else reverse("abonents:dogovor", args=[cod_gor, nom_dog]),
@@ -758,7 +784,8 @@ def dokumenty(request):
         raise Http404
     cities = _cities()
     code = _current_city(request, cities)
-    doks = [d for d in (documents.sobrat(code, n) for n in documents.dogovory(code)) if d]
+    mesyac, mes = _arh_mes(request)
+    doks = [d for d in (documents.sobrat(code, n, mesyac=mesyac) for n in documents.dogovory(code, mesyac=mesyac)) if d]
     ctx = _dok_context(doks[0]) if doks else {"org": documents.ORG}
     if request.GET.get("pdf") and doks:
         from . import pdf
@@ -770,6 +797,7 @@ def dokumenty(request):
     return render(request, "abonents/dokument.html", {
         **ctx, "vid": vid, "title": DOKUMENTY[vid], "doks": doks, "paket": True,
         "cities": cities, "city": code, "vidy": DOKUMENTY.items(),
+        "mes": mes, "mesyacy": _mes_vybor(), "qs": _qs(gorod=code, vid=vid, mes=mes),
         "back": reverse("abonents:otchety"),
     })
 
@@ -790,6 +818,7 @@ def rassylka(request):
     if city is None:
         raise Http404
     can_send = request.user.has_perm("catalogs.change_potreb")
+    mesyac, mes = _arh_mes(request)
     if request.method == "POST":
         if not can_send:
             raise PermissionDenied
@@ -800,16 +829,18 @@ def rassylka(request):
         elif not nomera:
             messages.warning(request, "Не отмечено ни одного договора")
         else:
-            doks = [d for d in (documents.sobrat(code, n) for n in nomera) if d]
+            doks = [d for d in (documents.sobrat(code, n, mesyac=mesyac) for n in nomera) if d]
             ctx = _dok_context(doks[0]) if doks else {}
-            res = pochta.rassylka(code, nomera, vid, ctx, request.user.get_username())
+            res = pochta.rassylka(code, nomera, vid, ctx, request.user.get_username(), mesyac=mesyac)
             ok = sum(1 for z in res if z.status == z.OK)
             (messages.success if ok == len(res) else messages.warning)(
                 request, f"Отправлено: {ok} из {len(res)}. Ошибки — в реестре писем.")
-        return redirect(f"{reverse('abonents:rassylka')}?gorod={code}&vid={vid}")
-    rows = pochta.spisok(code, city.nom_mes, city.god, vid)
+        return redirect(f"{reverse('abonents:rassylka')}?{_qs(gorod=code, vid=vid, mes=mes)}")
+    m, g = (mesyac.mes, mesyac.god) if mesyac else (city.nom_mes, city.god)
+    rows = pochta.spisok(code, m, g, vid, mesyac=mesyac)
     return render(request, "abonents/rassylka.html", {
         "rows": rows, "vid": vid, "vidy": DOKUMENTY.items(), "title": DOKUMENTY[vid], "cities": cities, "city": city,
+        "mes": mes, "mesyacy": _mes_vybor(), "mes_name": (mesyac.nazvanie if mesyac else f"{city.name_mes} {city.god}"),
         "can_send": can_send, "problem": pochta.gotovo(),
     })
 

@@ -1079,3 +1079,95 @@ class NastroikaTests(KartaBase):
         r = self.client.post(f"/catalogs/nastroika/{pk}/edit/", {"papka_1c": r"\\srv\1c"})
         self.assertIn(r.status_code, (200, 302))
         self.assertEqual(Nastroika.objects.get().papka_1c, r"\\srv\1c")
+
+
+class DokumentyArhivTests(DokumentyTests):
+    """Документы за закрытый месяц из архива."""
+
+    def setUp(self):
+        super().setUp()
+        from abonents.models import MesArhiv, TarifGorod
+        a = MesArhiv(nom_mes=9, god=2026, istochnik=MesArhiv.WEB)
+        a.set_tables({"potreb": list(Potreb.objects.order_by("pk").values()),
+                      "danrasch": list(Danrasch.objects.order_by("pk").values()),
+                      "tarif": [], "tarif_gorod": list(TarifGorod.objects.values())})
+        a.save()
+
+    def izmenit(self):
+        """После закрытия сентября изменились начисления и тариф."""
+        from abonents.models import TarifGorod
+        Potreb.objects.filter(potreb_id=5).update(nach_otopl=Decimal("3"))
+        TarifGorod.objects.filter(gorod=1, id_tar=1).update(zn_tar=Decimal("500"))
+
+    def test_sobrat_po_arhivu(self):
+        from abonents import arhiv, documents
+        self.izmenit()
+        m = arhiv.najti((9, 2026))
+        dok = documents.sobrat(1, 6, mesyac=m)
+        self.assertEqual((dok.mes, dok.god, dok.mes_pr), (9, 2026, "Сентябре"))
+        self.assertTrue(dok.arhiv)
+        self.assertFalse(dok.tarif_tekushchij)
+        self.assertEqual(dok.stroki[0].itog_r, Decimal("664.33"))      # архивные Гкал и тариф
+        self.assertEqual(dok.itog, Decimal("2467.03"))
+        self.assertEqual(documents.dogovory(1, mesyac=m), [6])
+        self.assertEqual(arhiv.vybor(), [("2026-09", "сентябрь 2026")])
+        self.assertNotEqual(documents.sobrat(1, 6).stroki[0].itog_r, Decimal("664.33"))
+
+    def test_bez_tarifov_v_arhive(self):
+        from abonents import arhiv, documents
+        from abonents.models import MesArhiv
+        a = MesArhiv.objects.get()
+        t = a.tables()
+        t["tarif_gorod"] = []
+        a.set_tables(t)
+        a.save()
+        self.izmenit()
+        dok = documents.sobrat(1, 6, mesyac=arhiv.najti((9, 2026)))
+        self.assertTrue(dok.tarif_tekushchij)
+        self.assertEqual(dok.stroki[0].tarif, Decimal("500"))
+
+    def test_stranicy_i_pdf(self):
+        import tempfile
+        from pathlib import Path
+        from django.test import override_settings
+        self.izmenit()
+        self.login("Наблюдатель")
+        r = self.client.get("/abonents/dogovor/1/6/akt/?ls=5&mes=2026-09")
+        self.assertContains(r, "в Сентябре 2026 года было отпущено")
+        self.assertContains(r, "закрытый месяц")
+        self.assertContains(r, "ls=5&amp;mes=2026-09&amp;pdf=1")
+        self.assertEqual(self.client.get("/abonents/dogovor/1/6/akt/?mes=2025-01").status_code, 404)
+        r = self.client.get("/abonents/dokumenty/?gorod=1&vid=schet&mes=2026-09")
+        self.assertContains(r, "664,33")
+        d = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, d)
+        with override_settings(TEPLO_DOC_DIR=d):
+            r = self.client.get("/abonents/dogovor/1/6/schet/?mes=2026-09&pdf=1")
+            self.assertTrue(r.content.startswith(b"%PDF"))
+            self.assertTrue((Path(d) / "ryb" / "2026" / "9" / "schet_6_5.pdf").exists())
+
+    def test_rassylka_za_arhivnyj_mesyac(self):
+        from django.core import mail
+        from django.test import override_settings
+        from catalogs.models import SmtpNas
+        from abonents.models import Pismo
+        import tempfile
+        d = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, d)
+        SmtpNas.objects.create(smtp="smtp.example.org", port=25, from_dbf="t@example.org", pismo="Счёт за")
+        from abonents.models import MesArhiv
+        a = MesArhiv.objects.get()
+        t = a.tables()
+        for row in t["potreb"]:
+            if row["potreb_id"] == 5:
+                row["mail"], row["mail_ras"] = "krips@example.org", True
+        a.set_tables(t)
+        a.save()
+        self.login("Оператор")
+        r = self.client.get("/abonents/rassylka/?gorod=1&vid=schet&mes=2026-09")
+        self.assertContains(r, "сентябрь 2026")
+        with override_settings(TEPLO_DOC_DIR=d):
+            self.client.post("/abonents/rassylka/?gorod=1&vid=schet&mes=2026-09", {"dog": ["6"], "mes": "2026-09"})
+        z = Pismo.objects.get()
+        self.assertEqual((z.nom_mes, z.god, z.status), (9, 2026, Pismo.OK))
+        self.assertIn("Сентябрь 2026", mail.outbox[0].body)
