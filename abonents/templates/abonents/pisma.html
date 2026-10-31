@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Реестр отправленных писем{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a><span class="sep">›</span><a href="{% url 'abonents:otchety' %}">Отчеты</a><span class="sep">›</span>Реестр писем</p>
+<div class="page-head"><h1>Реестр отправленных писем</h1>
+  <div class="actions"><a class="button" href="{% url 'abonents:rassylka' %}">{% icon "open" %} Рассылка</a></div></div>
+<form method="get" class="toolbar rep-params">
+  <label>Месяц <input type="month" name="mes" value="{{ mes }}" onchange="this.form.submit()"></label>
+  <label>Л/№ или договор <input type="number" name="ls" value="{{ ls }}" style="width:7em" onchange="this.form.submit()"></label>
+  <label><input type="checkbox" name="oshibki" value="1"{% if oshibki %} checked{% endif %} onchange="this.form.submit()"> только ошибки</label>
+</form>
+<div class="scroll"><table class="grid">
+  <thead><tr><th class="num">№</th><th>Отправлено</th><th>Месяц</th><th>Участок</th><th class="num">Договор</th><th class="num">Л/№</th><th>Потребитель</th><th>Куда</th><th>Адрес</th><th>Документ</th><th>Результат</th></tr></thead>
+  <tbody>{% for z in page %}
+    <tr><td class="num">{{ z.nomer }}</td><td>{{ z.created|date:"d.m.Y H:i" }}</td><td>{{ z.nom_mes|stringformat:"02d" }}.{{ z.god }}</td>
+      <td>{% for k, v in goroda.items %}{% if k == z.cod_gor %}{{ v }}{% endif %}{% endfor %}</td>
+      <td class="num">{{ z.nom_dog }}</td><td class="num"><a href="{% url 'abonents:karta' z.potreb_id %}">{{ z.potreb_id }}</a></td>
+      <td class="wrap">{{ z.name_potre }}</td><td>{{ z.get_kanal_display }}</td><td>{{ z.email }}</td>
+      <td>{% if z.fail %}<a href="{% url 'abonents:pismo_pdf' z.pk %}" target="_blank">{% if z.vid == "akt" %}Акт{% else %}Счёт{% endif %} (PDF)</a>{% else %}{% if z.vid == "akt" %}Акт{% else %}Счёт{% endif %}{% endif %}</td>
+      <td>{% if z.status == "ok" %}отправлено{% elif z.status == "chk" %}<span title="{{ z.oshibka }}">проверка, не отправлялось</span>{% else %}<span class="err" title="{{ z.oshibka }}">ошибка: {{ z.oshibka|truncatechars:60 }}</span>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="11" class="muted">Писем нет</td></tr>{% endfor %}</tbody>
+</table></div>
+<p class="pager">{% if page.has_previous %}<a href="?mes={{ mes }}&amp;ls={{ ls }}{% if oshibki %}&amp;oshibki=1{% endif %}&amp;page={{ page.previous_page_number }}">← Назад</a>{% endif %}
+  {% if page.has_next %}<a href="?mes={{ mes }}&amp;ls={{ ls }}{% if oshibki %}&amp;oshibki=1{% endif %}&amp;page={{ page.next_page_number }}">Вперёд →</a>{% endif %}</p>
+{% endblock %}

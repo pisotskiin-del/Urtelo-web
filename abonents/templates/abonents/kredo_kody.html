@@ -1,0 +1,38 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}КРЭДО: коды абонентов{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a><span class="sep">›</span><a href="{% url 'abonents:raschet' %}">Расчет</a><span class="sep">›</span>КРЭДО: коды абонентов</p>
+<div class="page-head"><h1>КРЭДО: коды абонентов</h1></div>
+<nav class="tabs">{% for c in cities %}<a href="?gorod={{ c.cod_gorod }}&amp;f={{ filtr }}" {% if c.cod_gorod == city.cod_gorod %}class="active"{% endif %}>{{ c.name_gorod }}</a>{% endfor %}</nav>
+<section class="card">
+  <p>Чтобы отправлять абоненту документы через КРЭДО, в его карте нужны код организации (org_in) и код представителя (pid_in).
+    Организация находится по фискальному коду или лицевому № в КРЭДО, представитель выбирается из зарегистрированных в КРЭДО.</p>
+  <p>Список организаций КРЭДО: {% if orgs_n %}<b>{{ orgs_n }}</b>, получен {{ orgs_data|date:"d.m.Y H:i" }}{% else %}<b>ещё не получали</b>{% endif %}.</p>
+  {% if can_change %}
+  <form method="post" class="actions">{% csrf_token %}
+    <button class="primary" onclick="this.disabled=true;this.textContent='Запрос к КРЭДО…';this.form.submit()">{% icon "open" %} Получить список организаций из КРЭДО</button>
+  </form>
+  {% endif %}
+</section>
+<form method="get" class="actions">
+  <input type="hidden" name="gorod" value="{{ city.cod_gorod }}">
+  <label>Показать <select name="f" onchange="this.form.submit()">
+    <option value="net"{% if filtr == "net" %} selected{% endif %}>без кодов КРЭДО</option>
+    <option value="kredo"{% if filtr == "kredo" %} selected{% endif %}>с отметкой «Авторассылка: КРЭДО»</option>
+    <option value="vse"{% if filtr == "vse" %} selected{% endif %}>все лицевые</option>
+  </select></label>
+  <span class="muted">лицевых: {{ rows|length }}, из них с найденной организацией КРЭДО: {{ najdeno }}</span>
+</form>
+<div class="scroll"><table class="grid">
+  <thead><tr><th>Договор №</th><th>Л/с</th><th>Потребитель</th><th>Фиск. код</th><th>Организация в КРЭДО</th><th>Представитель</th><th></th></tr></thead>
+  <tbody>
+  {% for p, o in rows %}
+    <tr><td>{{ p.nom_dog|default:"" }}</td><td><a href="{% url 'abonents:karta' p.potreb_id %}">{{ p.potreb_id }}</a></td>
+      <td>{{ p.name_potre }}</td><td>{{ p.fisk_cod|default:"" }}</td>
+      <td>{% if p.org_in %}{{ o.s_name|default:p.org_in }}{% elif o %}<span class="muted">найдена: {{ o.s_name }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>{% if p.pid_in %}{{ p.users_name|default:p.pid_in }}{% if p.pos_name %}, {{ p.pos_name }}{% endif %}{% endif %}</td>
+      <td>{% if can_change %}<a href="{% url 'abonents:kredo_kod' p.potreb_id %}">подобрать</a>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="7" class="muted">Нет лицевых</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}

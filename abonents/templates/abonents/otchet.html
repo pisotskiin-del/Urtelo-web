@@ -14,6 +14,8 @@
   {% for name, label, choices in options %}
   <label>{{ label }}
     {% if choices == "date" %}<input type="date" name="{{ name }}" value="{% for n, v in opts.items %}{% if n == name %}{{ v }}{% endif %}{% endfor %}" onchange="this.form.submit()">
+    {% elif choices == "month" %}<input type="month" name="{{ name }}" value="{% for n, v in opts.items %}{% if n == name %}{{ v }}{% endif %}{% endfor %}" onchange="this.form.submit()">
+    {% elif choices == "number" %}<input type="number" min="1" name="{{ name }}" style="width:7em" value="{% for n, v in opts.items %}{% if n == name %}{{ v }}{% endif %}{% endfor %}" onchange="this.form.submit()">
     {% else %}<select name="{{ name }}" onchange="this.form.submit()">
       {% for value, title in choices %}<option value="{{ value }}"{% for n, v in opts.items %}{% if n == name and v == value %} selected{% endif %}{% endfor %}>{{ title }}</option>{% endfor %}
     </select>{% endif %}</label>

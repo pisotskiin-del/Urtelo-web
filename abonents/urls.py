@@ -24,4 +24,13 @@ urlpatterns = [
     path("<int:potreb_id>/poteri/", views.poteri_view, name="poteri"),
     path("<int:potreb_id>/teploschetchik/", views.teplosch_view, name="teplosch"),
     path("dogovor/<int:cod_gor>/<int:nom_dog>/", views.dogovor, name="dogovor"),
+    path("dogovor/<int:cod_gor>/<int:nom_dog>/<slug:vid>/", views.dokument, name="dokument"),
+    path("dokumenty/", views.dokumenty, name="dokumenty"),
+    path("rassylka/", views.rassylka, name="rassylka"),
+    path("pisma/", views.pisma, name="pisma"),
+    path("pisma/<int:pk>/pdf/", views.pismo_pdf, name="pismo_pdf"),
+    path("kredo/", views.kredo_view, name="kredo"),
+    path("kredo/<int:pk>/", views.kredo_priem, name="kredo_priem"),
+    path("kredo/kody/", views.kredo_kody, name="kredo_kody"),
+    path("kredo/kod/<int:potreb_id>/", views.kredo_kod, name="kredo_kod"),
 ]

@@ -18,6 +18,10 @@ class Command(BaseCommand):
                 ct = ContentType.objects.get_for_model(model)
                 codenames = [f"{a}_{model._meta.model_name}" for a in actions]
                 perms += Permission.objects.filter(content_type=ct, codename__in=codenames)
+            # Настройки программы (одна запись): видят все, меняет только Администратор.
+            ct = ContentType.objects.get_for_model(apps.get_model("abonents", "Nastroika"))
+            codenames = ["view_nastroika"] + (["change_nastroika"] if role == ADMIN else [])
+            perms += Permission.objects.filter(content_type=ct, codename__in=codenames)
             if role == ADMIN:
                 # Администратор управляет и пользователями.
                 perms += Permission.objects.filter(content_type__app_label="auth")

@@ -6,3 +6,4 @@ staticfiles/
 .env
 .app-profile/
 teplo.log
+dokumenty/

@@ -1,0 +1,40 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{{ title }}{% if not paket and doks %} — договор № {{ doks.0.nom_dog }}{% endif %}{% endblock %}
+{% block content %}
+<div class="no-print">
+<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a><span class="sep">›</span><a href="{{ back }}">Назад</a><span class="sep">›</span>{{ title }}</p>
+<div class="page-head"><h1>{{ title }}{% if paket %}: все договоры участка{% elif doks %} по договору № {{ doks.0.nom_dog }}{% endif %}</h1>
+  <div class="actions">
+    {% if not paket and doks %}
+      {% if vid == "schet" %}<a class="button" href="{% url 'abonents:dokument' doks.0.gorod.cod_gorod doks.0.nom_dog 'akt' %}?{{ qs }}">Акт</a>
+      {% else %}<a class="button" href="{% url 'abonents:dokument' doks.0.gorod.cod_gorod doks.0.nom_dog 'schet' %}?{{ qs }}">Информация-счёт</a>{% endif %}
+    {% endif %}
+    <a class="button" href="?{{ qs }}&amp;pdf=1" target="_blank">{% icon "save" %} PDF</a>
+    <button type="button" onclick="window.print()">{% icon "file" %} Печать</button>
+    {% if not paket and can_send and vid == "schet" %}<form method="post" class="inline">{% csrf_token %}
+      <button name="action" value="kredo" {% if not kredo_p %}disabled title="В карте нет кодов КРЭДО (org_in, pid_in)"{% endif %} onclick="return confirm('Подписать «Информацию-счёт» и отправить абоненту через КРЭДО?')">{% icon "open" %} В КРЭДО</button>
+      <button name="action" value="kredo_proverka" {% if not kredo_p %}disabled{% endif %} title="Подписать и сохранить XML, не отправляя">Подписать (проверка)</button></form>{% endif %}
+    {% if not paket and can_send %}<form method="post" class="inline">{% csrf_token %}<button name="action" value="send" {% if not email %}disabled title="В карте нет адреса электронной почты"{% endif %} onclick="return confirm('Отправить документ на {{ email|escapejs }}?')">{% icon "open" %} На почту</button></form>{% endif %}
+  </div>
+</div>
+{% if paket %}
+<form method="get" class="toolbar rep-params">
+  <nav class="tabs">{% for c in cities %}<a href="?gorod={{ c.cod_gorod }}&amp;vid={{ vid }}{% if mes %}&amp;mes={{ mes }}{% endif %}" {% if c.cod_gorod == city %}class="active"{% endif %}>{{ c.name_gorod }}</a>{% endfor %}</nav>
+  <input type="hidden" name="gorod" value="{{ city }}">
+  <label>Документ <select name="vid" onchange="this.form.submit()">{% for k, t in vidy %}<option value="{{ k }}"{% if k == vid %} selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
+  {% include "abonents/_mes_vybor.html" %}
+  <span class="muted">Договоров: {{ doks|length }}. «PDF» сохраняет каждый документ в папку месяца и открывает все одним файлом.</span>
+</form>
+{% endif %}
+{% if not paket %}<form method="get" class="toolbar rep-params">{% if ls %}<input type="hidden" name="ls" value="{{ ls }}">{% endif %}{% include "abonents/_mes_vybor.html" %}</form>{% endif %}
+{% if doks.0.arhiv %}<p class="msg">Документ за закрытый месяц {{ doks.0.mes_im|lower }} {{ doks.0.god }} — по архиву месяца.{% if doks.0.tarif_tekushchij %} В архиве этого месяца нет тарифов: суммы посчитаны по нынешним тарифам.{% endif %}</p>{% endif %}
+<p class="muted">Сумма = (отопление + ГВС) Гкал × тариф; потери ГВС в сумму не входят.</p>
+</div>
+{% for dok in doks %}
+<section class="dok">
+{% if vid == "akt" %}{% include "abonents/_dok_akt.html" %}{% else %}{% include "abonents/_dok_schet.html" %}{% endif %}
+</section>
+{% empty %}
+<p class="muted">Нет договоров с начислением за {% if mes %}этот месяц{% else %}текущий месяц{% endif %}.</p>
+{% endfor %}
+{% endblock %}

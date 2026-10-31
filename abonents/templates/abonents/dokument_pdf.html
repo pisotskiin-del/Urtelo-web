@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<style>
+@page { size: a4 portrait; margin: 12mm 12mm 12mm 15mm; }
+body { font-family: {% if font %}"{{ font }}", {% endif %}Helvetica, sans-serif; font-size: 10pt; color: #000; }
+b, th { font-weight: bold; }
+.dok-org { font-size: 8.5pt; margin-bottom: 6pt; }
+.dok-title { text-align: center; margin: 4pt 0 8pt; }
+.dok-title b { font-size: 12pt; }
+table.dok-row { width: 100%; margin: 4pt 0; }
+table.dok-row td.c { text-align: center; }
+table.dok-row td.r { text-align: right; }
+.dok-text { text-align: justify; }
+table.dok-tab { width: 100%; font-size: 8.5pt; margin: 6pt 0; }
+table.dok-tab th, table.dok-tab td { border: 0.5pt solid #333; padding: 2pt 3pt 1pt 3pt; vertical-align: top; }
+table.dok-tab th { text-align: center; }
+table.dok-tab th.left { text-align: left; }
+table.dok-tab td.num, table.dok-tab th.num { text-align: right; }
+table.dok-tab tr.dok-kat td { font-weight: bold; background-color: #eeeeee; }
+table.dok-tab tr.dok-sub td { font-style: italic; }
+.dok-sign { margin-top: 12pt; }
+table.dok-signs { width: 100%; margin-top: 14pt; }
+table.dok-signs td { width: 50%; vertical-align: top; }
+.dok-foot { font-size: 8.5pt; margin-top: 14pt; }
+.next { page-break-before: always; }
+</style></head>
+<body>
+{% for dok in doks %}<div{% if not forloop.first %} class="next"{% endif %}>
+{% if vid == "akt" %}{% include "abonents/_dok_akt.html" %}{% else %}{% include "abonents/_dok_schet.html" %}{% endif %}
+</div>{% endfor %}
+</body></html>

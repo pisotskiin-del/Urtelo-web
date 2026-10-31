@@ -1,9 +1,12 @@
 """Переход на новый месяц (форма nov_mes старой программы).
 
 Порядок тот же, что в кнопке «ДА» формы:
-1. Архив месяца: состояние potreb, danrasch, polez_otpusk, polez_tarif (файлы
-   Po/Da/Ot/ta в Arhiv) — здесь одна запись MesArhiv. Туда же кладутся gvs_kot и
-   abot, чтобы последний переход можно было отменить.
+1. Архив месяца: состояние potreb, danrasch, полезный отпуск и тарифы (файлы
+   Po/Da/Ot/ta/tar в Arhiv) — здесь одна запись MesArhiv. Полезный отпуск
+   считается по закрываемому месяцу тем же расчетом, что отчет «Полезный
+   отпуск» (таблицы polez_otpusk/polez_tarif веб не ведет, в них остались
+   данные импорта из DBF). Туда же кладутся gvs_kot и abot, чтобы последний
+   переход можно было отменить.
 2. baza_buh: таблица abot для 1С — абоненты с начислением больше нуля.
 3. Запись в журнале arhiv (дата, месяц, год закрытого месяца).
 4. Следующий месяц во всех городах danrasch.
@@ -22,7 +25,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from django.db import transaction
 from django.utils import timezone
 
-from catalogs.models import Abot, Arhiv, Danrasch, GvsKot, PolezOtpusk, PolezTarif, Potreb
+from catalogs.models import Abot, Arhiv, Danrasch, GvsKot, Potreb, Tarif
 
 from .models import MesArhiv, TarifGorod
 
@@ -95,10 +98,13 @@ def run(user=""):
     total = sum((p.nac_vsego or 0 for p in potrebs), Decimal(0))
 
     # 1. Архив.
+    from .reports import VID_USLUGA, polez_data
     arh = MesArhiv(nom_mes=mes, god=god, user=user, potreb_count=len(potrebs), nac_vsego=total)
     arh.set_tables({
-        "potreb": _rows(Potreb), "danrasch": _rows(Danrasch), "polez_otpusk": _rows(PolezOtpusk),
-        "polez_tarif": _rows(PolezTarif), "gvs_kot": [{"pk": k.pk, "nagr_kot": k.nagr_kot} for k in GvsKot.objects.all()],
+        "potreb": _rows(Potreb), "danrasch": _rows(Danrasch),
+        # {услуга ("" — отопление и ГВС, "gvs", "otopl"): [[участок, название, [П/У, Нагр.]]]}
+        "polez_otpusk": {vid: polez_data(vid or None) for vid, _ in VID_USLUGA},
+        "tarif": _rows(Tarif), "tarif_gorod": _rows(TarifGorod), "gvs_kot": [{"pk": k.pk, "nagr_kot": k.nagr_kot} for k in GvsKot.objects.all()],
         "abot": _rows(Abot),
     })
     arh.save()
@@ -154,7 +160,8 @@ def run(user=""):
 
 
 def last():
-    return MesArhiv.objects.order_by("-pk").first()
+    """Последний месяц, закрытый в новой программе (его можно отменить)."""
+    return MesArhiv.objects.filter(istochnik=MesArhiv.WEB).order_by("-pk").first()
 
 
 @transaction.atomic
@@ -185,8 +192,9 @@ def undo():
 
 
 def abot_filename(mes, god):
-    """Имя файла как в старой программе: Abot<ГГ><ММ>.dbf за закрытый месяц."""
-    return f"Abot{god % 100:02d}{mes:02d}.dbf"
+    """Имя файла как в старой программе (baza_buh.prg): Abpt<ГГ><ММ>.dbf за
+    закрытый месяц."""
+    return f"Abpt{god % 100:02d}{mes:02d}.dbf"
 
 
 def abot_rows(arh):
@@ -206,10 +214,11 @@ def write_abot(arh, target):
 
 
 def export_1c(arh):
-    """Положить файл в папку для 1С, если она задана (TEPLO_1C_DIR, в старой
-    программе \\SERVER-B\Abon_teplo1C). Возвращает путь или None."""
-    from django.conf import settings
-    folder = getattr(settings, "TEPLO_1C_DIR", "")
+    """Положить файл в папку для 1С, если она задана («Справочники» →
+    «Настройки программы», у бухгалтерии \\\\server-ff\\Abon_teplo1C).
+    Возвращает путь или None."""
+    from .models import Nastroika
+    folder = Nastroika.papka()
     if not folder:
         return None
     path = Path(folder) / abot_filename(arh.nom_mes, arh.god)

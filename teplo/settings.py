@@ -60,6 +60,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "teplo.middleware.PonyatnyeOshibki",
 ]
 
 ROOT_URLCONF = "teplo.urls"
@@ -133,7 +134,42 @@ DBF_ENCODING = env("DBF_ENCODING", "")
 
 CATALOG_PAGE_SIZE = 50
 
-# Папка, куда при переходе на новый месяц кладётся файл Abot<ГГ><ММ>.dbf для 1С
-# (в старой программе \\SERVER-B\Abon_teplo1C). Пусто — файл только скачивается
-# со страницы «Новый месяц».
+# Папка, куда при переходе на новый месяц кладётся файл Abpt<ГГ><ММ>.dbf для 1С.
+# Задаётся в «Справочниках» → «Настройки программы» (меняет Администратор); эта
+# переменная — только запасной вариант, если там пусто.
 TEPLO_1C_DIR = env("TEPLO_1C_DIR", "")
+
+# Документы абонентам в PDF («Информация-счёт», акт): папка, где они хранятся по
+# участкам и месяцам (в старой программе D:\Teplo_dog\Akt_potreb). Пусто — папка
+# dokumenty рядом с программой.
+TEPLO_DOC_DIR = env("TEPLO_DOC_DIR", "")
+# Шрифт TrueType с кириллицей для PDF. Пусто — Arial из Windows (DejaVu Sans в Linux).
+TEPLO_PDF_FONT = env("TEPLO_PDF_FONT", "")
+TEPLO_PDF_FONT_BOLD = env("TEPLO_PDF_FONT_BOLD", "")
+
+# Почта. Сервер, порт, адрес отправителя, тема и текст письма — в «Настройке рассылки
+# писем» (smtp_nas, админка). Пароль почтового ящика лучше задать здесь, а не в smtp_nas.
+TEPLO_SMTP_PASSWORD = env("TEPLO_SMTP_PASSWORD", "")
+# Первый номер документа в реестре отправленных писем (продолжить нумерацию старой программы).
+TEPLO_PISMO_NOMER = int(env("TEPLO_PISMO_NOMER", "1") or 1)
+
+# Обмен с КРЭДО (РРИЦ) через COM-объект RRIC_COM_OBJECT (только Windows, pywin32).
+# Сертификаты клиента — в хранилище «Личные» пользователя Windows, под которым работает
+# программа; здесь — их отпечатки по участкам.
+TEPLO_KREDO_ENDPOINT = env("TEPLO_KREDO_ENDPOINT", "http://www.rric.org:7742/RRIC_EP_SERVICE/WcfService")
+TEPLO_KREDO_SERVICE_CERT = env("TEPLO_KREDO_SERVICE_CERT", "Rric Wcf Service")
+TEPLO_KREDO_THUMB = {
+    1: env("TEPLO_KREDO_THUMB_RYB", "eb89da47d567beee800118756e9b31568bf95072"),
+    2: env("TEPLO_KREDO_THUMB_DUB", "e968ac9950fc5bd24953ec529980a8eac2e57e10"),
+    3: env("TEPLO_KREDO_THUMB_KAM", "aedfd090498ab56b99b683782bba47fcd98d473c"),
+}
+# Штамп времени к подписи электронного документа (как в старой программе).
+TEPLO_KREDO_TSA = env("TEPLO_KREDO_TSA", "http://ca.agroprombank.com/tsa")
+# Отправитель «Информации-счёта» в КРЭДО по участкам: GUID организации и представителя.
+# Рыбница — значения из старой программы (infch_kredo_kr); другим участкам задать в .env.
+TEPLO_KREDO_OTPRAVITEL = {
+    1: {"org": env("TEPLO_KREDO_ORG_OUT_RYB", "7DFDBD9A-EDBA-4B92-91EB-3A9D453860CF"),
+        "pid": env("TEPLO_KREDO_PID_OUT_RYB", "527172a2-82e2-41fb-bc50-0984d4321163")},
+    2: {"org": env("TEPLO_KREDO_ORG_OUT_DUB", ""), "pid": env("TEPLO_KREDO_PID_OUT_DUB", "")},
+    3: {"org": env("TEPLO_KREDO_ORG_OUT_KAM", ""), "pid": env("TEPLO_KREDO_PID_OUT_KAM", "")},
+}

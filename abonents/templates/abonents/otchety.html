@@ -11,5 +11,14 @@
   </ul>
 </section>
 {% endfor %}
+<section class="card kgroup"><h2>{% icon "file" %} Документы абонентам</h2>
+  <ul class="rep-list">
+  <li><a href="{% url 'abonents:dokumenty' %}?vid=schet"><b>Информация-счёт</b><small>по всем договорам участка с начислением за месяц</small></a></li>
+  <li><a href="{% url 'abonents:dokumenty' %}?vid=akt"><b>Акт о фактическом потреблении</b><small>по всем договорам участка с начислением за месяц</small></a></li>
+  <li><a href="{% url 'abonents:rassylka' %}"><b>Рассылка по почте</b><small>отправить документы отмеченным абонентам</small></a></li>
+  <li><a href="{% url 'abonents:rassylka' %}?vid=schet&amp;kanal=kredo"><b>Рассылка через КРЭДО</b><small>подписанная «Информация-счёт» абонентам, зарегистрированным в КРЭДО</small></a></li>
+  <li><a href="{% url 'abonents:pisma' %}"><b>Реестр отправленных писем</b><small>что, кому и когда отправлено; ошибки отправки</small></a></li>
+  </ul>
+</section>
 </div>
 {% endblock %}
