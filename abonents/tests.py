@@ -1225,7 +1225,7 @@ class KredoSchetTests(DokumentyTests):
             z = kredo_dok.otpravit(dok, {}, "op", crypto=x, invoker=inv)
         self.assertEqual((z.status, z.kanal, z.nomer), (Pismo.OK, Pismo.KREDO, 500))
         names = [c[0] for c in x.calls]
-        self.assertIn(("regnumber", "07/500"), [c[1][1:] for c in x.calls if c[0] == "SetDocInfoParameter"])
+        self.assertIn(("reg/regnumber", "07/500"), [c[1][1:] for c in x.calls if c[0] == "SetDocInfoParameter"])
         self.assertIn(("AddRecipient", ("doc1", 'ООО "Крипс"', "Директор", "Иванов И.И.", "")), x.calls)
         self.assertEqual(names.index("SignDocument1") < names.index("CompressDocument"), True)
         sign = next(c for c in x.calls if c[0] == "SignDocument1")[1]

@@ -34,8 +34,10 @@ REKVIZITY = {
     "namemainru": "МИНИСТЕРСТВО ЭКОНОМИЧЕСКОГО РАЗВИТИЯ ПМР",
     "nameru": 'Межрайонное государственное унитарное предприятие "Тирастеплоэнерго"',
     "postaladdress": "ПМР,г.Тирасполь,ул.Шутова,д.3",
-    "bankaccount": "2211290000000026",
-    "emailaddress": "tiraste@mail.ru",
+    # Вложенные поля документа задаются путём «раздел/поле»: просто «bankaccount»,
+    # «datareg», «executorname» крипто-модуль не находит и оставляет пустыми.
+    "referencedataorg/bankaccount": "2211290000000026",
+    "referencedataorg/emailaddress": "tiraste@mail.ru",
     "nameviewdoc": "Информация-счет",
 }
 # Адрес участка (referencedataorg/postaladdress).
@@ -108,8 +110,8 @@ def podpisat(x, spec):
         x.SetDocInfoParameter(y, k, v)
     x.AddRecipient(y, *spec["poluchatel"], "")
     x.AddSigner(y, *spec["podpisant"])
-    x.SetDocInfoParameter(y, "executorname", spec["ispolnitel"][0])
-    x.SetDocInfoParameter(y, "executorphone", spec["ispolnitel"][1])
+    x.SetDocInfoParameter(y, "executor/executorname", spec["ispolnitel"][0])
+    x.SetDocInfoParameter(y, "executor/executorphone", spec["ispolnitel"][1])
     if spec.get("logo"):
         x.SetDocInfoLogo(y, spec["logo"])
     x.AddAttachment1(y, spec["vlozhenie"])
@@ -150,8 +152,8 @@ def spec_dokumenta(dok, p, nomer, pdf_path):
     info = dict(REKVIZITY)
     info["referencedataorg/postaladdress"] = ADRES_UCHASTKA.get(dok.gorod.cod_gorod) or \
         f"г.{(dok.gorod.name_gorod or '').strip()}"
-    info.update({"datareg": date.today().strftime("%d.%m.%Y"), "regnumber": f"07/{nomer}",
-                 "vhodregnumber": "", "vhodregdate": "", "content": ""})
+    info.update({"reg/datareg": date.today().strftime("%d.%m.%Y"), "reg/regnumber": f"07/{nomer}",
+                 "reg/vhodregnumber": "", "reg/vhodregdate": "", "content": ""})
     logo = base64.b64encode(LOGO.read_bytes()).decode() if LOGO.exists() else ""
     return {
         "info": info,
