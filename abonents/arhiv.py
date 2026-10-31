@@ -115,7 +115,7 @@ class Mesyac:
         for row in uch:
             if row.get("gorod") == code and row.get("id_tar") is not None:
                 out[int(row["id_tar"])] = (row.get("zn_tar") or 0, row.get("diz_tar") or 0)
-        return out
+        return out or None
 
     def licevoj(self, potreb_id):
         return next((p for p in self.potreb if p.potreb_id == potreb_id), None)

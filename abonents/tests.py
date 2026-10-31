@@ -837,9 +837,49 @@ class ArhivTests(KartaBase):
         call_command("arhiv_import", dir=str(folder), stdout=io.StringIO())
         self.assertEqual(nov_mes_model().objects.filter(nom_mes=3, god=2024).count(), 1)
 
+    def test_tarify_iz_ta_i_tar(self):
+        import tempfile
+        from pathlib import Path
+        from django.core.management import call_command
+        from abonents import arhiv
+        folder = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__("shutil").rmtree, folder)
+        spec = "potreb_id N(6,0); cod_gor N(2,0); nom_dog N(6,0); id_kategor N(2,0); nac_vsego N(12,3)"
+        for f in ("Po032024.dbf", "Po042024.dbf"):
+            self.make_dbf(folder, f, spec, [(21, 1, 30, 1, 1)])
+        # ta — тарифы одной строкой (TAR_n, TAR_nD); tar — копия tarif.dbf, она важнее.
+        self.make_dbf(folder, "ta032024.dbf", "TAR_1 N(9,2); TAR_2 N(9,2); TAR_2D N(9,2)", [(996.68, 692.46, 311.15)])
+        self.make_dbf(folder, "ta042024.dbf", "TAR_1 N(9,2)", [(1.0,)])
+        self.make_dbf(folder, "tar042024.dbf", "id_tar N(3,0); zn_tar N(9,2); diz_tar N(9,2)", [(1, 900.5, 0)])
+        call_command("arhiv_import", dir=str(folder), stdout=io.StringIO())
+        t = arhiv.zagruzit([(3, 2024)])[0][2].tarify(1)
+        self.assertEqual({k: (Decimal(a), Decimal(b)) for k, (a, b) in t.items()},
+                         {1: (Decimal("996.68"), Decimal("0")), 2: (Decimal("692.46"), Decimal("311.15"))})
+        self.assertEqual(Decimal(arhiv.zagruzit([(4, 2024)])[0][2].tarify(1)[1][0]), Decimal("900.5"))
+
+    def test_budj_za_period(self):
+        rep, _ = reports.build(reports.BY_KEY["arh_budj"], self.ryb, {"s": "2026-11", "po": "2026-12"})
+        t = rep.tables[0]
+        self.assertEqual([s.title for s in t.sections], ["ноябрь 2026", "декабрь 2026"])
+        self.assertEqual(len(t.cols), 11)
+        self.assertEqual(t.total[-1], Decimal("9.000"))
+        self.assertEqual(t.total[7], Decimal("9.000"))      # хозрасчёт — всего (отопление и ГВС)
+
+    def test_dog_za_period(self):
+        rep, _ = reports.build(reports.BY_KEY["arh_dog"], self.ryb, {"dog": "6", "s": "2026-11", "po": "2026-12"})
+        rows = [r for s in rep.tables[0].sections for r in s.rows]
+        self.assertEqual(sorted(r[1] for r in rows), [5, 7])         # оба лицевых договора № 6
+        row = next(r for r in rows if r[1] == 5)
+        self.assertTrue(row[0].startswith('ООО "Крипс"'))       # объекта нет — наименование
+        self.assertEqual(row[3:], [Decimal("4"), Decimal("5"), Decimal("9")])
+        self.assertEqual([c.title for c in rep.tables[0].cols][3:5], ["11.2026", "12.2026"])
+        rep, _ = reports.build(reports.BY_KEY["arh_dog"], self.ryb, {"dog": "", "s": "2026-11", "po": "2026-12"})
+        self.assertEqual(rep.title, "РАСШИФРОВКА ОТПУСКА ПО ЛИЦЕВЫМ")
+        self.assertEqual(rep.tables[0].total[-1], Decimal("9"))
+
     def test_excel(self):
         self.login("Наблюдатель")
-        for key in ("arh_polez", "arh_ras_ab", "arh_potreb_god"):
+        for key in ("arh_polez", "arh_ras_ab", "arh_potreb_god", "arh_budj", "arh_dog"):
             r = self.client.get(f"/abonents/otchety/{key}/?xlsx=1&ls=5&s=2026-11&po=2026-12&god=2026")
             self.assertEqual(r.status_code, 200, key)
 

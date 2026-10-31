@@ -19,7 +19,8 @@ from catalogs.models import Danrasch, Potreb, Tarif
 from dbfsync.importer import column_map, convert
 from dbfsync.reader import open_dbf
 
-FILE = re.compile(r"^(po|da|ta)(\d\d)(\d{4})\.dbf$", re.I)
+FILE = re.compile(r"^(po|da|tar|ta)(\d\d)(\d{4})\.dbf$", re.I)
+TA_COL = re.compile(r"^TAR_(\d+)(D?)$", re.I)
 
 
 def read_rows(model, path):
@@ -31,6 +32,28 @@ def read_rows(model, path):
         out.append({f.attname: convert(f, rec.get(col), table.encoding)
                     for f, col in cols.items() if col in names})
     return out
+
+
+def read_tarif(parts):
+    """Тарифы месяца как строки tarif.dbf (id_tar, zn_tar, diz_tar).
+
+    tarММГГГГ.dbf — копия tarif.dbf (есть с 2022 года); в taММГГГГ.dbf тарифы
+    лежат в одной строке колонками TAR_n (тариф с кодом n) и TAR_nD (для
+    дизеля). Если есть оба файла, берется tar."""
+    if "tar" in parts:
+        return [r for r in read_rows(Tarif, parts["tar"]) if r.get("id_tar") is not None]
+    if "ta" not in parts:
+        return []
+    table = open_dbf(parts["ta"], settings.DBF_ENCODING or None)
+    out = {}
+    for rec in table:
+        for name, value in dict(rec).items():
+            m = TA_COL.match(name)
+            if m:
+                row = out.setdefault(int(m.group(1)), {"id_tar": int(m.group(1)), "zn_tar": None, "diz_tar": None})
+                row["diz_tar" if m.group(2) else "zn_tar"] = Decimal(value if value is not None else 0)
+        break
+    return [out[k] for k in sorted(out)]
 
 
 class Command(BaseCommand):
@@ -63,7 +86,7 @@ class Command(BaseCommand):
             potreb = read_rows(Potreb, parts["po"])
             tables = {"potreb": potreb,
                       "danrasch": read_rows(Danrasch, parts["da"]) if "da" in parts else [],
-                      "tarif": read_rows(Tarif, parts["ta"]) if "ta" in parts else []}
+                      "tarif": read_tarif(parts)}
             with transaction.atomic():
                 existing.filter(istochnik=MesArhiv.DBF).delete()
                 arh = MesArhiv(nom_mes=mes, god=god, user="arhiv_import", istochnik=MesArhiv.DBF,

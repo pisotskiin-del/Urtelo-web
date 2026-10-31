@@ -164,7 +164,7 @@ python manage.py add_user view --role viewer --password Пароль123
 загружать данные из копии папки `dbf`.
 
 Архивы месяцев старой программы для отчетов за период (файлы `PoММГГГГ.dbf`,
-`DaММГГГГ.dbf`, `taММГГГГ.dbf`) загружаются отдельно, один раз:
+`DaММГГГГ.dbf`, `tarММГГГГ.dbf` или `taММГГГГ.dbf`) загружаются отдельно, один раз:
 
 ```bat
 python manage.py arhiv_import --dir D:\teplo_dog\Arhiv
