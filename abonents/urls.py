@@ -17,6 +17,7 @@ urlpatterns = [
     path("otchety/polez_otpusk/rasshifr/", views.polez_rasshifr, name="polez_rasshifr"),
     path("otchety/<slug:key>/", views.otchet, name="otchet"),
     path("<int:potreb_id>/", views.karta, name="karta"),
+    path("<int:potreb_id>/pokazanie/<str:pole>/", views.pokazanie, name="pokazanie"),
     path("<int:potreb_id>/edit/", views.karta_edit, name="edit"),
     path("<int:potreb_id>/delete/", views.karta_delete, name="delete"),
     path("<int:potreb_id>/prisoed/", views.prisoed, name="prisoed"),

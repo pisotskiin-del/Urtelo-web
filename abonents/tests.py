@@ -1350,3 +1350,31 @@ class KredoKodyTests(KartaBase):
         self.login("Наблюдатель")
         r = self.client.post(reverse("abonents:kredo_kod", args=[5]), {"action": "ochistit"})
         self.assertEqual(r.status_code, 403)
+
+
+class PokazanieTests(KartaBase):
+    """Показания прибора вводятся в карточке без «Изменить»."""
+
+    def test_vvod(self):
+        url = reverse("abonents:pokazanie", args=[5, "pok_new"])
+        self.login("Оператор")
+        r = self.client.get(reverse("abonents:karta", args=[5]))
+        self.assertContains(r, url)
+        self.assertContains(r, "pokPodtv")
+        r = self.client.post(url, {"znach": "15,125", "tab": "otop"}, follow=True)
+        self.assertContains(r, "было 12,500, стало 15,125")
+        self.assertEqual(Potreb.objects.get(potreb_id=5).pok_new, Decimal("15.125"))
+        r = self.client.post(url, {"znach": "1,23456"}, follow=True)
+        self.assertContains(r, "не показание")
+        self.client.post(url, {"znach": "-1"})
+        self.assertEqual(Potreb.objects.get(potreb_id=5).pok_new, Decimal("15.125"))
+        self.client.post(reverse("abonents:pokazanie", args=[5, "pok_newg"]), {"znach": "120", "tab": "gvs"})
+        self.assertEqual(Potreb.objects.get(potreb_id=5).pok_newg, 120)
+        self.assertEqual(self.client.post(reverse("abonents:pokazanie", args=[5, "name_potre"]),
+                                          {"znach": "x"}).status_code, 404)
+
+    def test_nablyudatel(self):
+        self.login("Наблюдатель")
+        url = reverse("abonents:pokazanie", args=[5, "pok_new"])
+        self.assertNotContains(self.client.get(reverse("abonents:karta", args=[5])), url)
+        self.assertEqual(self.client.post(url, {"znach": "1"}).status_code, 403)

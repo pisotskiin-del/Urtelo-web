@@ -250,6 +250,7 @@ def _card_context(request, p, tab_key, form=None):
         "hero": _hero(p, related),
         "can_change": request.user.has_perm("catalogs.change_potreb"),
         "can_delete": request.user.has_perm("catalogs.delete_potreb"),
+        "pokazaniya": POKAZANIYA,
     }
 
 
@@ -280,6 +281,49 @@ def karta_edit(request, potreb_id):
     context = _card_context(request, p, tab_key, form)
     context["form"] = form
     return render(request, "abonents/karta_edit.html", context)
+
+
+# Показания прибора, которые вводятся прямо в карточке, без «Изменить»:
+# поле → (название, наибольшее значение, знаков после запятой).
+POKAZANIYA = {
+    "pok_new": ("Показания настоящие (отопление)", Decimal("999999.999"), 3),
+    "pok_newg": ("Показания настоящие (ГВС)", Decimal("999999999999"), 0),
+}
+
+
+@login_required
+@permission_required("catalogs.change_potreb", raise_exception=True)
+def pokazanie(request, potreb_id, pole):
+    """Ввод показаний прибора в карточке. Сохранение подтверждается в окне
+    браузера, старое и новое значение пишутся в сообщение."""
+    if pole not in POKAZANIYA or request.method != "POST":
+        raise Http404
+    p = get_object_or_404(Potreb, potreb_id=potreb_id)
+    nazv, maks, znakov = POKAZANIYA[pole]
+    tab = request.POST.get("tab") if request.POST.get("tab") in layout.TAB_KEYS else layout.TAB_KEYS[0]
+    nazad = reverse("abonents:karta", args=[potreb_id]) + f"?tab={tab}"
+    raw = (request.POST.get("znach") or "").strip().replace(" ", "").replace("\xa0", "").replace(",", ".")
+    try:
+        znach = Decimal(raw) if raw else None
+    except ArithmeticError:
+        znach = None
+        raw = "ошибка"
+    if raw and (znach is None or not znach.is_finite() or znach < 0 or znach > maks
+                or znach != round(znach, znakov)):
+        messages.error(request, f"{nazv}: «{request.POST.get('znach')}» — не показание "
+                                f"(число от 0 до {formats.localize(maks)}"
+                                + (f", не больше {znakov} знаков после запятой" if znakov else ", целое") + ")")
+        return redirect(nazad)
+    if znach is not None and not znakov:
+        znach = int(znach)
+    staroe = getattr(p, pole)
+    if staroe == znach:
+        return redirect(nazad)
+    setattr(p, pole, znach)
+    p.save(update_fields=[pole])
+    pokaz = lambda v: "пусто" if v is None else formats.localize(v)
+    messages.success(request, f"{nazv}: было {pokaz(staroe)}, стало {pokaz(znach)}")
+    return redirect(nazad)
 
 
 @login_required
