@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from django.db.models import Q
+from django.utils import timezone
 
 from catalogs.models import (Akcept, Danrasch, GvsKot, Kategorpot, Limit, Minist, Potreb, SetUrdevice,
                              SetUrdevicelist)
@@ -913,6 +914,120 @@ def _arh_gody():
     return [(str(g), str(g)) for g in arhiv.gody()] or [(str(datetime.date.today().year), str(datetime.date.today().year))]
 
 
+# --- Ведомости, реестры -------------------------------------------------------
+
+def reestr_dog(city, opts):
+    """«Ведомости, реестры → Реестр действующих договоров» (proced.reestr_dog,
+    reestr_dog.frx): договоры участка с заключённым или возобновлённым
+    статусом по категориям потребителей — абонент, № и дата договора. На
+    договор одна строка (главный лицевой: абонент, затем меньший л/№)."""
+    names = _kategor()
+    recs = _active(Potreb.objects.filter(cod_gor=city.cod_gorod, nom_dog__gt=0)).order_by("nom_dog", "potreb_id")
+    dog = {}
+    for p in recs:
+        cur = dog.get(p.nom_dog)
+        if cur is None or (cur.id_katabon != 1 and p.id_katabon == 1):
+            dog[p.nom_dog] = p
+    items = sorted(dog.values(), key=lambda p: (p.id_kategor or 0, p.nom_dog))
+    cols = [Col("№ п/п", "int"), Col("Абонент"), Col("Номер договора", "int"), Col("Дата заключения договора", "date")]
+    sections, cur, kat = [], None, object()
+    for p in items:
+        if p.id_kategor != kat:
+            kat = p.id_kategor
+            cur = Section(f"Категория потребителя: {names.get(kat) or kat or '—'}")
+            sections.append(cur)
+        cur.rows.append([len(cur.rows) + 1, (p.name_potre or "").strip(), p.nom_dog, p.data_dog])
+    for s in sections:
+        s.foot = [None, f"договоров: {len(s.rows)}", None, None]
+    return Report("Реестр действующих договоров на отпуск тепловой энергии",
+                  [f"г. {(city.name_gorod or '').strip()}",
+                   f"по состоянию на {(city.name_mes or '').strip()} {city.god} г."],
+                  [Table(cols, sections, total=[None, f"Всего договоров: {len(items)}", None, None])],
+                  signatures=_signatures(city))
+
+
+def _pisma_mesyacy():
+    from .models import Pismo
+    mes = sorted(set(Pismo.objects.values_list("god", "nom_mes")), reverse=True)
+    from .nov_mes import MONTHS
+    return [(f"{g}-{m:02d}", f"{MONTHS[m - 1]} {g}") for g, m in mes] or [("", "писем ещё не отправляли")]
+
+
+VID_KANAL = [("", "Почта и КРЭДО"), ("mail", "Почта"), ("kredo", "КРЭДО")]
+
+
+def vedom_pisem(city, opts):
+    """«Ведомости, реестры → Ведомость отправленных писем» (proced.vedom,
+    vedommail.frx): документы, успешно отправленные абонентам участка за
+    месяц, по реестру писем — л/№, № договора, потребитель, дата отправки."""
+    from .models import Pismo
+    from .nov_mes import MONTHS
+    qs = Pismo.objects.filter(cod_gor=city.cod_gorod, status=Pismo.OK)
+    mes = opts.get("mes") or ""
+    if mes:
+        m, g = _ym(mes)
+    else:
+        m, g = city.nom_mes, city.god
+    qs = qs.filter(nom_mes=m, god=g)
+    if opts.get("kanal"):
+        qs = qs.filter(kanal=opts["kanal"])
+    cols = [Col("№ ПП", "int"), Col("Л.№", "int"), Col("№ дог", "int"), Col("Наименование потребителя"),
+            Col("Документ"), Col("Куда"), Col("Дата отправки письма")]
+    vid = {"schet": "Информация-счёт", "akt": "Акт"}
+    rows = [[i, z.potreb_id, z.nom_dog, z.name_potre, vid.get(z.vid, z.vid), z.get_kanal_display(),
+             timezone.localtime(z.created).strftime("%d.%m.%Y %H:%M")]
+            for i, z in enumerate(qs.order_by("created", "nomer"), 1)]
+    mes_txt = f"{MONTHS[m - 1]} {g} г." if m and g else ""
+    return Report("ВЕДОМОСТЬ", ["отправленных писем абонентам", f"г. {(city.name_gorod or '').strip()}",
+                                f"документы за {mes_txt}" if mes_txt else "",
+                                f"сформирована {timezone.localtime().strftime('%d.%m.%Y %H:%M')}"],
+                  [Table(cols, [Section(rows=rows)], total=[None, None, None, f"Всего писем: {len(rows)}", None, None, None])])
+
+
+NAGR_KAT = [(1, "Хозрасчет"), (2, "Местный бюджет"), (3, "Республ. бюджет"), (4, "Население бюджет"),
+            (5, "Население хозрасчет"), (6, "Население абонентское"), (7, "Организация СКиИОД")]
+
+
+def nagr_kot_kat(city, opts):
+    """«Ведомости, реестры → Нагрузка котельных по категориям»
+    (nagr_kot_kat.prg, в старой программе — книга Excel по шаблону): по
+    каждой котельной участка часовая нагрузка действующих договоров на
+    отопление (q_otoppr) и ГВС (q_gvs) по категориям потребителей."""
+    sums = {}
+    for p in _active(Potreb.objects.filter(cod_gor=city.cod_gorod)).only("id_koteln", "id_kategor", "q_otoppr", "q_gvs"):
+        k = (p.id_koteln, p.id_kategor)
+        o, g = sums.get(k, (Decimal(0), Decimal(0)))
+        sums[k] = (o + n(p.q_otoppr), g + n(p.q_gvs))
+    kotly = list(GvsKot.objects.filter(kod_gor=city.cod_gorod).order_by("id_kot"))
+    known = {k.id_kot for k in kotly}
+    cols = [Col("Котельная")]
+    for _, t in NAGR_KAT:
+        cols += [Col(f"{t}: отопление", "num", 5, total=True), Col(f"{t}: ГВС", "num", 5, total=True)]
+    cols += [Col("Всего: отопление", "num", 5, total=True), Col("Всего: ГВС", "num", 5, total=True)]
+    rows = []
+
+    def row(name, kot):
+        r = [name]
+        to = tg = Decimal(0)
+        for kat, _ in NAGR_KAT:
+            o, g = sums.get((kot, kat), (Decimal(0), Decimal(0)))
+            r += [o, g]
+            to, tg = to + o, tg + g
+        return r + [to, tg]
+    for k in kotly:
+        r = row((k.name_kot or "").strip() or f"Котельная {k.id_kot}", k.id_kot)
+        if any(r[1:]):
+            rows.append(r)
+    for kot in sorted({k for k, _ in sums if k not in known}, key=lambda v: (v is None, v or 0)):
+        rows.append(row("Котельная не указана" if kot is None else f"Котельная {kot}", kot))
+    head = [[("Котельная", 1, 2)] + [(t, 2, 1) for _, t in NAGR_KAT] + [("Всего", 2, 1)],
+            [("отопл.", 1, 1), ("ГВС", 1, 1)] * (len(NAGR_KAT) + 1)]
+    return Report("Нагрузка котельных по категориям потребителей, Гкал/час",
+                  [f"г. {(city.name_gorod or '').strip()} данные на {_today()}"],
+                  [Table(cols, [Section(rows=rows)], total=_sum_row(cols, rows, "Итого по участку"), head=head)],
+                  landscape=True)
+
+
 VID_PRIBOR = [("nach", "Начислено"), ("nenach", "Не начислено")]
 VID_NUL = [("otopl", "Отопление"), ("gvs", "ГВС")]
 
@@ -950,6 +1065,13 @@ REPORTS = [
               hint="Перечень потребителей и нагрузка по котельным"),
     ReportDef("potreb_kategor", "Часовые нагрузки по категориям", "Печать", potreb_kategor, per_city=False,
               hint="Нагрузка по участкам и категориям потребителей"),
+    ReportDef("reestr_dog", "Реестр действующих договоров", "Ведомости, реестры", reestr_dog,
+              hint="Действующие договоры участка по категориям потребителей"),
+    ReportDef("vedom_pisem", "Ведомость отправленных писем", "Ведомости, реестры", vedom_pisem,
+              options=[("mes", "Месяц", _pisma_mesyacy), ("kanal", "Куда", VID_KANAL)],
+              hint="Документы, отправленные абонентам за месяц, по реестру писем"),
+    ReportDef("nagr_kot_kat", "Нагрузка котельных по категориям", "Ведомости, реестры", nagr_kot_kat,
+              hint="Часовая нагрузка отопления и ГВС по котельным и категориям"),
     ReportDef("arh_polez", "Полезный отпуск за период", "Архив (за период)", arh_polez, per_city=False,
               options=[("s", "С", MONTH), ("po", "по", MONTH), ("vid", "Услуга", VID_USLUGA)],
               hint="По закрытым месяцам, по участкам, с итогом за период"),

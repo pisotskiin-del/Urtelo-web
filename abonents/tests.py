@@ -1382,3 +1382,49 @@ class PokazanieTests(KartaBase):
         url = reverse("abonents:pokazanie", args=[5, "pok_new"])
         self.assertNotContains(self.client.get(reverse("abonents:karta", args=[5])), url)
         self.assertEqual(self.client.post(url, {"znach": "1"}).status_code, 403)
+
+
+class VedomostiTests(KartaBase):
+    """Ведомости, реестры: реестр договоров, ведомость писем, нагрузка котельных."""
+
+    def setUp(self):
+        super().setUp()
+        Potreb.objects.filter(potreb_id__in=[5, 7, 9]).update(d_stat=60, data_dog=date(2025, 1, 15))
+        Potreb.objects.filter(potreb_id=5).update(q_otoppr=Decimal("0.1"), q_gvs=Decimal("0.02"))
+        Potreb.objects.filter(potreb_id=9).update(id_kategor=None)
+
+    def test_reestr_dog(self):
+        from abonents import reports
+        r = reports.reestr_dog(self.ryb, {})
+        rows = [row for s in r.tables[0].sections for row in s.rows]
+        self.assertEqual([(row[1], row[2]) for row in rows], [("Школа  № 1", 8), ('ООО "Крипс"', 6)])
+        self.assertIn("Всего договоров: 2", r.tables[0].total)
+
+    def test_vedom_pisem(self):
+        from abonents import reports
+        from abonents.models import Pismo
+        Danrasch.objects.filter(cod_gorod=1).update(nom_mes=10)
+        self.ryb.refresh_from_db()
+        for nomer, st, kanal in ((1, Pismo.OK, Pismo.POCHTA), (2, Pismo.OSHIBKA, Pismo.POCHTA), (3, Pismo.OK, Pismo.KREDO)):
+            Pismo.objects.create(nomer=nomer, cod_gor=1, nom_dog=6, potreb_id=5, name_potre="Крипс", vid="schet",
+                                 nom_mes=10, god=2026, status=st, kanal=kanal)
+        r = reports.vedom_pisem(self.ryb, {})
+        self.assertEqual(len(r.tables[0].sections[0].rows), 2)
+        r = reports.vedom_pisem(self.ryb, {"mes": "2026-10", "kanal": "kredo"})
+        self.assertEqual([row[5] for row in r.tables[0].sections[0].rows], ["КРЭДО"])
+        self.assertEqual(reports._pisma_mesyacy(), [("2026-10", "Октябрь 2026")])
+
+    def test_nagr_kot_kat(self):
+        from abonents import reports
+        r = reports.nagr_kot_kat(self.ryb, {})
+        (row,) = r.tables[0].sections[0].rows
+        self.assertEqual(row[0], "(Р) Котельная №2")
+        self.assertEqual((row[1], row[2]), (Decimal("0.1"), Decimal("0.02")))
+        self.assertEqual(row[-2:], [Decimal("0.1"), Decimal("0.02")])
+
+    def test_stranicy(self):
+        self.login("Оператор")
+        for key in ("reestr_dog", "vedom_pisem", "nagr_kot_kat"):
+            r = self.client.get(reverse("abonents:otchet", args=[key]) + "?gorod=1")
+            self.assertEqual(r.status_code, 200, key)
+        self.assertContains(self.client.get(reverse("abonents:otchety")), "Ведомости, реестры")
