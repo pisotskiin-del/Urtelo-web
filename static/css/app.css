@@ -468,6 +468,13 @@ table.dok-signs td { width:50%; vertical-align:top; padding:0 12px 0 0; }
 @media print { .dok { border:0; padding:0; margin:0; max-width:none; } }
 .err { color:#b42318; }
 
-/* Ввод показаний прямо в карточке */
-.pok-inline { display: inline-flex; gap: 6px; align-items: center; margin: 0; }
-.pok-inline input { width: 9em; }
+/* Ввод показаний прямо в карточке: поле той же высоты, что и текст строки,
+   чтобы карточка не сдвигалась; кнопка «✓» маленькая и стоит справа. */
+.pok-inline { display:flex; align-items:center; gap:4px; margin:0; width:100%; max-width:220px; }
+.kgroup .kv .pok-inline input, .kv .pok-inline input { flex:1 1 auto; width:auto; min-width:0; max-width:none;
+  min-height:0; height:24px; padding:0 6px; line-height:22px; font-weight:inherit;
+  border:1px dashed var(--line-strong); background:transparent; }
+.kv .pok-inline input:focus { border-style:solid; background:#fff; }
+.kv .pok-inline button { flex:0 0 auto; min-height:0; height:24px; padding:0 8px; line-height:1; font-size:13px;
+  background:var(--accent); border-color:var(--accent); color:#fff; }
+.kv .pok-inline button[hidden] { display:none; }
