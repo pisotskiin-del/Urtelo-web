@@ -121,20 +121,26 @@ def rassylka(cod_gor, nomera, vid, context, user="", mesyac=None):
     return out
 
 
-def spisok(cod_gor, mes, god, vid, mesyac=None):
+def spisok(cod_gor, mes, god, vid, mesyac=None, kanal=Pismo.POCHTA):
     """Договоры участка для рассылки за месяц: [(документ, получатель, отмечен
     по умолчанию, последняя запись реестра за месяц)]. По умолчанию отмечены
     договоры с признаком «Почта» в карте, которым документ ещё не отправлен."""
     last = {}
-    for p in Pismo.objects.filter(cod_gor=cod_gor, nom_mes=mes, god=god, vid=vid).order_by("pk"):
+    for p in Pismo.objects.filter(cod_gor=cod_gor, nom_mes=mes, god=god, vid=vid, kanal=kanal).order_by("pk"):
         last[p.nom_dog] = p
     out = []
     for nom in documents.dogovory(cod_gor, mesyac=mesyac):
         dok = documents.sobrat(cod_gor, nom, mesyac=mesyac)
         if dok is None:
             continue
-        p = poluchatel(dok)
         zapis = last.get(nom)
-        flag = bool(p and any(s.p.mail_ras for s in dok.stroki)) and not (zapis and zapis.status == Pismo.OK)
+        if kanal == Pismo.KREDO:
+            from . import kredo_dok
+            p = kredo_dok.poluchatel(dok)
+            flag = bool(p and any(s.p.kredo_ras for s in dok.stroki))
+        else:
+            p = poluchatel(dok)
+            flag = bool(p and any(s.p.mail_ras for s in dok.stroki))
+        flag = flag and not (zapis and zapis.status == Pismo.OK)
         out.append((dok, p, flag, zapis))
     return out

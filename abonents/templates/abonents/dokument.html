@@ -11,6 +11,9 @@
     {% endif %}
     <a class="button" href="?{{ qs }}&amp;pdf=1" target="_blank">{% icon "save" %} PDF</a>
     <button type="button" onclick="window.print()">{% icon "file" %} Печать</button>
+    {% if not paket and can_send and vid == "schet" %}<form method="post" class="inline">{% csrf_token %}
+      <button name="action" value="kredo" {% if not kredo_p %}disabled title="В карте нет кодов КРЭДО (org_in, pid_in)"{% endif %} onclick="return confirm('Подписать «Информацию-счёт» и отправить абоненту через КРЭДО?')">{% icon "open" %} В КРЭДО</button>
+      <button name="action" value="kredo_proverka" {% if not kredo_p %}disabled{% endif %} title="Подписать и сохранить XML, не отправляя">Подписать (проверка)</button></form>{% endif %}
     {% if not paket and can_send %}<form method="post" class="inline">{% csrf_token %}<button name="action" value="send" {% if not email %}disabled title="В карте нет адреса электронной почты"{% endif %} onclick="return confirm('Отправить документ на {{ email|escapejs }}?')">{% icon "open" %} На почту</button></form>{% endif %}
   </div>
 </div>

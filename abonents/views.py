@@ -5,6 +5,7 @@
 import datetime
 import re
 from decimal import Decimal
+from pathlib import Path
 
 from django.conf import settings
 from django.contrib import messages
@@ -762,13 +763,28 @@ def dokument(request, cod_gor, nom_dog, vid):
             else:
                 messages.error(request, f"Не отправлено: {z.oshibka}")
         return redirect(request.get_full_path())
-    from . import pochta
+    if request.method == "POST" and request.POST.get("action") in ("kredo", "kredo_proverka") and vid == "schet":
+        if not request.user.has_perm("catalogs.change_potreb"):
+            raise PermissionDenied
+        from . import kredo_dok
+        proverka = request.POST["action"] == "kredo_proverka"
+        z = kredo_dok.otpravit(dok, _dok_context(dok), request.user.get_username(), proverka=proverka)
+        if z.status == z.OK:
+            messages.success(request, f"Документ № {z.nomer} подписан и отправлен в КРЭДО")
+        elif z.status == z.PROVERKA:
+            messages.success(request, f"Документ № {z.nomer} подписан (проверка, в КРЭДО не отправлялся). "
+                                      f"XML: {Path(z.fail).with_suffix('.xml')}")
+        else:
+            messages.error(request, f"КРЭДО: {z.oshibka}")
+        return redirect(request.get_full_path())
+    from . import kredo_dok, pochta
     poluch = pochta.poluchatel(dok)
     ls = request.GET.get("ls", "") if request.GET.get("ls", "").isdigit() else ""
     return render(request, "abonents/dokument.html", {
         **_dok_context(dok), "vid": vid, "title": DOKUMENTY[vid], "doks": [dok],
         "mes": mes, "mesyacy": _mes_vybor(), "ls": ls, "qs": _qs(ls=ls, mes=mes),
         "email": poluch.mail.strip() if poluch else "", "can_send": request.user.has_perm("catalogs.change_potreb"),
+        "kredo_p": kredo_dok.poluchatel(dok) if vid == "schet" else None,
         "back": reverse("abonents:karta", args=[int(request.GET["ls"])]) if request.GET.get("ls", "").isdigit()
         else reverse("abonents:dogovor", args=[cod_gor, nom_dog]),
     })
@@ -819,6 +835,26 @@ def rassylka(request):
         raise Http404
     can_send = request.user.has_perm("catalogs.change_potreb")
     mesyac, mes = _arh_mes(request)
+    from .models import Pismo
+    kanal = Pismo.KREDO if (request.GET.get("kanal") or request.POST.get("kanal")) == Pismo.KREDO and vid == "schet" \
+        else Pismo.POCHTA
+    if request.method == "POST" and kanal == Pismo.KREDO:
+        if not can_send:
+            raise PermissionDenied
+        from . import kredo_dok
+        nomera = [int(x) for x in request.POST.getlist("dog") if x.isdigit()]
+        if not nomera:
+            messages.warning(request, "Не отмечено ни одного договора")
+        else:
+            doks = [d for d in (documents.sobrat(code, n, mesyac=mesyac) for n in nomera) if d]
+            ctx = _dok_context(doks[0]) if doks else {}
+            res = kredo_dok.rassylka(code, nomera, ctx, request.user.get_username(), mesyac=mesyac,
+                                     proverka=request.POST.get("action") == "proverka")
+            ok = sum(1 for z in res if z.status in (z.OK, z.PROVERKA))
+            (messages.success if ok == len(res) else messages.warning)(
+                request, f"КРЭДО: {'подписано (проверка)' if request.POST.get('action') == 'proverka' else 'отправлено'}"
+                         f" {ok} из {len(res)}. Ошибки — в реестре писем.")
+        return redirect(f"{reverse('abonents:rassylka')}?{_qs(gorod=code, vid=vid, mes=mes, kanal=kanal)}")
     if request.method == "POST":
         if not can_send:
             raise PermissionDenied
@@ -837,11 +873,12 @@ def rassylka(request):
                 request, f"Отправлено: {ok} из {len(res)}. Ошибки — в реестре писем.")
         return redirect(f"{reverse('abonents:rassylka')}?{_qs(gorod=code, vid=vid, mes=mes)}")
     m, g = (mesyac.mes, mesyac.god) if mesyac else (city.nom_mes, city.god)
-    rows = pochta.spisok(code, m, g, vid, mesyac=mesyac)
+    rows = pochta.spisok(code, m, g, vid, mesyac=mesyac, kanal=kanal)
     return render(request, "abonents/rassylka.html", {
         "rows": rows, "vid": vid, "vidy": DOKUMENTY.items(), "title": DOKUMENTY[vid], "cities": cities, "city": city,
         "mes": mes, "mesyacy": _mes_vybor(), "mes_name": (mesyac.nazvanie if mesyac else f"{city.name_mes} {city.god}"),
-        "can_send": can_send, "problem": pochta.gotovo(),
+        "kanal": kanal,
+        "can_send": can_send, "problem": pochta.gotovo() if kanal == Pismo.POCHTA else "",
     })
 
 

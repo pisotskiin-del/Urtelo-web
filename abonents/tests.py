@@ -1171,3 +1171,100 @@ class DokumentyArhivTests(DokumentyTests):
         z = Pismo.objects.get()
         self.assertEqual((z.nom_mes, z.god, z.status), (9, 2026, Pismo.OK))
         self.assertIn("Сентябрь 2026", mail.outbox[0].body)
+
+
+class FakeCrypto:
+    """Крипто-модуль РРИЦ для тестов: записывает вызовы."""
+
+    def __init__(self, podpis="SIG1"):
+        self.calls, self.podpis = [], podpis
+
+    @property
+    def CreateDocument(self):     # без аргументов — как свойство, как в pywin32
+        return "doc1"
+
+    @property
+    def GetLastError(self):
+        return "нет сертификата"
+
+    def __getattr__(self, name):
+        def m(*args):
+            self.calls.append((name, args))
+            return {"SignDocument1": self.podpis, "GetDocumentContent": "<doc/>", "GetDocumentStatus": "Compressed",
+                    "ConvertToBase64String": "QUJD", "ValidateSignature": "Valid"}.get(name, 0)
+        return m
+
+    import contextlib
+
+    @contextlib.contextmanager
+    def objekt(self):
+        yield self
+
+
+class KredoSchetTests(DokumentyTests):
+    """Подписанная «Информация-счёт» в КРЭДО."""
+
+    def setUp(self):
+        super().setUp()
+        import tempfile
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, self.tmp)
+        Potreb.objects.filter(potreb_id=5).update(org_in="ORG-IN-1", pid_in="PID-IN-1", users_name="Иванов И.И.",
+                                                  pos_name="Директор", kredo_ras=True)
+
+    def test_otpravka(self):
+        from pathlib import Path
+        from django.test import override_settings
+        from abonents import documents, kredo_dok
+        from abonents.models import Pismo
+        dok = documents.sobrat(1, 6)
+        x, inv = FakeCrypto(), FakeInvoker("<ok/>")
+        with override_settings(TEPLO_DOC_DIR=self.tmp, TEPLO_PISMO_NOMER=500):
+            z = kredo_dok.otpravit(dok, {}, "op", crypto=x, invoker=inv)
+        self.assertEqual((z.status, z.kanal, z.nomer), (Pismo.OK, Pismo.KREDO, 500))
+        names = [c[0] for c in x.calls]
+        self.assertIn(("regnumber", "07/500"), [c[1][1:] for c in x.calls if c[0] == "SetDocInfoParameter"])
+        self.assertIn(("AddRecipient", ("doc1", 'ООО "Крипс"', "Директор", "Иванов И.И.", "")), x.calls)
+        self.assertEqual(names.index("SignDocument1") < names.index("CompressDocument"), True)
+        sign = next(c for c in x.calls if c[0] == "SignDocument1")[1]
+        self.assertEqual(sign[1:], ("CurrentUser", "My", 4, "http://ca.agroprombank.com/tsa"))
+        attach = next(c for c in x.calls if c[0] == "AddAttachment1")[1][1]
+        self.assertTrue(attach.endswith("schet_6_5.pdf"))
+        self.assertTrue(Path(attach).with_suffix(".xml").exists())
+        (name, params), = inv.calls
+        self.assertEqual(name, "Set_URDocument")
+        self.assertEqual(params, "@type=3,@org_out=7DFDBD9A-EDBA-4B92-91EB-3A9D453860CF,"
+                                 "@pid_out=527172a2-82e2-41fb-bc50-0984d4321163,@org_in=ORG-IN-1,"
+                                 "@pid_in=PID-IN-1,@doc_stat=5,@doc_data={base64}QUJD")
+
+    def test_proverka_i_oshibki(self):
+        from django.test import override_settings
+        from abonents import documents, kredo_dok
+        from abonents.models import Pismo
+        dok = documents.sobrat(1, 6)
+        inv = FakeInvoker("<ok/>")
+        with override_settings(TEPLO_DOC_DIR=self.tmp):
+            z = kredo_dok.otpravit(dok, {}, crypto=FakeCrypto(), invoker=inv, proverka=True)
+            self.assertEqual(z.status, Pismo.PROVERKA)
+            self.assertEqual(inv.calls, [])
+            z = kredo_dok.otpravit(dok, {}, crypto=FakeCrypto(podpis=""), invoker=inv)
+            self.assertEqual(z.status, Pismo.OSHIBKA)
+            self.assertIn("нет сертификата", z.oshibka)
+            z = kredo_dok.otpravit(dok, {}, crypto=FakeCrypto(), invoker=FakeInvoker("<error>Нет получателя</error>"))
+            self.assertIn("Нет получателя", z.oshibka)
+            Potreb.objects.filter(potreb_id=5).update(pid_in="")
+            z = kredo_dok.otpravit(documents.sobrat(1, 6), {}, crypto=FakeCrypto(), invoker=inv)
+            self.assertIn("org_in, pid_in", z.oshibka)
+
+    def test_stranicy(self):
+        from django.test import override_settings
+        self.login("Оператор")
+        r = self.client.get("/abonents/dogovor/1/6/schet/")
+        self.assertContains(r, "В КРЭДО")
+        r = self.client.get("/abonents/rassylka/?gorod=1&vid=schet&kanal=kredo")
+        self.assertContains(r, "Иванов И.И.")
+        self.assertContains(r, 'name="dog" value="6" checked')
+        # Без pywin32 (Linux) — ошибка записывается в реестр, страница не падает.
+        with override_settings(TEPLO_DOC_DIR=self.tmp):
+            r = self.client.post("/abonents/dogovor/1/6/schet/", {"action": "kredo_proverka"}, follow=True)
+        self.assertContains(r, "pywin32")

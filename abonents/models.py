@@ -151,9 +151,12 @@ class Pismo(models.Model):
     первый номер задается TEPLO_PISMO_NOMER (чтобы продолжить нумерацию
     старой программы)."""
 
-    OK, OSHIBKA = "ok", "err"
+    OK, OSHIBKA, PROVERKA = "ok", "err", "chk"
+    POCHTA, KREDO = "mail", "kredo"
 
     nomer = models.IntegerField("Номер документа", unique=True)
+    kanal = models.CharField("Куда", max_length=5, default=POCHTA,
+                             choices=[(POCHTA, "Почта"), (KREDO, "КРЭДО")])
     created = models.DateTimeField("Отправлено", auto_now_add=True)
     user = models.CharField("Кто отправил", max_length=150, blank=True)
     cod_gor = models.IntegerField("Участок")
@@ -164,8 +167,10 @@ class Pismo(models.Model):
     vid = models.CharField("Документ", max_length=10)
     nom_mes = models.IntegerField("Месяц")
     god = models.IntegerField("Год")
-    status = models.CharField("Результат", max_length=3, choices=[(OK, "Отправлено"), (OSHIBKA, "Ошибка")])
+    status = models.CharField("Результат", max_length=3,
+                              choices=[(OK, "Отправлено"), (OSHIBKA, "Ошибка"), (PROVERKA, "Проверка (не отправлялось)")])
     oshibka = models.TextField("Ошибка", blank=True)
+    otvet = models.TextField("Ответ КРЭДО", blank=True)
     fail = models.CharField("Файл PDF", max_length=500, blank=True)
 
     class Meta:

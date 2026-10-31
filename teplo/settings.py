@@ -162,3 +162,13 @@ TEPLO_KREDO_THUMB = {
     2: env("TEPLO_KREDO_THUMB_DUB", "e968ac9950fc5bd24953ec529980a8eac2e57e10"),
     3: env("TEPLO_KREDO_THUMB_KAM", "aedfd090498ab56b99b683782bba47fcd98d473c"),
 }
+# Штамп времени к подписи электронного документа (как в старой программе).
+TEPLO_KREDO_TSA = env("TEPLO_KREDO_TSA", "http://ca.agroprombank.com/tsa")
+# Отправитель «Информации-счёта» в КРЭДО по участкам: GUID организации и представителя.
+# Рыбница — значения из старой программы (infch_kredo_kr); другим участкам задать в .env.
+TEPLO_KREDO_OTPRAVITEL = {
+    1: {"org": env("TEPLO_KREDO_ORG_OUT_RYB", "7DFDBD9A-EDBA-4B92-91EB-3A9D453860CF"),
+        "pid": env("TEPLO_KREDO_PID_OUT_RYB", "527172a2-82e2-41fb-bc50-0984d4321163")},
+    2: {"org": env("TEPLO_KREDO_ORG_OUT_DUB", ""), "pid": env("TEPLO_KREDO_PID_OUT_DUB", "")},
+    3: {"org": env("TEPLO_KREDO_ORG_OUT_KAM", ""), "pid": env("TEPLO_KREDO_PID_OUT_KAM", "")},
+}
