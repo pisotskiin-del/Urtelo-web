@@ -1365,11 +1365,15 @@ class PokazanieTests(KartaBase):
         self.assertContains(r, "было 12,500, стало 15,125")
         self.assertEqual(Potreb.objects.get(potreb_id=5).pok_new, Decimal("15.125"))
         r = self.client.post(url, {"znach": "1,23456"}, follow=True)
-        self.assertContains(r, "не показание")
+        self.assertContains(r, "неверное значение")
         self.client.post(url, {"znach": "-1"})
         self.assertEqual(Potreb.objects.get(potreb_id=5).pok_new, Decimal("15.125"))
         self.client.post(reverse("abonents:pokazanie", args=[5, "pok_newg"]), {"znach": "120", "tab": "gvs"})
         self.assertEqual(Potreb.objects.get(potreb_id=5).pok_newg, 120)
+        self.client.post(reverse("abonents:pokazanie", args=[5, "dnotop"]), {"znach": "30,5", "tab": "otop"})
+        self.assertEqual(Potreb.objects.get(potreb_id=5).dnotop, Decimal("30.5"))
+        r = self.client.post(reverse("abonents:pokazanie", args=[5, "dnotop"]), {"znach": "1000"}, follow=True)
+        self.assertContains(r, "неверное значение")
         self.assertEqual(self.client.post(reverse("abonents:pokazanie", args=[5, "name_potre"]),
                                           {"znach": "x"}).status_code, 404)
 

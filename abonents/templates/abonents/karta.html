@@ -21,7 +21,7 @@
 function pokPodtv(f) {
   var staroe = f.dataset.staroe || "пусто", novoe = f.znach.value.trim() || "пусто";
   if (novoe === staroe) return false;
-  return confirm("Сохранить показания?\n\nБыло: " + staroe + "\nСтало: " + novoe);
+  return confirm("Сохранить изменение?\n\nБыло: " + staroe + "\nСтало: " + novoe);
 }
 </script>{% endif %}
 {% endblock %}

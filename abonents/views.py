@@ -283,11 +283,12 @@ def karta_edit(request, potreb_id):
     return render(request, "abonents/karta_edit.html", context)
 
 
-# Показания прибора, которые вводятся прямо в карточке, без «Изменить»:
+# Показания прибора и дни потребления т/э, которые вводятся прямо в карточке, без «Изменить»:
 # поле → (название, наибольшее значение, знаков после запятой).
 POKAZANIYA = {
     "pok_new": ("Показания настоящие (отопление)", Decimal("999999.999"), 3),
     "pok_newg": ("Показания настоящие (ГВС)", Decimal("999999999999"), 0),
+    "dnotop": ("Потребление т/э, дней", Decimal("999.9"), 1),
 }
 
 
@@ -310,7 +311,7 @@ def pokazanie(request, potreb_id, pole):
         raw = "ошибка"
     if raw and (znach is None or not znach.is_finite() or znach < 0 or znach > maks
                 or znach != round(znach, znakov)):
-        messages.error(request, f"{nazv}: «{request.POST.get('znach')}» — не показание "
+        messages.error(request, f"{nazv}: «{request.POST.get('znach')}» — неверное значение "
                                 f"(число от 0 до {formats.localize(maks)}"
                                 + (f", не больше {znakov} знаков после запятой" if znakov else ", целое") + ")")
         return redirect(nazad)
