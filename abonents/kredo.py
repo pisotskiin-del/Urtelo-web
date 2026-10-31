@@ -17,6 +17,7 @@ import contextlib
 import datetime
 import re
 import xml.etree.ElementTree as ET
+from collections import defaultdict
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
@@ -194,6 +195,7 @@ class Stroka:
     p: Potreb = None
     status: str = NET
     dubl: bool = False      # на лицевой пришло несколько показаний
+    posled: bool = False    # из них последнее по дате (один прибор)
 
     @property
     def potreb_id(self):
@@ -218,8 +220,8 @@ class Stroka:
     @property
     def otmetit(self):
         """Отмечать ли по умолчанию: новое показание не меньше старого и
-        единственное на лицевой. Меньшее — только по подтверждению."""
-        return self.status == NOVOE and not self.dubl
+        единственное (или последнее) на лицевой. Меньшее — только по подтверждению."""
+        return self.status == NOVOE and (not self.dubl or self.posled)
 
 
 def _r2(v):
@@ -227,18 +229,31 @@ def _r2(v):
 
 
 def sverit(rows):
-    """Строки ответа рядом с картами лицевых."""
-    ids = set()
-    stroki = [Stroka(nomer=i, r=r) for i, r in enumerate(rows)]
-    for s in stroki:
-        if s.potreb_id is not None:
-            ids.add(s.potreb_id)
+    """Строки ответа рядом с картами лицевых.
+
+    КРЭДО повторяет одно и то же показание в нескольких строках (по одной на
+    документ) — повторы убираются. Если на лицевой пришло несколько разных
+    показаний одного прибора, по умолчанию отмечается последнее по дате; если
+    приборов несколько — ни одно (в карте одно показание отопления).
+    """
+    vidal, stroki = set(), []
+    for r in rows:
+        key = (r["p_kod"], r["d_num"], r["cur_pok"], r["date_pok"])
+        if key not in vidal:
+            vidal.add(key)
+            stroki.append(Stroka(nomer=len(stroki), r=r))
+    ids = {s.potreb_id for s in stroki if s.potreb_id is not None}
     karty = {p.potreb_id: p for p in Potreb.objects.filter(potreb_id__in=ids).select_related("cod_gor")}
-    from collections import Counter
-    cnt = Counter(s.potreb_id for s in stroki)
+    gruppy = defaultdict(list)
+    for s in stroki:
+        gruppy[s.potreb_id].append(s)
     for s in stroki:
         s.p = karty.get(s.potreb_id)
-        s.dubl = s.p is not None and cnt[s.potreb_id] > 1
+        g = gruppy[s.potreb_id]
+        if s.p is not None and len(g) > 1:
+            s.dubl = True
+            if len({x.r["d_num"] for x in g}) == 1:
+                s.posled = s is max(g, key=lambda x: (x.r["date_pok"] or datetime.date.min, x.r["cur_pok"] or 0))
         cur = s.r["cur_pok"]
         if s.p is None:
             s.status = NET

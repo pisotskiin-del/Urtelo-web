@@ -1015,3 +1015,34 @@ class KredoTests(KartaBase):
         self.assertEqual(r.status_code, 200)
         self.assertNotContains(r, "Получить показания")
         self.assertEqual(self.client.post("/abonents/kredo/?gorod=1", {"action": "kredo"}).status_code, 403)
+
+
+def _kredo_row(p_kod, d_num, prev, cur, data, doc):
+    return (f"<row><org_id>AC23888B</org_id><comorg_id>210</comorg_id><liz>{p_kod}</liz><p_kod>{p_kod}</p_kod>"
+            f"<d_kod>14</d_kod><d_tip>1</d_tip><d_num>{d_num}</d_num><tip_pok>2</tip_pok><prev_pok>{prev}</prev_pok>"
+            f"<cur_pok>{cur}</cur_pok><date_pok>{data}</date_pok><waitable>0.0000</waitable><doc_id>{doc}</doc_id></row>")
+
+
+# Как настоящий ответ Kredo_DeviceMeters_Info (31.10.2026): схема xsd, строки <row>,
+# лицевой с ведущими нулями, одно показание повторяется по документам.
+KREDO_REAL = ('<?xml version="1.0" encoding="windows-1251"?><records>'
+              '<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" id="records">'
+              '<xsd:element name="records"><xsd:complexType><xsd:choice maxOccurs="unbounded">'
+              '<xsd:element name="Kredo_DeviceMeters_Info"><xsd:complexType><xsd:sequence>'
+              '<xsd:element name="p_kod"/></xsd:sequence></xsd:complexType></xsd:element>'
+              '</xsd:choice></xsd:complexType></xsd:element></xsd:schema>'
+              + _kredo_row("000005", "997800", "12.5000", "13.0600", "2026-01-28", "A")
+              + _kredo_row("000005", "997800", "12.5000", "13.0600", "2026-01-28", "B")
+              + _kredo_row("000009", "2091363", "1.0", "6.3240", "2026-03-26", "C")
+              + _kredo_row("000009", "2091363", "1.0", "4.1900", "2025-12-02", "D")
+              + "</records>")
+
+
+class KredoRealTests(KartaBase):
+    def test_nastoyashchij_otvet(self):
+        from abonents import kredo
+        stroki = kredo.sverit(kredo.razobrat(KREDO_REAL))
+        self.assertEqual([(s.potreb_id, s.r["cur_pok"]) for s in stroki],
+                         [(5, Decimal("13.0600")), (9, Decimal("6.3240")), (9, Decimal("4.1900"))])
+        self.assertEqual([s.otmetit for s in stroki], [True, True, False])
+        self.assertFalse(stroki[0].dubl)

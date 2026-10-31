@@ -28,7 +28,7 @@
       <td>{{ s.r.date_pok|date:"d.m.Y" }}</td>
       <td class="num">{{ s.p.pok_new|default_if_none:"" }}</td>
       <td>{{ s.p.date_pok|date:"d.m.Y" }}</td>
-      <td>{{ s.status_text }}{% if s.dubl %}; <b>несколько показаний на лицевой — отметьте одно</b>{% endif %}</td>
+      <td>{{ s.status_text }}{% if s.dubl %}; {% if s.posled %}последнее из нескольких{% else %}<b>несколько показаний на лицевой — отметьте одно</b>{% endif %}{% endif %}</td>
     </tr>
   {% empty %}<tr><td colspan="13" class="muted">В ответе КРЭДО нет показаний</td></tr>{% endfor %}
   </tbody>
