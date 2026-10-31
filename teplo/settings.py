@@ -137,3 +137,11 @@ CATALOG_PAGE_SIZE = 50
 # (у бухгалтерии \\SERVER-FF\Abon_teplo1C). Пусто — файл только скачивается
 # со страницы «Новый месяц».
 TEPLO_1C_DIR = env("TEPLO_1C_DIR", "")
+
+# Документы абонентам в PDF («Информация-счёт», акт): папка, где они хранятся по
+# участкам и месяцам (в старой программе D:\Teplo_dog\Akt_potreb). Пусто — папка
+# dokumenty рядом с программой.
+TEPLO_DOC_DIR = env("TEPLO_DOC_DIR", "")
+# Шрифт TrueType с кириллицей для PDF. Пусто — Arial из Windows (DejaVu Sans в Linux).
+TEPLO_PDF_FONT = env("TEPLO_PDF_FONT", "")
+TEPLO_PDF_FONT_BOLD = env("TEPLO_PDF_FONT_BOLD", "")

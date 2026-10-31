@@ -242,8 +242,8 @@ def sobrat(cod_gor, nom_dog, data=None):
     for k in kats.values():
         if k.stroki[0].p.potreb_id in KOPEIKA_PLUS:
             k.plus = KOP
-    # Реквизиты договора — у основного абонента (nom_dogab = nom_dog), иначе у первого.
-    glav = next((p for p in recs if p.nom_dogab and p.nom_dogab == p.nom_dog), recs[0])
+    # Реквизиты договора (наименование, руководитель, дата) — у первого лицевого договора.
+    glav = min(recs, key=lambda p: p.potreb_id)
     return Dokument(gorod=gorod, glav=glav, kategorii=list(kats.values()), data=data or datetime.date.today())
 
 

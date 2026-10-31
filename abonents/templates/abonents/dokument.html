@@ -9,14 +9,15 @@
       {% if vid == "schet" %}<a class="button" href="{% url 'abonents:dokument' doks.0.gorod.cod_gorod doks.0.nom_dog 'akt' %}{% if request.GET.ls %}?ls={{ request.GET.ls }}{% endif %}">Акт</a>
       {% else %}<a class="button" href="{% url 'abonents:dokument' doks.0.gorod.cod_gorod doks.0.nom_dog 'schet' %}{% if request.GET.ls %}?ls={{ request.GET.ls }}{% endif %}">Информация-счёт</a>{% endif %}
     {% endif %}
-    <button type="button" onclick="window.print()">{% icon "file" %} Печать / PDF</button>
+    <a class="button" href="?{% if paket %}gorod={{ city }}&amp;vid={{ vid }}{% elif request.GET.ls %}ls={{ request.GET.ls }}{% endif %}&amp;pdf=1" target="_blank">{% icon "save" %} PDF</a>
+    <button type="button" onclick="window.print()">{% icon "file" %} Печать</button>
   </div>
 </div>
 {% if paket %}
 <form method="get" class="toolbar rep-params">
   <nav class="tabs">{% for c in cities %}<a href="?gorod={{ c.cod_gorod }}&amp;vid={{ vid }}" {% if c.cod_gorod == city %}class="active"{% endif %}>{{ c.name_gorod }}</a>{% endfor %}</nav>
   <label>Документ <select name="vid" onchange="this.form.submit()">{% for k, t in vidy %}<option value="{{ k }}"{% if k == vid %} selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
-  <span class="muted">Договоров: {{ doks|length }}. Сохранить в PDF — «Печать / PDF», принтер «Сохранить как PDF».</span>
+  <span class="muted">Договоров: {{ doks|length }}. «PDF» сохраняет каждый документ в папку месяца и открывает все одним файлом.</span>
 </form>
 {% endif %}
 <p class="muted">Сумма = (отопление + ГВС) Гкал × тариф; потери ГВС в сумму не входят.</p>

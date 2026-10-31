@@ -2,11 +2,11 @@
   <div class="dok-org"><b>{{ org.name }}</b>{% for l in org.lines %}<br>{{ l }}{% endfor %}</div>
 </div>
 <div class="dok-title"><b>Информация-счёт</b><br>о фактическом потреблении и стоимости тепловой энергии<br>по договору № {{ dok.nom_dog }} от {{ dok.glav.data_dog|date:"d.m.Y" }}</div>
-<div class="dok-row"><span>г.{{ dok.gorod.name_gorod|default:"" }}</span><span>Дата составления документа: {{ dok.data|date:"d.m.Y" }}</span><span>Номер документа: ________</span></div>
+<table class="dok-row"><tr><td>г.{{ dok.gorod.name_gorod|default:"" }}</td><td class="c">Дата составления документа: {{ dok.data|date:"d.m.Y" }}</td><td class="r">Номер документа: {{ nomer|default:"________" }}</td></tr></table>
 <p>Потребитель: <b>{{ dok.glav.name_potre|default:"" }}</b></p>
 <p>МГУП "Тирастеплоэнерго" информирует Вас о количестве и стоимости потребленной Вами тепловой энергии за {{ dok.mes_im }} месяц {{ dok.god }} года:</p>
 <table class="dok-tab">
-  <thead><tr><th>№</th><th>Наименование и адрес объекта</th><th>Отопл. Гкал</th><th>Подогр. воды Гкал</th><th>Потери Гкал</th><th>Итого, Гкал</th><th>Тариф</th><th>Итого начисл., руб.</th></tr></thead>
+  <thead><tr><th width="6%">№</th><th width="32%">Наименование и адрес объекта</th><th width="9%">Отопл. Гкал</th><th width="10%">Подогр. воды Гкал</th><th width="9%">Потери Гкал</th><th width="9%">Итого, Гкал</th><th width="10%">Тариф</th><th width="15%">Итого начисл., руб.</th></tr></thead>
   {% for k in dok.kategorii %}
   <tbody>
     <tr class="dok-kat"><td colspan="8">Категория потребителя: {{ k.name }}</td></tr>
@@ -25,6 +25,6 @@
     <th class="num">{{ dok.otopl|floatformat:3 }}</th><th class="num">{{ dok.gvs|floatformat:3 }}</th><th class="num">{{ dok.poteri|floatformat:3 }}</th>
     <th class="num">{{ dok.gkal|floatformat:3 }}</th><th></th><th class="num">{{ dok.itog|floatformat:2 }}</th></tr></tfoot>
 </table>
-<p class="dok-sign">{{ ved.0|default:"Ведущий специалист" }} СУиРТЭ МГУП "Тирастеплоэнерго" <span class="line"></span> {{ ved.1 }}</p>
+<p class="dok-sign">{{ ved.0|default:"Ведущий специалист" }} СУиРТЭ МГУП "Тирастеплоэнерго" __________________ {{ ved.1 }}</p>
 <p class="dok-foot">Для получения консультаций обращайтесь в отдел учета и реализации тепловой энергии{% if isp.1 %}: исп. {{ isp.1 }}{% endif %}<br>
 – телефон: {{ org.telefon }}<br>– E-mail: {{ org.email }}</p>

@@ -742,6 +742,24 @@ class DokumentyTests(KartaBase):
         self.assertContains(self.client.get("/abonents/5/"), "/abonents/dogovor/1/6/schet/?ls=5")
 
 
+class DokumentyPdfTests(DokumentyTests):
+    def test_pdf(self):
+        import tempfile
+        from pathlib import Path
+        from django.test import override_settings
+        d = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, d)
+        self.login("Наблюдатель")
+        with override_settings(TEPLO_DOC_DIR=d):
+            r = self.client.get("/abonents/dogovor/1/6/schet/?ls=5&pdf=1")
+            self.assertEqual(r["Content-Type"], "application/pdf")
+            self.assertTrue(r.content.startswith(b"%PDF"))
+            self.assertTrue((Path(d) / "ryb" / "2026" / "10" / "schet_6_5.pdf").exists())
+            r = self.client.get("/abonents/dokumenty/?gorod=1&vid=akt&pdf=1")
+            self.assertTrue(r.content.startswith(b"%PDF"))
+            self.assertTrue((Path(d) / "ryb" / "2026" / "10" / "akt_6_5.pdf").exists())
+
+
 class ArhivTests(KartaBase):
     """Отчеты за период по закрытым месяцам и загрузка архивов старой программы."""
 

@@ -712,6 +712,12 @@ def dokument(request, cod_gor, nom_dog, vid):
     dok = documents.sobrat(cod_gor, nom_dog)
     if dok is None:
         raise Http404("В договоре нет действующих лицевых счетов")
+    if request.GET.get("pdf"):
+        from . import pdf
+        path = pdf.save(dok, vid, _dok_context(dok))
+        response = HttpResponse(path.read_bytes(), content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="{path.name}"'
+        return response
     return render(request, "abonents/dokument.html", {
         **_dok_context(dok), "vid": vid, "title": DOKUMENTY[vid], "doks": [dok],
         "back": reverse("abonents:karta", args=[int(request.GET["ls"])]) if request.GET.get("ls", "").isdigit()
@@ -731,6 +737,13 @@ def dokumenty(request):
     code = _current_city(request, cities)
     doks = [d for d in (documents.sobrat(code, n) for n in documents.dogovory(code)) if d]
     ctx = _dok_context(doks[0]) if doks else {"org": documents.ORG}
+    if request.GET.get("pdf") and doks:
+        from . import pdf
+        for d in doks:   # каждый документ — в папку месяца, как в старой программе
+            pdf.save(d, vid, ctx)
+        response = HttpResponse(pdf.render(doks, vid, ctx), content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="{vid}_{code}_{doks[0].god}_{doks[0].mes:02d}.pdf"'
+        return response
     return render(request, "abonents/dokument.html", {
         **ctx, "vid": vid, "title": DOKUMENTY[vid], "doks": doks, "paket": True,
         "cities": cities, "city": code, "vidy": DOKUMENTY.items(),
