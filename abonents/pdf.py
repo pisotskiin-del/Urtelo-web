@@ -32,11 +32,36 @@ def _font():
     return None, None
 
 
-def html(doks, vid, context):
+FONT_NAME = "TeploDoc"
+
+
+def _register_font():
+    """Зарегистрировать шрифт в reportlab напрямую и сообщить xhtml2pdf его имя.
+
+    Через @font-face xhtml2pdf копирует шрифт во временный файл и открывает его,
+    пока файл ещё открыт, — в Windows это ошибка «Can't open file …\\Temp\\tmp….ttf».
+    Возвращает имя семейства для CSS или пустую строку.
+    """
     regular, bold = _font()
+    if not regular:
+        return ""
+    from reportlab.lib.fonts import addMapping
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from xhtml2pdf import default
+    if FONT_NAME not in pdfmetrics.getRegisteredFontNames():
+        pdfmetrics.registerFont(TTFont(FONT_NAME, regular))
+        pdfmetrics.registerFont(TTFont(FONT_NAME + "-Bold", bold))
+        for b, i, name in ((0, 0, FONT_NAME), (1, 0, FONT_NAME + "-Bold"),
+                           (0, 1, FONT_NAME), (1, 1, FONT_NAME + "-Bold")):
+            addMapping(FONT_NAME, b, i, name)
+    default.DEFAULT_FONT[FONT_NAME.lower()] = FONT_NAME
+    return FONT_NAME
+
+
+def html(doks, vid, context):
     return render_to_string("abonents/dokument_pdf.html", {
-        **context, "doks": doks, "vid": vid, "title": VIDY[vid],
-        "font": Path(regular).as_posix() if regular else "", "font_bold": Path(bold).as_posix() if bold else "",
+        **context, "doks": doks, "vid": vid, "title": VIDY[vid], "font": _register_font(),
     })
 
 
@@ -44,11 +69,7 @@ def render(doks, vid, context):
     """PDF (bytes) документов vid по списку документов doks."""
     from xhtml2pdf import pisa
     out = io.BytesIO()
-    regular, _ = _font()
-    # Базовый каталог документа — каталог шрифта: новые версии xhtml2pdf читают
-    # файлы только из него.
-    base = str(Path(regular).parent / "dokument.html") if regular else ""
-    result = pisa.CreatePDF(html(doks, vid, context), dest=out, encoding="utf-8", path=base)
+    result = pisa.CreatePDF(html(doks, vid, context), dest=out, encoding="utf-8")
     if result.err:
         raise RuntimeError("Не удалось построить PDF")
     return out.getvalue()

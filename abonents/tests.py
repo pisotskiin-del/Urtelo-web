@@ -758,6 +758,11 @@ class DokumentyPdfTests(DokumentyTests):
             r = self.client.get("/abonents/dokumenty/?gorod=1&vid=akt&pdf=1")
             self.assertTrue(r.content.startswith(b"%PDF"))
             self.assertTrue((Path(d) / "ryb" / "2026" / "10" / "akt_6_5.pdf").exists())
+        # Шрифт с кириллицей встроен (обычный и жирный), а не Helvetica.
+        pdf_bytes = (Path(d) / "ryb" / "2026" / "10" / "akt_6_5.pdf").read_bytes()
+        fonts = set(re.findall(rb"/BaseFont /[A-Z]{6}\+(\S+)", pdf_bytes))
+        self.assertEqual(len(fonts), 2, fonts)
+        self.assertTrue(any(b"Bold" in f for f in fonts), fonts)
 
 
 class ArhivTests(KartaBase):
