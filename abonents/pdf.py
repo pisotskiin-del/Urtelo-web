@@ -35,6 +35,33 @@ def _font():
 FONT_NAME = "TeploDoc"
 
 
+def _md5_py38():
+    """Python 3.8: hashlib.md5 не знает параметра usedforsecurity, а новые версии
+    reportlab и xhtml2pdf его передают (TypeError: 'usedforsecurity' is an invalid
+    keyword argument for openssl_md5()). Подменяем md5 обёрткой, которая этот
+    параметр отбрасывает: в hashlib и в уже загруженных модулях reportlab/xhtml2pdf
+    (они берут md5 через «from hashlib import md5»)."""
+    import hashlib
+    import sys
+    try:
+        hashlib.md5(usedforsecurity=False)
+        return
+    except TypeError:
+        pass
+    orig = hashlib.md5
+
+    def md5(*args, usedforsecurity=True, **kw):
+        return orig(*args, **kw)
+
+    hashlib.md5 = md5
+    for name, mod in list(sys.modules.items()):
+        if name.split(".")[0] in ("reportlab", "xhtml2pdf") and getattr(mod, "md5", None) is orig:
+            mod.md5 = md5
+
+
+_md5_py38()
+
+
 def _register_font():
     """Зарегистрировать шрифт в reportlab напрямую и сообщить xhtml2pdf его имя.
 
