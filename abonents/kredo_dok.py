@@ -19,6 +19,7 @@
 
 import base64
 import contextlib
+import re
 from pathlib import Path
 
 from django.conf import settings
@@ -112,15 +113,35 @@ def podpisat(x, spec):
     if spec.get("logo"):
         x.SetDocInfoLogo(y, spec["logo"])
     x.AddAttachment1(y, spec["vlozhenie"])
+    # Крипто-модуль сам показывает окно выбора сертификата из хранилища «Личные»
+    # (как в старой программе): выбрать сертификат заранее по отпечатку нельзя.
     s = x.SignDocument1(y, "CurrentUser", "My", 4, spec["tsa"])
     if not s:
         raise kredo.KredoError(f"Документ не подписан: {x.GetLastError or 'нет описания ошибки'}")
+    proverit_sertifikat(str(x.CertificateInfo1(y, s) or ""), spec.get("thumb", ""))
     proverka = x.ValidateSignature(y, s)
     xml = str(x.GetDocumentContent(y) or "")
     x.CompressDocument(y)
     status = STATUSY.get(str(x.GetDocumentStatus(y)), 0)
     b64 = str(x.ConvertToBase64String(x.GetDocumentContent(y)) or "")
     return xml, b64, status, str(proverka or "")
+
+
+def _pole(xml, tag):
+    m = re.search(rf"<{tag}>(.*?)</{tag}>", xml or "", re.DOTALL)
+    return m.group(1).strip() if m else ""
+
+
+def proverit_sertifikat(info, thumb):
+    """Документ должен быть подписан сертификатом участка (отпечаток из
+    TEPLO_KREDO_THUMB): в окне выбора легко ошибиться строкой."""
+    if not thumb:
+        return
+    vybran = re.sub(r"[^0-9a-f]", "", _pole(info, "thumbprint").lower())
+    if vybran != re.sub(r"[^0-9a-f]", "", thumb.lower()):
+        kto = _pole(info, "subject") or "неизвестный сертификат"
+        raise kredo.KredoError(f"Документ подписан не сертификатом участка ({kto}). "
+                               f"Выберите в окне сертификат участка; документ не отправлен")
 
 
 def spec_dokumenta(dok, p, nomer, pdf_path):
@@ -141,6 +162,7 @@ def spec_dokumenta(dok, p, nomer, pdf_path):
                        (p.users_name or p.direktor or "").strip()),
         "podpisant": podp, "ispolnitel": ispoln, "logo": logo,
         "vlozhenie": str(pdf_path), "tsa": settings.TEPLO_KREDO_TSA,
+        "thumb": kredo.nastrojki(dok.gorod.cod_gorod)["thumb"],
     }
 
 

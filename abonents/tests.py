@@ -1176,8 +1176,8 @@ class DokumentyArhivTests(DokumentyTests):
 class FakeCrypto:
     """Крипто-модуль РРИЦ для тестов: записывает вызовы."""
 
-    def __init__(self, podpis="SIG1"):
-        self.calls, self.podpis = [], podpis
+    def __init__(self, podpis="SIG1", thumb="EB89DA47D567BEEE800118756E9B31568BF95072"):
+        self.calls, self.podpis, self.thumb = [], podpis, thumb
 
     @property
     def CreateDocument(self):     # без аргументов — как свойство, как в pywin32
@@ -1191,7 +1191,9 @@ class FakeCrypto:
         def m(*args):
             self.calls.append((name, args))
             return {"SignDocument1": self.podpis, "GetDocumentContent": "<doc/>", "GetDocumentStatus": "Compressed",
-                    "ConvertToBase64String": "QUJD", "ValidateSignature": "Valid"}.get(name, 0)
+                    "ConvertToBase64String": "QUJD", "ValidateSignature": "Valid",
+                    "CertificateInfo1": f"<root><thumbprint>{self.thumb}</thumbprint>"
+                                        f"<subject>CN=TTE_Dub</subject></root>"}.get(name, 0)
         return m
 
     import contextlib
@@ -1252,6 +1254,10 @@ class KredoSchetTests(DokumentyTests):
             self.assertIn("нет сертификата", z.oshibka)
             z = kredo_dok.otpravit(dok, {}, crypto=FakeCrypto(), invoker=FakeInvoker("<error>Нет получателя</error>"))
             self.assertIn("Нет получателя", z.oshibka)
+            z = kredo_dok.otpravit(dok, {}, crypto=FakeCrypto(thumb="E968AC99"), invoker=inv)
+            self.assertEqual(z.status, Pismo.OSHIBKA)
+            self.assertIn("не сертификатом участка (CN=TTE_Dub)", z.oshibka)
+            self.assertEqual(inv.calls, [])
             Potreb.objects.filter(potreb_id=5).update(pid_in="")
             z = kredo_dok.otpravit(documents.sobrat(1, 6), {}, crypto=FakeCrypto(), invoker=inv)
             self.assertIn("org_in, pid_in", z.oshibka)
