@@ -3,7 +3,9 @@
 используется его лицевой № (potreb_id)."""
 
 import datetime
+import re
 from decimal import Decimal
+from pathlib import Path
 
 from django.conf import settings
 from django.contrib import messages
@@ -22,7 +24,7 @@ from django.db import transaction
 from catalogs.models import Akcept, Bank, Danrasch, GvsKot, Kategorpot, Limit, Potreb, SpTeplosch, SpTeplpoteri
 from teplo.sqlite_unicode import UnicodeLower
 
-from . import layout, nov_mes, poteri, raschet, reports
+from . import documents, layout, nov_mes, poteri, raschet, reports
 from .forms import DanRaschForm, NovAbonentForm, PoteriForm, TeploschForm, karta_form
 
 view_required = permission_required("catalogs.view_potreb", raise_exception=True)
@@ -41,6 +43,11 @@ def _current_city(request, cities):
     if code not in codes:
         code = codes[0] if codes else None
     return code
+
+
+def _papka_1c():
+    from .models import Nastroika
+    return Nastroika.papka()
 
 
 def _int(value):
@@ -243,6 +250,7 @@ def _card_context(request, p, tab_key, form=None):
         "hero": _hero(p, related),
         "can_change": request.user.has_perm("catalogs.change_potreb"),
         "can_delete": request.user.has_perm("catalogs.delete_potreb"),
+        "pokazaniya": POKAZANIYA,
     }
 
 
@@ -273,6 +281,49 @@ def karta_edit(request, potreb_id):
     context = _card_context(request, p, tab_key, form)
     context["form"] = form
     return render(request, "abonents/karta_edit.html", context)
+
+
+# Показания прибора, которые вводятся прямо в карточке, без «Изменить»:
+# поле → (название, наибольшее значение, знаков после запятой).
+POKAZANIYA = {
+    "pok_new": ("Показания настоящие (отопление)", Decimal("999999.999"), 3),
+    "pok_newg": ("Показания настоящие (ГВС)", Decimal("999999999999"), 0),
+}
+
+
+@login_required
+@permission_required("catalogs.change_potreb", raise_exception=True)
+def pokazanie(request, potreb_id, pole):
+    """Ввод показаний прибора в карточке. Сохранение подтверждается в окне
+    браузера, старое и новое значение пишутся в сообщение."""
+    if pole not in POKAZANIYA or request.method != "POST":
+        raise Http404
+    p = get_object_or_404(Potreb, potreb_id=potreb_id)
+    nazv, maks, znakov = POKAZANIYA[pole]
+    tab = request.POST.get("tab") if request.POST.get("tab") in layout.TAB_KEYS else layout.TAB_KEYS[0]
+    nazad = reverse("abonents:karta", args=[potreb_id]) + f"?tab={tab}"
+    raw = (request.POST.get("znach") or "").strip().replace(" ", "").replace("\xa0", "").replace(",", ".")
+    try:
+        znach = Decimal(raw) if raw else None
+    except ArithmeticError:
+        znach = None
+        raw = "ошибка"
+    if raw and (znach is None or not znach.is_finite() or znach < 0 or znach > maks
+                or znach != round(znach, znakov)):
+        messages.error(request, f"{nazv}: «{request.POST.get('znach')}» — не показание "
+                                f"(число от 0 до {formats.localize(maks)}"
+                                + (f", не больше {znakov} знаков после запятой" if znakov else ", целое") + ")")
+        return redirect(nazad)
+    if znach is not None and not znakov:
+        znach = int(znach)
+    staroe = getattr(p, pole)
+    if staroe == znach:
+        return redirect(nazad)
+    setattr(p, pole, znach)
+    p.save(update_fields=[pole])
+    pokaz = lambda v: "пусто" if v is None else formats.localize(v)
+    messages.success(request, f"{nazv}: было {pokaz(staroe)}, стало {pokaz(znach)}")
+    return redirect(nazad)
 
 
 @login_required
@@ -605,15 +656,15 @@ def nov_mes_view(request):
     rows = [(c, sums.get(c.cod_gorod, {})) for c in cities]
     return render(request, "abonents/nov_mes.html", {
         "mes": mes and nov_mes.MONTHS[mes - 1], "god": god, "next": nxt and f"{nov_mes.MONTHS[nxt[0] - 1]} {nxt[1]}",
-        "rows": rows, "can_run": can_run, "arhiv": nov_mes.MesArhiv.objects.defer("data")[:24],
-        "last": nov_mes.last(), "dir_1c": settings.TEPLO_1C_DIR, "year_reset": nxt and nxt[0] == 1, "season_reset": nxt and nxt[0] == 10,
+        "rows": rows, "can_run": can_run, "arhiv": nov_mes.MesArhiv.objects.filter(istochnik=nov_mes.MesArhiv.WEB).defer("data")[:24],
+        "last": nov_mes.last(), "dir_1c": _papka_1c(), "year_reset": nxt and nxt[0] == 1, "season_reset": nxt and nxt[0] == 10,
     })
 
 
 @login_required
 @permission_required("catalogs.view_potreb", raise_exception=True)
 def abot_1c(request, pk):
-    """Скачать выгрузку в 1С закрытого месяца: Abot<ГГ><ММ>.dbf, как в старой программе."""
+    """Скачать выгрузку в 1С закрытого месяца: Abpt<ГГ><ММ>.dbf, как в старой программе."""
     arh = get_object_or_404(nov_mes.MesArhiv, pk=pk)
     response = HttpResponse(content_type="application/x-dbf")
     response["Content-Disposition"] = f'attachment; filename="{nov_mes.abot_filename(arh.nom_mes, arh.god)}"'
@@ -681,4 +732,424 @@ def otchet(request, key):
     return render(request, "abonents/otchet.html", {
         "rdef": rdef, "report": report, "opts": opts, "options": reports.options_for(rdef),
         "cities": cities, "city": code, "xlsx_query": query.urlencode(),
+    })
+
+
+DOKUMENTY = {"schet": "Информация-счёт", "akt": "Акт о фактическом потреблении"}
+
+
+def _arh_mes(request):
+    """Закрытый месяц из параметра ?mes=ГГГГ-ММ: (arhiv.Mesyac, "ГГГГ-ММ"),
+    без параметра — (None, "") — текущий месяц."""
+    from . import arhiv
+    raw = (request.GET.get("mes") or request.POST.get("mes") or "").strip()
+    if not re.fullmatch(r"\d{4}-\d{2}", raw):
+        return None, ""
+    m = arhiv.najti((int(raw[5:]), int(raw[:4])))
+    if m is None:
+        raise Http404("Этого месяца нет в архиве")
+    return m, raw
+
+
+def _mes_vybor():
+    from . import arhiv
+    return arhiv.vybor()
+
+
+def _qs(**kw):
+    from urllib.parse import urlencode
+    return urlencode({k: v for k, v in kw.items() if v not in (None, "")})
+
+
+def _dok_context(dok):
+    """Подписи и реквизиты для шаблона документа."""
+    from .models import Podpisant
+    from catalogs.models import SmtpNas
+    ved = Podpisant.get(Podpisant.VED_SPEC, dok.gorod)
+    isp = Podpisant.get(Podpisant.ISPOLNITEL, dok.gorod)
+    akt = Podpisant.get(Podpisant.AKT, dok.gorod)
+    smtp = SmtpNas.objects.first()
+    return {"dok": dok, "org": documents.ORG, "ved": ved, "isp": isp,
+            "akt_lico": " ".join(x for x in akt if x) or
+            "ведущего специалиста Рыбницкого участка по эксплуатации котельных и тепловых сетей "
+            "Борсуковского Сергея Васильевича",
+            "dov": (smtp.nom_dov, smtp.data_dov) if smtp and smtp.nom_dov else None}
+
+
+@login_required
+@view_required
+def dokument(request, cod_gor, nom_dog, vid):
+    """«Информация-счёт» (vid=schet) или акт (vid=akt) по договору за текущий
+    месяц участка: на экране и для печати (в PDF — печатью из браузера)."""
+    if vid not in DOKUMENTY:
+        raise Http404
+    mesyac, mes = _arh_mes(request)
+    dok = documents.sobrat(cod_gor, nom_dog, mesyac=mesyac)
+    if dok is None:
+        raise Http404("В договоре нет действующих лицевых счетов" + (" в этом месяце" if mesyac else ""))
+    if request.GET.get("pdf"):
+        from . import pdf
+        path = pdf.save(dok, vid, _dok_context(dok))
+        response = HttpResponse(path.read_bytes(), content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="{path.name}"'
+        return response
+    if request.method == "POST" and request.POST.get("action") == "send":
+        if not request.user.has_perm("catalogs.change_potreb"):
+            raise PermissionDenied
+        from . import pochta
+        problem = pochta.gotovo()
+        if problem:
+            messages.error(request, problem)
+        else:
+            z = pochta.otpravit(dok, vid, _dok_context(dok), request.user.get_username())
+            if z.status == z.OK:
+                messages.success(request, f"Документ № {z.nomer} отправлен на {z.email}")
+            else:
+                messages.error(request, f"Не отправлено: {z.oshibka}")
+        return redirect(request.get_full_path())
+    if request.method == "POST" and request.POST.get("action") in ("kredo", "kredo_proverka") and vid == "schet":
+        if not request.user.has_perm("catalogs.change_potreb"):
+            raise PermissionDenied
+        from . import kredo_dok
+        proverka = request.POST["action"] == "kredo_proverka"
+        z = kredo_dok.otpravit(dok, _dok_context(dok), request.user.get_username(), proverka=proverka)
+        if z.status == z.OK:
+            messages.success(request, f"Документ № {z.nomer} подписан и отправлен в КРЭДО")
+        elif z.status == z.PROVERKA:
+            messages.success(request, f"Документ № {z.nomer}. {z.oshibka}. "
+                                      f"XML: {Path(z.fail).with_suffix('.xml')}")
+        else:
+            messages.error(request, f"КРЭДО: {z.oshibka}")
+        return redirect(request.get_full_path())
+    from . import kredo_dok, pochta
+    poluch = pochta.poluchatel(dok)
+    ls = request.GET.get("ls", "") if request.GET.get("ls", "").isdigit() else ""
+    return render(request, "abonents/dokument.html", {
+        **_dok_context(dok), "vid": vid, "title": DOKUMENTY[vid], "doks": [dok],
+        "mes": mes, "mesyacy": _mes_vybor(), "ls": ls, "qs": _qs(ls=ls, mes=mes),
+        "email": poluch.mail.strip() if poluch else "", "can_send": request.user.has_perm("catalogs.change_potreb"),
+        "kredo_p": kredo_dok.poluchatel(dok) if vid == "schet" else None,
+        "back": reverse("abonents:karta", args=[int(request.GET["ls"])]) if request.GET.get("ls", "").isdigit()
+        else reverse("abonents:dogovor", args=[cod_gor, nom_dog]),
+    })
+
+
+@login_required
+@view_required
+def dokumenty(request):
+    """Пакет документов участка за месяц: по каждому договору с начислением
+    больше нуля, каждый документ с новой страницы."""
+    vid = request.GET.get("vid", "schet")
+    if vid not in DOKUMENTY:
+        raise Http404
+    cities = _cities()
+    code = _current_city(request, cities)
+    mesyac, mes = _arh_mes(request)
+    doks = [d for d in (documents.sobrat(code, n, mesyac=mesyac) for n in documents.dogovory(code, mesyac=mesyac)) if d]
+    ctx = _dok_context(doks[0]) if doks else {"org": documents.ORG}
+    if request.GET.get("pdf") and doks:
+        from . import pdf
+        for d in doks:   # каждый документ — в папку месяца, как в старой программе
+            pdf.save(d, vid, ctx)
+        response = HttpResponse(pdf.render(doks, vid, ctx), content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="{vid}_{code}_{doks[0].god}_{doks[0].mes:02d}.pdf"'
+        return response
+    return render(request, "abonents/dokument.html", {
+        **ctx, "vid": vid, "title": DOKUMENTY[vid], "doks": doks, "paket": True,
+        "cities": cities, "city": code, "vidy": DOKUMENTY.items(),
+        "mes": mes, "mesyacy": _mes_vybor(), "qs": _qs(gorod=code, vid=vid, mes=mes),
+        "back": reverse("abonents:otchety"),
+    })
+
+
+@login_required
+@view_required
+def rassylka(request):
+    """Рассылка документов по почте за текущий месяц участка (форма
+    auto_send_mail): договоры с начислением, отметки по признаку «Почта» из
+    карты, отправка отмеченных с записью в реестр."""
+    from . import pochta
+    vid = request.GET.get("vid", "schet")
+    if vid not in DOKUMENTY:
+        raise Http404
+    cities = _cities()
+    code = _current_city(request, cities)
+    city = next((c for c in cities if c.cod_gorod == code), None)
+    if city is None:
+        raise Http404
+    can_send = request.user.has_perm("catalogs.change_potreb")
+    mesyac, mes = _arh_mes(request)
+    from .models import Pismo
+    kanal = Pismo.KREDO if (request.GET.get("kanal") or request.POST.get("kanal")) == Pismo.KREDO and vid == "schet" \
+        else Pismo.POCHTA
+    if request.method == "POST" and kanal == Pismo.KREDO:
+        if not can_send:
+            raise PermissionDenied
+        from . import kredo_dok
+        nomera = [int(x) for x in request.POST.getlist("dog") if x.isdigit()]
+        if not nomera:
+            messages.warning(request, "Не отмечено ни одного договора")
+        else:
+            doks = [d for d in (documents.sobrat(code, n, mesyac=mesyac) for n in nomera) if d]
+            ctx = _dok_context(doks[0]) if doks else {}
+            res = kredo_dok.rassylka(code, nomera, ctx, request.user.get_username(), mesyac=mesyac,
+                                     proverka=request.POST.get("action") == "proverka")
+            ok = sum(1 for z in res if z.status in (z.OK, z.PROVERKA))
+            (messages.success if ok == len(res) else messages.warning)(
+                request, f"КРЭДО: {'подписано (проверка)' if request.POST.get('action') == 'proverka' else 'отправлено'}"
+                         f" {ok} из {len(res)}. Ошибки — в реестре писем.")
+        return redirect(f"{reverse('abonents:rassylka')}?{_qs(gorod=code, vid=vid, mes=mes, kanal=kanal)}")
+    if request.method == "POST":
+        if not can_send:
+            raise PermissionDenied
+        problem = pochta.gotovo()
+        nomera = [int(x) for x in request.POST.getlist("dog") if x.isdigit()]
+        if problem:
+            messages.error(request, problem)
+        elif not nomera:
+            messages.warning(request, "Не отмечено ни одного договора")
+        else:
+            doks = [d for d in (documents.sobrat(code, n, mesyac=mesyac) for n in nomera) if d]
+            ctx = _dok_context(doks[0]) if doks else {}
+            res = pochta.rassylka(code, nomera, vid, ctx, request.user.get_username(), mesyac=mesyac)
+            ok = sum(1 for z in res if z.status == z.OK)
+            (messages.success if ok == len(res) else messages.warning)(
+                request, f"Отправлено: {ok} из {len(res)}. Ошибки — в реестре писем.")
+        return redirect(f"{reverse('abonents:rassylka')}?{_qs(gorod=code, vid=vid, mes=mes)}")
+    m, g = (mesyac.mes, mesyac.god) if mesyac else (city.nom_mes, city.god)
+    rows = pochta.spisok(code, m, g, vid, mesyac=mesyac, kanal=kanal)
+    return render(request, "abonents/rassylka.html", {
+        "rows": rows, "vid": vid, "vidy": DOKUMENTY.items(), "title": DOKUMENTY[vid], "cities": cities, "city": city,
+        "mes": mes, "mesyacy": _mes_vybor(), "mes_name": (mesyac.nazvanie if mesyac else f"{city.name_mes} {city.god}"),
+        "kanal": kanal,
+        "can_send": can_send, "problem": pochta.gotovo() if kanal == Pismo.POCHTA else "",
+    })
+
+
+@login_required
+@view_required
+def pisma(request):
+    """Реестр отправленных писем (форма reestrmail): фильтр по месяцу и л/№,
+    открытие отправленного PDF."""
+    from .models import Pismo
+    qs = Pismo.objects.all()
+    mes = request.GET.get("mes", "")
+    if re.fullmatch(r"\d{4}-\d{2}", mes):
+        qs = qs.filter(god=int(mes[:4]), nom_mes=int(mes[5:]))
+    ls = request.GET.get("ls", "").strip()
+    if ls.isdigit():
+        qs = qs.filter(Q(potreb_id=int(ls)) | Q(nom_dog=int(ls)))
+    if request.GET.get("oshibki"):
+        qs = qs.filter(status=Pismo.OSHIBKA)
+    page = Paginator(qs, 50).get_page(request.GET.get("page"))
+    return render(request, "abonents/pisma.html", {"page": page, "mes": mes, "ls": ls,
+                                                   "oshibki": bool(request.GET.get("oshibki")),
+                                                   "goroda": dict((c.cod_gorod, c.name_gorod) for c in _cities())})
+
+
+@login_required
+@view_required
+def pismo_pdf(request, pk):
+    from pathlib import Path
+    from .models import Pismo
+    z = get_object_or_404(Pismo, pk=pk)
+    path = Path(z.fail) if z.fail else None
+    if path is None or not path.is_file():
+        raise Http404("Файл не найден")
+    response = HttpResponse(path.read_bytes(), content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="{path.name}"'
+    return response
+
+
+def _kredo_poluchit(cod_gor, user, xml=None):
+    """Получить показания (из сервиса или файла) и сохранить ответ."""
+    from . import kredo
+    from .models import KredoPriem
+    city = Danrasch.objects.get(cod_gorod=cod_gor)
+    if not city.nom_mes or not city.god:
+        raise kredo.KredoError("У участка не задан текущий месяц")
+    istochnik = KredoPriem.FAIL if xml is not None else KredoPriem.KREDO
+    if xml is None:
+        xml = kredo.zaprosit_pokazaniya(cod_gor, city.nom_mes, city.god)
+    rows = kredo.razobrat(xml)
+    return KredoPriem.objects.create(user=user, cod_gor=cod_gor, nom_mes=city.nom_mes, god=city.god,
+                                     istochnik=istochnik, xml=xml, strok=len(rows))
+
+
+@login_required
+@view_required
+def kredo_view(request):
+    """Обмен с КРЭДО: приём последних показаний приборов учёта за текущий
+    месяц участка (форма rric старой программы)."""
+    from . import kredo
+    from .models import KredoPriem
+    cities = _cities()
+    code = _current_city(request, cities)
+    city = next((c for c in cities if c.cod_gorod == code), None)
+    if city is None:
+        raise Http404
+    can_change = request.user.has_perm("catalogs.change_potreb")
+    if request.method == "POST":
+        if not can_change:
+            raise PermissionDenied
+        try:
+            xml = None
+            if request.POST.get("action") == "fail":
+                f = request.FILES.get("fail")
+                if not f:
+                    raise kredo.KredoError("Не выбран файл")
+                raw = f.read()
+                try:
+                    xml = raw.decode("utf-8-sig")
+                except UnicodeDecodeError:
+                    xml = raw.decode("cp1251")
+            z = _kredo_poluchit(code, request.user.get_username(), xml)
+        except kredo.KredoError as e:
+            messages.error(request, f"КРЭДО: {e}")
+            return redirect(f"{reverse('abonents:kredo')}?gorod={code}")
+        messages.success(request, f"Информацию о показаниях приборов учета получил: строк {z.strok}")
+        return redirect("abonents:kredo_priem", pk=z.pk)
+    try:
+        nast = kredo.nastrojki(code)
+    except kredo.KredoError as e:
+        nast = None
+        messages.warning(request, str(e))
+    return render(request, "abonents/kredo.html", {
+        "cities": cities, "city": city, "nast": nast, "can_change": can_change,
+        "priemy": KredoPriem.objects.filter(cod_gor=code)[:30],
+    })
+
+
+@login_required
+@view_required
+def kredo_priem(request, pk):
+    """Полученные показания рядом с картами лицевых и их разнос."""
+    from . import kredo
+    from .models import KredoPriem
+    z = get_object_or_404(KredoPriem, pk=pk)
+    city = Danrasch.objects.filter(cod_gorod=z.cod_gor).first()
+    stroki = kredo.sverit(kredo.razobrat(z.xml))
+    tekushchij = city is not None and (city.nom_mes, city.god) == (z.nom_mes, z.god)
+    can_change = request.user.has_perm("catalogs.change_potreb") and tekushchij
+    if request.method == "POST":
+        if not can_change:
+            raise PermissionDenied
+        nomera = {int(x) for x in request.POST.getlist("n") if x.isdigit()}
+        menshe = [s for s in stroki if s.nomer in nomera and s.status == kredo.MENSHE]
+        if not nomera:
+            messages.warning(request, "Не отмечено ни одной строки")
+        elif menshe and not request.POST.get("podtv"):
+            messages.error(request, "Текущее показание счетчика не может быть меньше предыдущего: "
+                                    "подтвердите разнос таких строк")
+        else:
+            with transaction.atomic():
+                izm = kredo.raznesti(stroki, nomera)
+                z.razneseno = timezone.now()
+                z.razn_user = request.user.get_username()
+                z.izmeneniya = z.izmeneniya + izm
+                z.save(update_fields=["razneseno", "razn_user", "izm"])
+            messages.success(request, f"Показания приборов учета по лицевым счетам разнесены: {len(izm)}")
+        return redirect("abonents:kredo_priem", pk=z.pk)
+    from collections import Counter
+    return render(request, "abonents/kredo_priem.html", {
+        "z": z, "city": city, "stroki": stroki, "can_change": can_change, "tekushchij": tekushchij,
+        "itogi": [(t, n) for k, t in kredo.STATUSY.items() if (n := Counter(s.status for s in stroki)[k])],
+    })
+
+
+@login_required
+@view_required
+def kredo_kody(request):
+    """Коды абонентов в КРЭДО по участку: список организаций КРЭДО и лицевые
+    с подходящей организацией (форма kredo старой программы)."""
+    from . import kredo, kredo_kody as kk
+    from .models import KredoOrg
+    cities = _cities()
+    code = _current_city(request, cities)
+    city = next((c for c in cities if c.cod_gorod == code), None)
+    if city is None:
+        raise Http404
+    can_change = request.user.has_perm("catalogs.change_potreb")
+    if request.method == "POST":
+        if not can_change:
+            raise PermissionDenied
+        try:
+            n = kk.obnovit_organizacii(code)
+            messages.success(request, f"Список организаций КРЭДО получен: {n}")
+        except kredo.KredoError as e:
+            messages.error(request, f"КРЭДО: {e}")
+        return redirect(f"{reverse('abonents:kredo_kody')}?gorod={code}")
+    filtr = request.GET.get("f", "net")
+    qs = Potreb.objects.filter(cod_gor=code).order_by("nom_dog", "potreb_id")
+    if filtr == "net":
+        qs = qs.filter(Q(org_in__isnull=True) | Q(org_in="") | Q(pid_in__isnull=True) | Q(pid_in=""))
+    elif filtr == "kredo":
+        qs = qs.filter(kredo_ras=True)
+    orgs = list(KredoOrg.objects.all())
+    po_fisk = {o.fiscode: o for o in orgs if o.fiscode}
+    po_acn = {o.rric_acn: o for o in orgs if o.rric_acn}
+    rows = []
+    for p in qs:
+        o = po_acn.get((p.rric_acn or "").strip()) or po_fisk.get(kk._fisk(p.fisk_cod))
+        rows.append((p, o))
+    return render(request, "abonents/kredo_kody.html", {
+        "cities": cities, "city": city, "can_change": can_change, "rows": rows, "filtr": filtr,
+        "orgs_n": len(orgs), "orgs_data": orgs[0].obnovleno if orgs else None,
+        "najdeno": sum(1 for _, o in rows if o),
+    })
+
+
+@login_required
+@view_required
+def kredo_kod(request, potreb_id):
+    """Подбор кодов КРЭДО одному лицевому: организация → представитель."""
+    from . import kredo, kredo_kody as kk
+    from .models import KredoOrg
+    p = get_object_or_404(Potreb.objects.select_related("cod_gor"), potreb_id=potreb_id)
+    code = p.cod_gor_id
+    can_change = request.user.has_perm("catalogs.change_potreb")
+    nazad = reverse("abonents:kredo_kod", args=[potreb_id])
+    if request.method == "POST":
+        if not can_change:
+            raise PermissionDenied
+        if request.POST.get("action") == "ochistit":
+            kk.ochistit(p)
+            messages.success(request, "Коды КРЭДО в карте очищены")
+            return redirect(nazad)
+        org = KredoOrg.objects.filter(org_id=request.POST.get("org", "")).first()
+        if org is None:
+            raise Http404
+        predst = None
+        pid = request.POST.get("pid", "")
+        if pid:
+            try:
+                predst = next((r for r in kk.predstaviteli(code, org.org_id) if r["pid"] == pid), None)
+            except kredo.KredoError as e:
+                messages.error(request, f"КРЭДО: {e}")
+                return redirect(f"{nazad}?org={org.org_id}")
+            if predst is None:
+                messages.error(request, "Представитель не найден в КРЭДО")
+                return redirect(f"{nazad}?org={org.org_id}")
+        kk.zapisat(p, org, predst)
+        messages.success(request, f"В карту записаны коды КРЭДО: {org.s_name}"
+                                  + (f", представитель {predst['fio']}" if predst else " (без представителя)"))
+        return redirect("abonents:karta", potreb_id=potreb_id)
+    q = (request.GET.get("q") or "").strip()
+    kandidaty = kk.najti(p)
+    poisk = []
+    if q:
+        poisk = [o for o in KredoOrg.objects.all() if q.lower().replace(" ", "") in (o.s_name or "").lower().replace(" ", "")
+                 or q == o.fiscode or q == o.rric_acn][:50]
+    org = KredoOrg.objects.filter(org_id=request.GET.get("org", "")).first()
+    if org is None and len(kandidaty) == 1 and not q:
+        org = kandidaty[0]
+    predst, oshibka = [], None
+    if org is not None:
+        try:
+            predst = kk.predstaviteli(code, org.org_id)
+        except kredo.KredoError as e:
+            oshibka = str(e)
+    return render(request, "abonents/kredo_kod.html", {
+        "p": p, "can_change": can_change, "kandidaty": kandidaty, "poisk": poisk, "q": q,
+        "org": org, "predst": predst, "oshibka": oshibka, "orgs_n": KredoOrg.objects.count(),
     })

@@ -28,9 +28,10 @@ CATALOG_ORDER = [
     "seturdevice",        # Информация о приборах учёта
     "seturplomblist",     # Справочник пломб
     "podpisant",          # Подписанты документов (новый, в старой программе были вписаны в отчеты)
+    "nastroika",          # Настройки программы (новый: папка для 1С); меняет только Администратор
 ]
 # Справочники веб-программы, которых нет в базе старой программы.
-EXTRA_MODELS = [("abonents", "Podpisant"), ("abonents", "TarifGorod")]
+EXTRA_MODELS = [("abonents", "Podpisant"), ("abonents", "TarifGorod"), ("abonents", "Nastroika")]
 
 # Поля, которые не показываются ни в справочниках, ни в админке.
 SECRET_FIELDS = {"password"}

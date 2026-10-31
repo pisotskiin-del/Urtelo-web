@@ -2,7 +2,9 @@
 {% block title %}Карта договора № {{ nom_dog }}{% endblock %}
 {% block content %}
 <p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a> /</p>
-<h1>Карта договора № {{ nom_dog }}, {{ city.name_gorod }}</h1>
+<div class="page-head"><h1>Карта договора № {{ nom_dog }}, {{ city.name_gorod }}</h1>
+  <div class="actions"><a class="button" href="{% url 'abonents:dokument' city.cod_gorod nom_dog 'schet' %}">Информация-счёт</a><a class="button" href="{% url 'abonents:dokument' city.cod_gorod nom_dog 'akt' %}">Акт</a></div>
+</div>
 <div class="scroll">
 <table class="grid">
   <thead><tr><th>№-лиц</th><th>Наименование потребителя</th><th>к оплате</th><th>отоп. пр.</th><th>отоп. наг.</th><th>нач. ГВС</th><th>потери пр.</th><th>потери наг.</th><th>катег. абон.</th><th>адрес объекта</th></tr></thead>

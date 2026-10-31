@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}{{ zagolovok }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1>{{ zagolovok }}</h1></div>
+<div class="msg error">{{ tekst }}</div>
+{% if podrobno %}<p class="muted">{{ podrobno }}</p>{% endif %}
+<p><a href="javascript:history.back()">← Назад</a> · <a href="/">На главную</a></p>
+{% endblock %}

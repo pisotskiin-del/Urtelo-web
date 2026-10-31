@@ -1,0 +1,51 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Показания из КРЭДО{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a><span class="sep">›</span><a href="{% url 'abonents:kredo' %}?gorod={{ z.cod_gor }}">КРЭДО</a><span class="sep">›</span>{{ z.created|date:"d.m.Y H:i" }}</p>
+<div class="page-head"><h1>Показания приборов учета из КРЭДО</h1></div>
+<p>{{ city.name_gorod }}, за {{ z.nom_mes|stringformat:"02d" }}.{{ z.god }}; получено {{ z.created|date:"d.m.Y H:i" }} ({{ z.user }}), строк {{ stroki|length }}:
+  {% for t, n in itogi %}{{ t }} — {{ n }}{% if not forloop.last %}; {% endif %}{% endfor %}.</p>
+{% if z.razneseno %}<p class="msg">Разнесено {{ z.razneseno|date:"d.m.Y H:i" }} ({{ z.razn_user }}), изменено лицевых: {{ z.izmeneniya|length }}.</p>{% endif %}
+{% if not tekushchij %}<p class="msg warning">Показания получены за другой месяц: разносить их в карты нельзя.</p>{% endif %}
+<form method="post" id="razn">{% csrf_token %}<input type="hidden" name="podtv" value="">
+<div class="scroll"><table class="grid">
+  <thead><tr><th>{% if can_change %}<input type="checkbox" onclick="document.querySelectorAll('input[name=n]').forEach(c => { if (!c.disabled && c.dataset.st === 'novoe') c.checked = this.checked; })" title="Отметить новые">{% endif %}</th>
+    <th>Город</th><th>Л/№</th><th>Абонент</th><th>Точка потребления</th><th>№ счетчика</th>
+    <th class="num">Пред. пок.</th><th class="num">Тек. пок.</th><th class="num">Расход</th><th>Дата пок.</th>
+    <th class="num">Сейчас в карте</th><th>Дата в карте</th><th></th></tr></thead>
+  <tbody>
+  {% for s in stroki %}
+    <tr{% if s.status == "menshe" or s.status == "oshibka" or s.status == "net" %} class="err"{% endif %}>
+      <td>{% if can_change %}<input type="checkbox" name="n" value="{{ s.nomer }}" data-st="{{ s.status }}"{% if s.otmetit %} checked{% endif %}{% if not s.mozhno %} disabled{% endif %}>{% endif %}</td>
+      <td>{{ s.p.cod_gor.name_gorod|default:"" }}</td>
+      <td class="num">{% if s.p %}<a href="{% url 'abonents:karta' s.p.potreb_id %}">{{ s.p.potreb_id }}</a>{% else %}{{ s.r.p_kod }}{% endif %}</td>
+      <td class="wrap">{{ s.p.name_potre|default:"" }}</td>
+      <td class="wrap">{{ s.p.glav_potre|default:"" }}</td>
+      <td>{{ s.r.d_num }}</td>
+      <td class="num">{{ s.r.prev_pok|default_if_none:"" }}</td>
+      <td class="num"><b>{{ s.r.cur_pok|default_if_none:"" }}</b></td>
+      <td class="num">{{ s.rashod|default_if_none:"" }}</td>
+      <td>{{ s.r.date_pok|date:"d.m.Y" }}</td>
+      <td class="num">{{ s.p.pok_new|default_if_none:"" }}</td>
+      <td>{{ s.p.date_pok|date:"d.m.Y" }}</td>
+      <td>{{ s.status_text }}{% if s.dubl %}; {% if s.posled %}последнее из нескольких{% else %}<b>несколько показаний на лицевой — отметьте одно</b>{% endif %}{% endif %}</td>
+    </tr>
+  {% empty %}<tr><td colspan="13" class="muted">В ответе КРЭДО нет показаний</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+{% if can_change and stroki %}
+<p><button class="primary" onclick="return razn(this.form)">{% icon "save" %} Разнести отмеченные показания по лицевым счетам</button>
+  <span class="muted">Отмечены новые показания. Показание меньше того, что в карте, разносится только после подтверждения.</span></p>
+{% endif %}
+</form>
+<script>
+function razn(f) {
+  const menshe = [...f.querySelectorAll('input[name=n]:checked')].filter(c => c.dataset.st === 'menshe').length;
+  if (menshe) {
+    if (!confirm('Текущее показание счетчика не может быть меньше предыдущего (строк: ' + menshe + '). Все равно загрузить?')) return false;
+    f.podtv.value = '1';
+  }
+  return confirm('Записать отмеченные показания в карты лицевых счетов?');
+}
+</script>
+{% endblock %}

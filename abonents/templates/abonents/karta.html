@@ -10,9 +10,18 @@
       <span class="pos">{{ nav.position }} из {{ nav.total }}</span>
       {% if nav.next %}<a class="button" id="nav-next" href="{% url 'abonents:karta' nav.next %}?tab={{ tab }}" title="Следующий (PageDown)">Следующий {% icon "next" %}</a><a class="button" href="{% url 'abonents:karta' nav.last %}?tab={{ tab }}" title="Последняя запись">{% icon "last" %}</a>{% else %}<span class="button off">Следующий {% icon "next" %}</span><span class="button off">{% icon "last" %}</span>{% endif %}
     </span>
+    {% if p.nom_dog and p.cod_gor_id %}<a class="button" href="{% url 'abonents:dokument' p.cod_gor_id p.nom_dog 'schet' %}?ls={{ p.potreb_id }}" title="Информация-счёт по договору за текущий месяц">{% icon "file" %} Счёт</a><a class="button" href="{% url 'abonents:dokument' p.cod_gor_id p.nom_dog 'akt' %}?ls={{ p.potreb_id }}" title="Акт о фактическом потреблении за текущий месяц">{% icon "file" %} Акт</a>{% endif %}
+    {% if can_change %}<a class="button" href="{% url 'abonents:kredo_kod' p.potreb_id %}" title="Найти организацию и представителя абонента в КРЭДО и записать их коды в карту">{% icon "open" %} Коды КРЭДО</a>{% endif %}
     {% if can_change %}<a class="button primary" href="{% url 'abonents:edit' p.potreb_id %}?tab={{ tab }}">{% icon "edit" %} Изменить</a>{% endif %}
     {% if can_delete %}<a class="button danger" href="{% url 'abonents:delete' p.potreb_id %}">{% icon "trash" %} Удалить</a>{% endif %}
   </div>
 </div>
 {% include "abonents/_card.html" %}
+{% if can_change %}<script>
+function pokPodtv(f) {
+  var staroe = f.dataset.staroe || "пусто", novoe = f.znach.value.trim() || "пусто";
+  if (novoe === staroe) return false;
+  return confirm("Сохранить показания?\n\nБыло: " + staroe + "\nСтало: " + novoe);
+}
+</script>{% endif %}
 {% endblock %}

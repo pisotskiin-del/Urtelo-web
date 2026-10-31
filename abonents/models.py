@@ -8,7 +8,11 @@ from django.db import models
 class MesArhiv(models.Model):
     """Архив закрытого месяца (в старой программе — файлы Arhiv\\PoMMГГГГ.dbf,
     DaMMГГГГ.dbf, OtMMГГГГ.dbf, taMMГГГГ.dbf). Хранит состояние таблиц на момент
-    перехода на новый месяц; по нему можно отменить последний переход."""
+    перехода на новый месяц; по нему можно отменить последний переход.
+    Месяцы, закрытые в старой программе, загружаются из файлов Arhiv командой
+    arhiv_import (источник «dbf»): они нужны отчетам за период, отменять их нельзя."""
+
+    WEB, DBF = "web", "dbf"
 
     nom_mes = models.IntegerField("Месяц")
     god = models.IntegerField("Год")
@@ -17,6 +21,8 @@ class MesArhiv(models.Model):
     potreb_count = models.IntegerField("Абонентов", default=0)
     nac_vsego = models.DecimalField("Начислено всего", max_digits=14, decimal_places=3, default=0)
     data = models.BinaryField("Таблицы (gzip JSON)")
+    istochnik = models.CharField("Источник", max_length=3, default=WEB,
+                                 choices=[(WEB, "Новая программа"), (DBF, "Архив старой программы")])
 
     class Meta:
         verbose_name = "Архив месяца"
@@ -45,11 +51,13 @@ class Podpisant(models.Model):
     VED_SPEC = "ved"
     ISPOLNITEL = "isp"
     PRIBORY = "pribor"
+    AKT = "akt"
     ROLI = [
         (UTVERJDAU, "Утверждаю (гриф отчета)"),
         (VED_SPEC, "Подпись отчетов (ведущий специалист)"),
         (ISPOLNITEL, "Исполнитель"),
         (PRIBORY, "Отчеты по приборам учета (инспектор, контролер)"),
+        (AKT, "Акт о потреблении: «в лице …» (должность и Ф.И.О. в родительном падеже)"),
     ]
 
     rol = models.CharField("Где подписывает", max_length=10, choices=ROLI)
@@ -77,6 +85,63 @@ class Podpisant(models.Model):
         p = next((r for r in rows if code is not None and r.gorod == code), None) or \
             next((r for r in rows if r.gorod is None), None)
         return ((p.doljnost or "").strip(), (p.fio or "").strip()) if p else ("", "")
+
+
+class Nastroika(models.Model):
+    """Настройки программы (одна запись), меняет Администратор в
+    «Справочниках»: папка для выгрузки в 1С и сертификаты КРЭДО по участкам."""
+
+    papka_1c = models.CharField(
+        "Папка для выгрузки в 1С", max_length=255, blank=True,
+        help_text="Сюда при переходе на новый месяц записывается файл Abpt<ГГ><ММ>.dbf. "
+                  "Пусто — файл только скачивается в «Закрытых месяцах».")
+
+    kredo_cert_ryb = models.CharField("КРЭДО, Рыбница: имя сертификата", max_length=100, blank=True,
+                                      help_text="Имя (CN) сертификата участка в хранилище «Личные» Windows")
+    kredo_thumb_ryb = models.CharField("КРЭДО, Рыбница: отпечаток сертификата", max_length=100, blank=True,
+                                       help_text="Свойства сертификата → Состав → Отпечаток (пробелы можно оставить)")
+    kredo_org_ryb = models.CharField("КРЭДО, Рыбница: код организации-отправителя (org_out)", max_length=40, blank=True)
+    kredo_pid_ryb = models.CharField("КРЭДО, Рыбница: код представителя-отправителя (pid_out)", max_length=40, blank=True)
+    kredo_cert_dub = models.CharField("КРЭДО, Дубоссары: имя сертификата", max_length=100, blank=True,
+                                      help_text="Имя (CN) сертификата участка в хранилище «Личные» Windows")
+    kredo_thumb_dub = models.CharField("КРЭДО, Дубоссары: отпечаток сертификата", max_length=100, blank=True,
+                                       help_text="Свойства сертификата → Состав → Отпечаток (пробелы можно оставить)")
+    kredo_org_dub = models.CharField("КРЭДО, Дубоссары: код организации-отправителя (org_out)", max_length=40, blank=True)
+    kredo_pid_dub = models.CharField("КРЭДО, Дубоссары: код представителя-отправителя (pid_out)", max_length=40, blank=True)
+    kredo_cert_kam = models.CharField("КРЭДО, Каменка: имя сертификата", max_length=100, blank=True,
+                                      help_text="Имя (CN) сертификата участка в хранилище «Личные» Windows")
+    kredo_thumb_kam = models.CharField("КРЭДО, Каменка: отпечаток сертификата", max_length=100, blank=True,
+                                       help_text="Свойства сертификата → Состав → Отпечаток (пробелы можно оставить)")
+    kredo_org_kam = models.CharField("КРЭДО, Каменка: код организации-отправителя (org_out)", max_length=40, blank=True)
+    kredo_pid_kam = models.CharField("КРЭДО, Каменка: код представителя-отправителя (pid_out)", max_length=40, blank=True)
+
+    class Meta:
+        verbose_name = "Настройки программы"
+        verbose_name_plural = "Настройки программы"
+        ordering = ["pk"]
+
+    def __str__(self):
+        return "Настройки программы"
+
+    @classmethod
+    def papka(cls):
+        """Папка для 1С: из настроек программы, иначе TEPLO_1C_DIR."""
+        from django.conf import settings
+        n = cls.objects.order_by("pk").first()
+        return ((n.papka_1c if n else "") or getattr(settings, "TEPLO_1C_DIR", "") or "").strip()
+
+    UCHASTOK = {1: "ryb", 2: "dub", 3: "kam"}
+
+    @classmethod
+    def kredo(cls, cod_gor):
+        """Сертификат и отправитель КРЭДО участка: {cert, thumb, org, pid};
+        пустые поля настроек — None (тогда берутся значения по умолчанию)."""
+        k = cls.UCHASTOK.get(cod_gor)
+        n = cls.objects.order_by("pk").first()
+        if not k or n is None:
+            return {"cert": None, "thumb": None, "org": None, "pid": None}
+        znach = lambda pole: (getattr(n, f"kredo_{pole}_{k}") or "").strip() or None
+        return {"cert": znach("cert"), "thumb": znach("thumb"), "org": znach("org"), "pid": znach("pid")}
 
 
 class TarifGorod(models.Model):
@@ -109,3 +174,112 @@ class TarifGorod(models.Model):
         out = {t.id_tar: (t.zn_tar or 0, t.diz_tar or 0) for t in Tarif.objects.exclude(id_tar=None)}
         out.update({t.id_tar: (t.zn_tar or 0, t.diz_tar or 0) for t in cls.objects.filter(gorod=code)})
         return out
+
+
+class Pismo(models.Model):
+    """Журнал отправки документов абонентам по почте (реестр отправленных
+    писем reestrmail старой программы). Каждая попытка — запись: удачная или
+    с текстом ошибки. Номер записи — номер документа в «Информации-счёте»;
+    первый номер задается TEPLO_PISMO_NOMER (чтобы продолжить нумерацию
+    старой программы)."""
+
+    OK, OSHIBKA, PROVERKA = "ok", "err", "chk"
+    POCHTA, KREDO = "mail", "kredo"
+
+    nomer = models.IntegerField("Номер документа", unique=True)
+    kanal = models.CharField("Куда", max_length=5, default=POCHTA,
+                             choices=[(POCHTA, "Почта"), (KREDO, "КРЭДО")])
+    created = models.DateTimeField("Отправлено", auto_now_add=True)
+    user = models.CharField("Кто отправил", max_length=150, blank=True)
+    cod_gor = models.IntegerField("Участок")
+    nom_dog = models.IntegerField("Договор №")
+    potreb_id = models.IntegerField("Л/№")
+    name_potre = models.CharField("Потребитель", max_length=120, blank=True)
+    email = models.CharField("Адрес", max_length=254, blank=True)
+    vid = models.CharField("Документ", max_length=10)
+    nom_mes = models.IntegerField("Месяц")
+    god = models.IntegerField("Год")
+    status = models.CharField("Результат", max_length=3,
+                              choices=[(OK, "Отправлено"), (OSHIBKA, "Ошибка"), (PROVERKA, "Проверка (не отправлялось)")])
+    oshibka = models.TextField("Ошибка", blank=True)
+    otvet = models.TextField("Ответ КРЭДО", blank=True)
+    fail = models.CharField("Файл PDF", max_length=500, blank=True)
+
+    class Meta:
+        verbose_name = "Отправленное письмо"
+        verbose_name_plural = "Реестр отправленных писем"
+        ordering = ["-pk"]
+
+    def __str__(self):
+        return f"№ {self.nomer} {self.name_potre} {self.nom_mes:02d}.{self.god}"
+
+    @classmethod
+    def sleduyushchij_nomer(cls):
+        from django.conf import settings
+        last = cls.objects.aggregate(m=models.Max("nomer"))["m"]
+        return last + 1 if last else int(getattr(settings, "TEPLO_PISMO_NOMER", 1) or 1)
+
+
+class KredoPriem(models.Model):
+    """Полученные из КРЭДО показания приборов учёта (кнопки «Прием
+    информации о последних показаниях…» и «Разнести…» формы rric). Ответ
+    сервиса хранится целиком; при разносе записывается, что изменено."""
+
+    KREDO, FAIL = "kredo", "fail"
+
+    created = models.DateTimeField("Получено", auto_now_add=True)
+    user = models.CharField("Кто получил", max_length=150, blank=True)
+    cod_gor = models.IntegerField("Участок")
+    nom_mes = models.IntegerField("Месяц")
+    god = models.IntegerField("Год")
+    istochnik = models.CharField("Источник", max_length=5, default=KREDO,
+                                 choices=[(KREDO, "Сервис КРЭДО"), (FAIL, "Файл XML")])
+    xml = models.TextField("Ответ сервиса")
+    strok = models.IntegerField("Строк", default=0)
+    razneseno = models.DateTimeField("Разнесено", null=True, blank=True)
+    razn_user = models.CharField("Кто разнёс", max_length=150, blank=True)
+    # JSON в текстовом поле: SQLite в Python для Windows бывает без расширения JSON1.
+    izm = models.TextField("Изменения (JSON)", default="[]", blank=True)
+
+    class Meta:
+        verbose_name = "Показания из КРЭДО"
+        verbose_name_plural = "Показания из КРЭДО"
+        ordering = ["-pk"]
+
+    def __str__(self):
+        return f"{self.created:%d.%m.%Y %H:%M} участок {self.cod_gor}, {self.nom_mes:02d}.{self.god}"
+
+    @property
+    def izmeneniya(self):
+        """[[л/№, было, стало, дата было, дата стало]] — что изменено при разносе."""
+        import json
+        try:
+            return json.loads(self.izm or "[]")
+        except ValueError:
+            return []
+
+    @izmeneniya.setter
+    def izmeneniya(self, value):
+        import json
+        self.izm = json.dumps(value, ensure_ascii=False)
+
+
+class KredoOrg(models.Model):
+    """Юрлица и ИП, зарегистрированные в КРЭДО (Kredo_MainOrgs,
+    Kredo_MainIndividuals): список для подбора кодов абонентов."""
+
+    org_id = models.CharField("Код организации (org_id)", max_length=36)
+    s_name = models.CharField("Наименование", max_length=250, blank=True)
+    rric_acn = models.CharField("Лицевой № в КРЭДО", max_length=10, blank=True)
+    fiscode = models.CharField("Фискальный код", max_length=20, blank=True)
+    adr_full = models.CharField("Адрес", max_length=250, blank=True)
+    ip = models.BooleanField("Индивидуальный предприниматель", default=False)
+    obnovleno = models.DateTimeField("Получено", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Организация в КРЭДО"
+        verbose_name_plural = "Организации в КРЭДО"
+        ordering = ["s_name"]
+
+    def __str__(self):
+        return self.s_name

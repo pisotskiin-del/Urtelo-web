@@ -1,0 +1,25 @@
+<div class="dok-title"><b>АКТ</b><br>о фактическом потреблении тепловой энергии<br>по договору № {{ dok.nom_dog }} от {{ dok.glav.data_dog|date:"d.m.Y" }}</div>
+<table class="dok-row"><tr><td>г.{{ dok.gorod.name_gorod|default:"" }}</td><td class="r">{{ dok.data|date:"d.m.Y" }}</td></tr></table>
+<p class="dok-text">Мы, нижеподписавшиеся, МГУП "Тирастеплоэнерго", в лице {{ akt_lico }}{% if dov %}, действующего на основании доверенности № {{ dov.0 }} от {{ dov.1|date:"d.m.Y" }},{% else %},{% endif %}
+с одной стороны, и {{ dok.glav.name_potre|default:"" }}, в лице {{ dok.glav.doljn_podp|default:"" }} {{ dok.glav.direktor|default:"" }} с другой стороны,
+составили настоящий акт в том, что в {{ dok.mes_pr }} {{ dok.god }} года было отпущено тепловой энергии:</p>
+<table class="dok-tab">
+  <thead><tr><th width="6%">№</th><th width="{% if dok.akt_staryi %}46{% else %}26{% endif %}%">Наименование объекта теплоснабжения</th>{% if not dok.akt_staryi %}<th width="20%">Адрес</th>{% endif %}<th width="12%">Отопл. Гкал</th><th width="12%">Подогр. воды Гкал</th><th width="12%">Потери Гкал</th><th width="12%">Итого, Гкал</th></tr></thead>
+  {% for k in dok.kategorii %}
+  <tbody>
+    {% for s in k.stroki %}
+    <tr><td class="num">{{ s.p.potreb_id }}</td><td>{{ s.p.nameobakt|default:"" }}</td>{% if not dok.akt_staryi %}<td>{{ s.adres }}</td>{% endif %}
+      <td class="num">{{ s.otopl|floatformat:3 }}</td><td class="num">{{ s.gvs|floatformat:3 }}</td><td class="num">{{ s.poteri|floatformat:3 }}</td><td class="num">{{ s.gkal|floatformat:3 }}</td></tr>
+    {% endfor %}
+    <tr class="dok-sub"><td></td><td>{{ k.name }}</td>{% if not dok.akt_staryi %}<td>{% if k.tarif is not None %}тариф {{ k.tarif|floatformat:2 }} руб.{% endif %}</td>{% endif %}
+      <td class="num">{{ k.otopl|floatformat:3 }}</td><td class="num">{{ k.gvs|floatformat:3 }}</td><td class="num">{{ k.poteri|floatformat:3 }}</td><td class="num">{{ k.gkal|floatformat:3 }}</td></tr>
+  </tbody>
+  {% endfor %}
+  <tfoot><tr><th></th><th class="left" {% if not dok.akt_staryi %}colspan="2"{% endif %}>ИТОГО Гкал:</th>
+    <th class="num">{{ dok.otopl|floatformat:3 }}</th><th class="num">{{ dok.gvs|floatformat:3 }}</th><th class="num">{{ dok.poteri|floatformat:3 }}</th><th class="num">{{ dok.gkal|floatformat:3 }}</th></tr></tfoot>
+</table>
+<table class="dok-signs"><tr>
+  <td>{{ ved.0|default:"Ведущий специалист" }} СУиРТЭ<br><br>__________________ {{ ved.1 }}</td>
+  <td>{{ dok.glav.name_potre|default:"" }}<br>{{ dok.glav.doljn_podp|default:"" }}<br>__________________ {{ dok.glav.direktor|default:"" }}</td>
+</tr></table>
+<p class="dok-foot">Исполнитель {{ isp.1 }} тел. {{ org.telefon }}</p>

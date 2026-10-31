@@ -1,4 +1,4 @@
-{% load ui %}{% if form %}<section class="card karta-head{% if otkluchen %} otkl{% endif %}">{% if otkluchen %}<p class="otkl-note"><span class="chip off">Лицевой счет: {{ p.d_stat_val|default:"отключен" }}</span></p>{% endif %}
+{% load ui %}{% if form %}<section class="card karta-head{% if otkluchen %} otkl{% endif %}">{% if otkluchen %}<p class="otkl-note"><span class="chip {% if p.d_stat == 63 %}rastorg{% elif p.d_stat == 61 %}priost{% else %}off{% endif %}">Лицевой счет: {{ p.d_stat_val|default:"отключен" }}</span></p>{% endif %}
   <div class="kgrid">{% include "abonents/_fields.html" with items=header %}</div>
   {% if p.nom_dog %}<p class="links"><a href="{% url 'abonents:dogovor' p.cod_gor_id p.nom_dog %}?ls={{ p.potreb_id }}">{% icon "file" %} Карта договора № {{ p.nom_dog }}</a>
     {% if p.nom_dogab %}<a href="{% url 'abonents:index' %}?gorod={{ p.cod_gor_id }}&sub={{ p.nom_dogab }}">{% icon "users" %} Все субабоненты абонента № {{ p.nom_dogab }}</a>{% endif %}</p>{% endif %}
@@ -14,7 +14,7 @@
       </div>
       <div class="nm">{{ p.name_potre|default:"Без наименования" }}</div>
       <div class="chips">
-        {% if otkluchen %}<span class="chip {% if p.d_stat == 61 %}warn{% else %}off{% endif %}">Лицевой счет: {{ p.d_stat_val|default:"отключен" }}</span>{% elif p.d_stat == 60 %}<span class="chip ok">{% icon "shield" %} Заключен</span>{% endif %}
+        {% if otkluchen %}<span class="chip {% if p.d_stat == 63 %}rastorg{% elif p.d_stat == 61 %}priost{% else %}off{% endif %}">Лицевой счет: {{ p.d_stat_val|default:"отключен" }}</span>{% elif p.d_stat == 60 %}<span class="chip ok">{% icon "shield" %} Заключен</span>{% endif %}
         {% if hero.kategor %}<span class="chip cat">{{ hero.kategor }}</span>{% endif %}
       </div>
     </div>
@@ -25,7 +25,7 @@
   {% if p.nom_dog %}<p class="links"><a href="{% url 'abonents:dogovor' p.cod_gor_id p.nom_dog %}?ls={{ p.potreb_id }}">{% icon "file" %} Карта договора № {{ p.nom_dog }}</a>
     {% if p.nom_dogab %}<a href="{% url 'abonents:index' %}?gorod={{ p.cod_gor_id }}&sub={{ p.nom_dogab }}">{% icon "users" %} Все субабоненты абонента № {{ p.nom_dogab }}</a>{% endif %}</p>{% endif %}
 </section>{% endif %}
-<nav class="tabs">
+<nav class="tabs karta-tabs">
   {% for key, title in tabs %}<a href="{{ tab_url }}?tab={{ key }}" {% if key == tab %}class="active"{% endif %}>{% tab_icon key %} {{ title }}</a>{% endfor %}
 </nav>
 {% if not form %}{% if tab == "otop" %}<div class="tabtools"><a class="button" href="{% url 'abonents:poteri' p.potreb_id %}">{% icon "gauge" %} Диаметр/длина для расч. потерь</a>

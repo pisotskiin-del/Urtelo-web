@@ -1,0 +1,34 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Коды КРЭДО: {{ p.name_potre }}{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{% url 'abonents:karta' p.potreb_id %}">Карточка абонента</a><span class="sep">›</span><a href="{% url 'abonents:kredo_kody' %}?gorod={{ p.cod_gor_id }}">КРЭДО: коды абонентов</a><span class="sep">›</span>{{ p.potreb_id }}</p>
+<div class="page-head"><h1>Коды КРЭДО: {{ p.name_potre }}</h1></div>
+<section class="card">
+  <p>Л/с <b>{{ p.potreb_id }}</b>, договор № {{ p.nom_dog|default:"—" }}, фискальный код {{ p.fisk_cod|default:"—" }}, лицевой № в КРЭДО {{ p.rric_acn|default:"—" }}.</p>
+  <p>Сейчас в карте: организация <b>{{ p.org_in|default:"—" }}</b>, представитель <b>{{ p.pid_in|default:"—" }}</b>{% if p.users_name %} ({{ p.users_name }}{% if p.pos_name %}, {{ p.pos_name }}{% endif %}){% endif %}.</p>
+  {% if can_change and p.org_in %}<form method="post" class="actions">{% csrf_token %}<button name="action" value="ochistit" onclick="return confirm('Очистить коды КРЭДО в карте?')">Очистить коды</button></form>{% endif %}
+</section>
+{% if not orgs_n %}<div class="msg warning">Список организаций КРЭДО ещё не получен. Получите его на странице <a href="{% url 'abonents:kredo_kody' %}?gorod={{ p.cod_gor_id }}">КРЭДО: коды абонентов</a>.</div>{% endif %}
+<h2>1. Организация</h2>
+{% if kandidaty %}<p>Подходят по фискальному коду или лицевому № в КРЭДО:</p>
+<ul>{% for o in kandidaty %}<li><a href="?org={{ o.org_id }}"{% if org and o.org_id == org.org_id %} style="font-weight:bold"{% endif %}>{{ o.s_name }}</a> <span class="muted">{% if o.ip %}ИП, {% endif %}фиск. код {{ o.fiscode|default:"—" }}, л/с КРЭДО {{ o.rric_acn|default:"—" }}, {{ o.adr_full }}</span></li>{% endfor %}</ul>
+{% else %}<p class="muted">По фискальному коду и лицевому № в КРЭДО организация не найдена. Найдите её по названию.</p>{% endif %}
+<form method="get" class="actions"><label>Найти по названию, фискальному коду или л/с КРЭДО <input name="q" value="{{ q }}" size="40"></label><button>Найти</button></form>
+{% if q %}<ul>{% for o in poisk %}<li><a href="?org={{ o.org_id }}&amp;q={{ q|urlencode }}">{{ o.s_name }}</a> <span class="muted">{% if o.ip %}ИП, {% endif %}фиск. код {{ o.fiscode|default:"—" }}, {{ o.adr_full }}</span></li>{% empty %}<li class="muted">Ничего не найдено</li>{% endfor %}</ul>{% endif %}
+{% if org %}
+<h2>2. Представитель: {{ org.s_name }}</h2>
+{% if oshibka %}<div class="msg error">КРЭДО: {{ oshibka }}</div>{% endif %}
+<form method="post">{% csrf_token %}<input type="hidden" name="org" value="{{ org.org_id }}">
+<div class="scroll"><table class="grid">
+  <thead><tr><th></th><th>Ф.И.О.</th><th>Должность</th></tr></thead>
+  <tbody>
+  {% for r in predst %}<tr><td><input type="radio" name="pid" value="{{ r.pid }}" id="pid{{ forloop.counter }}"{% if r.pid == p.pid_in or predst|length == 1 %} checked{% endif %}></td>
+    <td><label for="pid{{ forloop.counter }}">{{ r.l_name }} {{ r.f_name }} {{ r.m_name }}</label></td><td>{{ r.pos_name }}</td></tr>
+  {% empty %}<tr><td colspan="3" class="muted">{% if not oshibka %}В КРЭДО у организации нет зарегистрированных представителей{% endif %}</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+{% if can_change %}<p class="actions"><button class="primary">Записать коды в карту</button>
+  <span class="muted">Без выбранного представителя запишется только код организации.</span></p>{% endif %}
+</form>
+{% endif %}
+{% endblock %}

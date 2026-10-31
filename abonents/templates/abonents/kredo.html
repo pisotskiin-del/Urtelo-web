@@ -1,0 +1,35 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}КРЭДО: показания приборов{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a><span class="sep">›</span>КРЭДО<span class="sep">›</span>КРЭДО</p>
+<div class="page-head"><h1>КРЭДО: показания приборов учета</h1></div>
+<nav class="tabs">{% for c in cities %}<a href="?gorod={{ c.cod_gorod }}" {% if c.cod_gorod == city.cod_gorod %}class="active"{% endif %}>{{ c.name_gorod }}</a>{% endfor %}</nav>
+<section class="card">
+  <p>Последние показания приборов учета абонентов участка за <b>{{ city.name_mes }} {{ city.god }}</b>
+    из АПК «КРЭДО» (процедура Kredo_DeviceMeters_Info{% if nast %}, организация {{ nast.comorg }}, сертификат {{ nast.cert }}{% endif %}).
+    Сначала показания только принимаются и показываются рядом с картами; в карты они записываются кнопкой «Разнести».</p>
+  {% if can_change and nast %}
+  <form method="post" class="actions">{% csrf_token %}
+    <button class="primary" name="action" value="kredo" onclick="this.disabled=true;this.textContent='Запрос к КРЭДО…';this.form.submit()">{% icon "open" %} Получить показания из КРЭДО</button>
+  </form>
+  <form method="post" enctype="multipart/form-data" class="actions" style="margin-top:12px">{% csrf_token %}
+    <label>или из файла ответа (XML) <input type="file" name="fail" accept=".xml,text/xml"></label>
+    <button name="action" value="fail">Загрузить файл</button>
+  </form>
+  <p class="muted">Запрос работает на компьютере с COM-объектом РРИЦ (RRIC_COM_OBJECT) и сертификатом участка в хранилище
+    пользователя Windows, под которым запущена программа.</p>
+  {% endif %}
+</section>
+<h2>Полученные показания</h2>
+<div class="scroll"><table class="grid">
+  <thead><tr><th>Получено</th><th>Кто</th><th>Месяц</th><th>Источник</th><th class="num">Строк</th><th>Разнесено</th><th></th></tr></thead>
+  <tbody>
+  {% for z in priemy %}
+    <tr><td>{{ z.created|date:"d.m.Y H:i" }}</td><td>{{ z.user }}</td><td>{{ z.nom_mes|stringformat:"02d" }}.{{ z.god }}</td>
+      <td>{{ z.get_istochnik_display }}</td><td class="num">{{ z.strok }}</td>
+      <td>{% if z.razneseno %}{{ z.razneseno|date:"d.m.Y H:i" }} ({{ z.razn_user }}), лицевых: {{ z.izmeneniya|length }}{% endif %}</td>
+      <td><a href="{% url 'abonents:kredo_priem' z.pk %}">открыть</a></td></tr>
+  {% empty %}<tr><td colspan="7" class="muted">Показаний ещё не получали</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}
