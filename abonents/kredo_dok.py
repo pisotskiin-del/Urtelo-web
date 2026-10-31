@@ -51,11 +51,14 @@ LOGO = Path(__file__).with_name("data") / "kredo_logo.png"
 
 def otpravitel(cod_gor):
     """GUID организации и представителя-отправителя участка в КРЭДО."""
+    from .models import Nastroika
+    n = Nastroika.kredo(cod_gor)
     o = (getattr(settings, "TEPLO_KREDO_OTPRAVITEL", {}) or {}).get(cod_gor) or {}
-    if not o.get("org") or not o.get("pid"):
-        raise kredo.KredoError(f"Для участка {cod_gor} не задан отправитель в КРЭДО "
-                               f"(TEPLO_KREDO_ORG_OUT_*, TEPLO_KREDO_PID_OUT_*)")
-    return o["org"], o["pid"]
+    org, pid = n["org"] or o.get("org"), n["pid"] or o.get("pid")
+    if not org or not pid:
+        raise kredo.KredoError(f"Для участка {cod_gor} не задан отправитель в КРЭДО: заполните коды "
+                               f"org_out и pid_out в «Справочники → Настройки программы»")
+    return org, pid
 
 
 def poluchatel(dok):
@@ -136,7 +139,7 @@ def _pole(xml, tag):
 
 def proverit_sertifikat(info, thumb):
     """Документ должен быть подписан сертификатом участка (отпечаток из
-    TEPLO_KREDO_THUMB): в окне выбора легко ошибиться строкой."""
+    «Настройки программы»): в окне выбора легко ошибиться строкой."""
     cn = re.search(r"CN=([^,]+)", _pole(info, "subject"))
     imya = cn.group(1).strip() if cn else _pole(info, "subject")
     if not thumb:

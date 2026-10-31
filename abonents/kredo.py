@@ -25,7 +25,8 @@ from django.conf import settings
 
 from catalogs.models import Potreb
 
-# Участок: код организации в КРЭДО (comorg) и сертификат клиента.
+# Участок: код организации в КРЭДО (comorg) и сертификат клиента по умолчанию.
+# Имя и отпечаток сертификата меняются в «Справочники → Настройки программы».
 UCHASTKI = {
     1: {"comorg": 210, "cert": "TTE_Ryb"},
     2: {"comorg": 211, "cert": "TTE_Dub"},
@@ -43,8 +44,11 @@ def nastrojki(cod_gor):
     u = UCHASTKI.get(cod_gor)
     if u is None:
         raise KredoError(f"Для участка {cod_gor} не задан код организации в КРЭДО")
-    thumb = (getattr(settings, "TEPLO_KREDO_THUMB", {}) or {}).get(cod_gor, "")
-    return {**u, "thumb": thumb, "endpoint": settings.TEPLO_KREDO_ENDPOINT,
+    from abonents.models import Nastroika
+    n = Nastroika.kredo(cod_gor)
+    thumb = n["thumb"] or (getattr(settings, "TEPLO_KREDO_THUMB", {}) or {}).get(cod_gor, "")
+    thumb = re.sub(r"[^0-9a-fA-F]", "", thumb or "").lower()
+    return {**u, "cert": n["cert"] or u["cert"], "thumb": thumb, "endpoint": settings.TEPLO_KREDO_ENDPOINT,
             "service": settings.TEPLO_KREDO_SERVICE_CERT}
 
 

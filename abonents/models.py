@@ -89,12 +89,31 @@ class Podpisant(models.Model):
 
 class Nastroika(models.Model):
     """Настройки программы (одна запись), меняет Администратор в
-    «Справочниках». Пока — папка для выгрузки в 1С."""
+    «Справочниках»: папка для выгрузки в 1С и сертификаты КРЭДО по участкам."""
 
     papka_1c = models.CharField(
         "Папка для выгрузки в 1С", max_length=255, blank=True,
         help_text="Сюда при переходе на новый месяц записывается файл Abpt<ГГ><ММ>.dbf. "
                   "Пусто — файл только скачивается в «Закрытых месяцах».")
+
+    kredo_cert_ryb = models.CharField("КРЭДО, Рыбница: имя сертификата", max_length=100, blank=True,
+                                      help_text="Имя (CN) сертификата участка в хранилище «Личные» Windows")
+    kredo_thumb_ryb = models.CharField("КРЭДО, Рыбница: отпечаток сертификата", max_length=100, blank=True,
+                                       help_text="Свойства сертификата → Состав → Отпечаток (пробелы можно оставить)")
+    kredo_org_ryb = models.CharField("КРЭДО, Рыбница: код организации-отправителя (org_out)", max_length=40, blank=True)
+    kredo_pid_ryb = models.CharField("КРЭДО, Рыбница: код представителя-отправителя (pid_out)", max_length=40, blank=True)
+    kredo_cert_dub = models.CharField("КРЭДО, Дубоссары: имя сертификата", max_length=100, blank=True,
+                                      help_text="Имя (CN) сертификата участка в хранилище «Личные» Windows")
+    kredo_thumb_dub = models.CharField("КРЭДО, Дубоссары: отпечаток сертификата", max_length=100, blank=True,
+                                       help_text="Свойства сертификата → Состав → Отпечаток (пробелы можно оставить)")
+    kredo_org_dub = models.CharField("КРЭДО, Дубоссары: код организации-отправителя (org_out)", max_length=40, blank=True)
+    kredo_pid_dub = models.CharField("КРЭДО, Дубоссары: код представителя-отправителя (pid_out)", max_length=40, blank=True)
+    kredo_cert_kam = models.CharField("КРЭДО, Каменка: имя сертификата", max_length=100, blank=True,
+                                      help_text="Имя (CN) сертификата участка в хранилище «Личные» Windows")
+    kredo_thumb_kam = models.CharField("КРЭДО, Каменка: отпечаток сертификата", max_length=100, blank=True,
+                                       help_text="Свойства сертификата → Состав → Отпечаток (пробелы можно оставить)")
+    kredo_org_kam = models.CharField("КРЭДО, Каменка: код организации-отправителя (org_out)", max_length=40, blank=True)
+    kredo_pid_kam = models.CharField("КРЭДО, Каменка: код представителя-отправителя (pid_out)", max_length=40, blank=True)
 
     class Meta:
         verbose_name = "Настройки программы"
@@ -110,6 +129,19 @@ class Nastroika(models.Model):
         from django.conf import settings
         n = cls.objects.order_by("pk").first()
         return ((n.papka_1c if n else "") or getattr(settings, "TEPLO_1C_DIR", "") or "").strip()
+
+    UCHASTOK = {1: "ryb", 2: "dub", 3: "kam"}
+
+    @classmethod
+    def kredo(cls, cod_gor):
+        """Сертификат и отправитель КРЭДО участка: {cert, thumb, org, pid};
+        пустые поля настроек — None (тогда берутся значения по умолчанию)."""
+        k = cls.UCHASTOK.get(cod_gor)
+        n = cls.objects.order_by("pk").first()
+        if not k or n is None:
+            return {"cert": None, "thumb": None, "org": None, "pid": None}
+        znach = lambda pole: (getattr(n, f"kredo_{pole}_{k}") or "").strip() or None
+        return {"cert": znach("cert"), "thumb": znach("thumb"), "org": znach("org"), "pid": znach("pid")}
 
 
 class TarifGorod(models.Model):

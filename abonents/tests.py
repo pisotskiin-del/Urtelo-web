@@ -1056,6 +1056,20 @@ class KredoRealTests(KartaBase):
 class NastroikaTests(KartaBase):
     """Папка для 1С в «Справочниках» → «Настройки программы»."""
 
+    def test_kredo(self):
+        from abonents import kredo, kredo_dok
+        from abonents.models import Nastroika
+        n = Nastroika.objects.get()
+        self.assertEqual((n.kredo_cert_ryb, n.kredo_thumb_ryb[:6]), ("TTE_Ryb", "eb89da"))
+        n.kredo_cert_ryb, n.kredo_thumb_ryb, n.kredo_org_dub, n.kredo_pid_dub = "TTE_Ryb2", "AB CD 12", "ORG2", "PID2"
+        n.save()
+        self.assertEqual((kredo.nastrojki(1)["cert"], kredo.nastrojki(1)["thumb"]), ("TTE_Ryb2", "abcd12"))
+        self.assertEqual(kredo_dok.otpravitel(2), ("ORG2", "PID2"))
+        n.kredo_org_kam = ""
+        n.save()
+        with self.assertRaises(kredo.KredoError):
+            kredo_dok.otpravitel(3)
+
     def test_papka_1c(self):
         from django.test import override_settings
         from abonents.models import Nastroika
