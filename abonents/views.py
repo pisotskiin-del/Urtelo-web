@@ -772,7 +772,7 @@ def dokument(request, cod_gor, nom_dog, vid):
         if z.status == z.OK:
             messages.success(request, f"Документ № {z.nomer} подписан и отправлен в КРЭДО")
         elif z.status == z.PROVERKA:
-            messages.success(request, f"Документ № {z.nomer} подписан (проверка, в КРЭДО не отправлялся). "
+            messages.success(request, f"Документ № {z.nomer}. {z.oshibka}. "
                                       f"XML: {Path(z.fail).with_suffix('.xml')}")
         else:
             messages.error(request, f"КРЭДО: {z.oshibka}")

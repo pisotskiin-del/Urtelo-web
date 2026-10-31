@@ -100,7 +100,7 @@ class ComCrypto:
 
 def podpisat(x, spec):
     """Создать, подписать и сжать документ объектом крипто-модуля x.
-    Возвращает (xml подписанного документа, base64 сжатого, статус)."""
+    Возвращает (xml подписанного документа, base64 сжатого, статус, сертификат)."""
     # Методы без аргументов (CreateDocument, GetLastError) при позднем
     # связывании pywin32 читаются как свойства — без скобок.
     y = x.CreateDocument
@@ -120,13 +120,13 @@ def podpisat(x, spec):
     s = x.SignDocument1(y, "CurrentUser", "My", 4, spec["tsa"])
     if not s:
         raise kredo.KredoError(f"Документ не подписан: {x.GetLastError or 'нет описания ошибки'}")
-    proverit_sertifikat(str(x.CertificateInfo1(y, s) or ""), spec.get("thumb", ""))
+    sertifikat = proverit_sertifikat(str(x.CertificateInfo1(y, s) or ""), spec.get("thumb", ""))
     proverka = x.ValidateSignature(y, s)
     xml = str(x.GetDocumentContent(y) or "")
     x.CompressDocument(y)
     status = STATUSY.get(str(x.GetDocumentStatus(y)), 0)
     b64 = str(x.ConvertToBase64String(x.GetDocumentContent(y)) or "")
-    return xml, b64, status, str(proverka or "")
+    return xml, b64, status, sertifikat
 
 
 def _pole(xml, tag):
@@ -137,13 +137,16 @@ def _pole(xml, tag):
 def proverit_sertifikat(info, thumb):
     """Документ должен быть подписан сертификатом участка (отпечаток из
     TEPLO_KREDO_THUMB): в окне выбора легко ошибиться строкой."""
+    cn = re.search(r"CN=([^,]+)", _pole(info, "subject"))
+    imya = cn.group(1).strip() if cn else _pole(info, "subject")
     if not thumb:
-        return
+        return imya
     vybran = re.sub(r"[^0-9a-f]", "", _pole(info, "thumbprint").lower())
     if vybran != re.sub(r"[^0-9a-f]", "", thumb.lower()):
         kto = _pole(info, "subject") or "неизвестный сертификат"
         raise kredo.KredoError(f"Документ подписан не сертификатом участка ({kto}). "
                                f"Выберите в окне сертификат участка; документ не отправлен")
+    return imya
 
 
 def spec_dokumenta(dok, p, nomer, pdf_path):
@@ -188,10 +191,10 @@ def otpravit(dok, context, user="", proverka=False, crypto=None, invoker=None):
         pismo.fail = str(path)
         spec = spec_dokumenta(dok, p, nomer, path)
         with (crypto or ComCrypto()).objekt() as x:
-            xml, b64, status, _ = podpisat(x, spec)
+            xml, b64, status, sertifikat = podpisat(x, spec)
         path.with_suffix(".xml").write_text(xml, encoding="utf-8")
         if proverka:
-            pismo.oshibka = f"Проверка: документ подписан, XML сохранён ({path.with_suffix('.xml').name}), не отправлялся"
+            pismo.oshibka = f"Проверка: документ подписан сертификатом {sertifikat}, XML сохранён ({path.with_suffix('.xml').name}), не отправлялся"
             pismo.status = Pismo.PROVERKA
             pismo.save()
             return pismo

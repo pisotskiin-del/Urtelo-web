@@ -1248,6 +1248,7 @@ class KredoSchetTests(DokumentyTests):
         with override_settings(TEPLO_DOC_DIR=self.tmp):
             z = kredo_dok.otpravit(dok, {}, crypto=FakeCrypto(), invoker=inv, proverka=True)
             self.assertEqual(z.status, Pismo.PROVERKA)
+            self.assertIn("сертификатом TTE_Dub", z.oshibka)
             self.assertEqual(inv.calls, [])
             z = kredo_dok.otpravit(dok, {}, crypto=FakeCrypto(podpis=""), invoker=inv)
             self.assertEqual(z.status, Pismo.OSHIBKA)
