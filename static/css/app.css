@@ -482,3 +482,18 @@ table.dok-signs td { width:50%; vertical-align:top; padding:0 12px 0 0; }
 /* Статус лицевого в карточке: расторгнут — красный, приостановлен — оранжевый */
 .chip.rastorg { background:var(--danger); color:#fff; font-weight:600; }
 .chip.priost { background:#e8770e; color:#fff; font-weight:600; }
+
+/* Группа «КРЭДО» в боковом меню с подменю */
+.sidebar .side-grp { margin-bottom:4px; }
+.sidebar .side-grp summary { display:flex; align-items:center; gap:14px; padding:12px 14px; border-radius:8px; color:inherit;
+  cursor:pointer; list-style:none; user-select:none; }
+.sidebar .side-grp summary::-webkit-details-marker { display:none; }
+.sidebar .side-grp summary::after { content:""; margin-left:auto; width:7px; height:7px; border-right:2px solid currentColor;
+  border-bottom:2px solid currentColor; transform:rotate(45deg); opacity:.7; transition:transform .15s; }
+.sidebar .side-grp[open] summary::after { transform:rotate(-135deg); }
+.sidebar .side-grp summary:hover { background:rgba(255,255,255,.07); color:#fff; }
+.sidebar .side-grp summary.active { color:#fff; background:rgba(255,255,255,.1); }
+.sidebar a.sub { padding:9px 10px 9px 26px; gap:10px; font-size:14px; white-space:nowrap; }
+.sidebar a.sub .i { width:18px; height:18px; }
+.side-mini .sidebar .side-grp summary::after { display:none; }
+.side-mini .sidebar a.sub { padding-left:14px; }

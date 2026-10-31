@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% load ui %}
 {% block title %}КРЭДО: коды абонентов{% endblock %}
 {% block content %}
-<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a><span class="sep">›</span><a href="{% url 'abonents:raschet' %}">Расчет</a><span class="sep">›</span>КРЭДО: коды абонентов</p>
+<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a><span class="sep">›</span>КРЭДО<span class="sep">›</span>КРЭДО: коды абонентов</p>
 <div class="page-head"><h1>КРЭДО: коды абонентов</h1></div>
 <nav class="tabs">{% for c in cities %}<a href="?gorod={{ c.cod_gorod }}&amp;f={{ filtr }}" {% if c.cod_gorod == city.cod_gorod %}class="active"{% endif %}>{{ c.name_gorod }}</a>{% endfor %}</nav>
 <section class="card">
