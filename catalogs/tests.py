@@ -68,3 +68,16 @@ class RoleTests(TestCase):
         response = self.client.get(f"/admin/catalogs/smtpnas/{smtp.pk}/change/")
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "secret-value")
+
+
+class PravaTests(TestCase):
+    """Нет прав — понятная страница, а не отладочная."""
+
+    def test_net_prav(self):
+        from django.contrib.auth.models import User
+        from django.urls import reverse
+        from abonents.models import Nastroika
+        User.objects.create_user("nab", password="x")
+        self.client.login(username="nab", password="x")
+        r = self.client.get(reverse("catalogs:edit", args=["nastroika", Nastroika.objects.get().pk]))
+        self.assertContains(r, "Недостаточно прав", status_code=403)
