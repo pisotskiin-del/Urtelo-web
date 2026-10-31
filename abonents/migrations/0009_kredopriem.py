@@ -59,9 +59,9 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 (
-                    "izmeneniya",
-                    models.JSONField(
-                        blank=True, default=list, verbose_name="Изменения"
+                    "izm",
+                    models.TextField(
+                        blank=True, default="[]", verbose_name="Изменения (JSON)"
                     ),
                 ),
             ],

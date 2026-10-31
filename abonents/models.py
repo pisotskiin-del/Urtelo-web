@@ -176,7 +176,8 @@ class KredoPriem(models.Model):
     strok = models.IntegerField("Строк", default=0)
     razneseno = models.DateTimeField("Разнесено", null=True, blank=True)
     razn_user = models.CharField("Кто разнёс", max_length=150, blank=True)
-    izmeneniya = models.JSONField("Изменения", default=list, blank=True)
+    # JSON в текстовом поле: SQLite в Python для Windows бывает без расширения JSON1.
+    izm = models.TextField("Изменения (JSON)", default="[]", blank=True)
 
     class Meta:
         verbose_name = "Показания из КРЭДО"
@@ -185,3 +186,17 @@ class KredoPriem(models.Model):
 
     def __str__(self):
         return f"{self.created:%d.%m.%Y %H:%M} участок {self.cod_gor}, {self.nom_mes:02d}.{self.god}"
+
+    @property
+    def izmeneniya(self):
+        """[[л/№, было, стало, дата было, дата стало]] — что изменено при разносе."""
+        import json
+        try:
+            return json.loads(self.izm or "[]")
+        except ValueError:
+            return []
+
+    @izmeneniya.setter
+    def izmeneniya(self, value):
+        import json
+        self.izm = json.dumps(value, ensure_ascii=False)

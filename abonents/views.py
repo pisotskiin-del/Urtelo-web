@@ -929,8 +929,8 @@ def kredo_priem(request, pk):
                 izm = kredo.raznesti(stroki, nomera)
                 z.razneseno = timezone.now()
                 z.razn_user = request.user.get_username()
-                z.izmeneniya = list(z.izmeneniya or []) + izm
-                z.save(update_fields=["razneseno", "razn_user", "izmeneniya"])
+                z.izmeneniya = z.izmeneniya + izm
+                z.save(update_fields=["razneseno", "razn_user", "izm"])
             messages.success(request, f"Показания приборов учета по лицевым счетам разнесены: {len(izm)}")
         return redirect("abonents:kredo_priem", pk=z.pk)
     from collections import Counter
