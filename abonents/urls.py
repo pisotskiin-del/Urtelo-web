@@ -26,4 +26,7 @@ urlpatterns = [
     path("dogovor/<int:cod_gor>/<int:nom_dog>/", views.dogovor, name="dogovor"),
     path("dogovor/<int:cod_gor>/<int:nom_dog>/<slug:vid>/", views.dokument, name="dokument"),
     path("dokumenty/", views.dokumenty, name="dokumenty"),
+    path("rassylka/", views.rassylka, name="rassylka"),
+    path("pisma/", views.pisma, name="pisma"),
+    path("pisma/<int:pk>/pdf/", views.pismo_pdf, name="pismo_pdf"),
 ]

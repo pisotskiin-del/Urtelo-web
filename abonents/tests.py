@@ -850,3 +850,61 @@ def nov_mes_model():
     from abonents.models import MesArhiv
     return MesArhiv
 
+
+
+class PochtaTests(DokumentyTests):
+    """Отправка документов по почте и реестр писем."""
+
+    def setUp(self):
+        super().setUp()
+        import tempfile
+        from catalogs.models import SmtpNas
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, self.tmp)
+        SmtpNas.objects.create(smtp="smtp.example.org", port=465, from_dbf="teplo@example.org", tema="Информация",
+                               pismo="Информация-счёт за", paunt=1, senduserna="teplo", password="x", puses=1)
+        Potreb.objects.filter(potreb_id=5).update(mail="krips@example.org; buh@example.org", mail_ras=True)
+
+    def test_spisok_i_rassylka(self):
+        from django.core import mail
+        from django.test import override_settings
+        from abonents import pochta
+        from abonents.models import Pismo
+        self.login("Оператор")
+        with override_settings(TEPLO_DOC_DIR=self.tmp, TEPLO_PISMO_NOMER=1001):
+            rows = pochta.spisok(1, 10, 2026, "schet")
+            self.assertEqual([(d.nom_dog, p.potreb_id, flag) for d, p, flag, z in rows], [(6, 5, True)])
+            r = self.client.post("/abonents/rassylka/?gorod=1&vid=schet", {"dog": ["6"]}, follow=True)
+            self.assertContains(r, "Отправлено: 1 из 1")
+        self.assertEqual(len(mail.outbox), 1)
+        m = mail.outbox[0]
+        self.assertEqual(m.to, ["krips@example.org", "buh@example.org"])
+        self.assertEqual(m.body, "Информация-счёт за Октябрь 2026 года")
+        self.assertEqual(m.attachments[0][0], "schet_6_5.pdf")
+        z = Pismo.objects.get()
+        self.assertEqual((z.nomer, z.status, z.nom_mes, z.god), (1001, "ok", 10, 2026))
+        self.assertIsNotNone(Potreb.objects.get(potreb_id=7).dataotpr)
+        # Отправленному договору повторно не предлагается.
+        self.assertFalse(pochta.spisok(1, 10, 2026, "schet")[0][2])
+        r = self.client.get("/abonents/pisma/?mes=2026-10")
+        self.assertContains(r, "1001")
+        self.assertEqual(self.client.get(f"/abonents/pisma/{z.pk}/pdf/")["Content-Type"], "application/pdf")
+
+    def test_oshibka_ne_preryvaet(self):
+        from unittest import mock
+        from django.test import override_settings
+        from abonents import pochta
+        from abonents.models import Pismo
+        with override_settings(TEPLO_DOC_DIR=self.tmp), \
+                mock.patch("django.core.mail.EmailMessage.send", side_effect=OSError("Connection refused")):
+            res = pochta.rassylka(1, [6, 8], "schet", {})
+        self.assertEqual([z.status for z in res], ["err", "err"])
+        self.assertIn("Connection refused", res[0].oshibka)
+        self.assertIn("Нет адреса", res[1].oshibka)        # у договора 8 нет почты
+        self.assertEqual(Pismo.objects.count(), 2)
+        self.assertTrue(pochta.spisok(1, 10, 2026, "schet")[0][2])   # неотправленный снова отмечен
+
+    def test_nablyudatel_ne_otpravlyaet(self):
+        self.login("Наблюдатель")
+        self.assertEqual(self.client.post("/abonents/rassylka/?gorod=1", {"dog": ["6"]}).status_code, 403)
+        self.assertEqual(self.client.post("/abonents/dogovor/1/6/schet/", {"action": "send"}).status_code, 403)

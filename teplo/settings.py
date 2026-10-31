@@ -145,3 +145,9 @@ TEPLO_DOC_DIR = env("TEPLO_DOC_DIR", "")
 # Шрифт TrueType с кириллицей для PDF. Пусто — Arial из Windows (DejaVu Sans в Linux).
 TEPLO_PDF_FONT = env("TEPLO_PDF_FONT", "")
 TEPLO_PDF_FONT_BOLD = env("TEPLO_PDF_FONT_BOLD", "")
+
+# Почта. Сервер, порт, адрес отправителя, тема и текст письма — в «Настройке рассылки
+# писем» (smtp_nas, админка). Пароль почтового ящика лучше задать здесь, а не в smtp_nas.
+TEPLO_SMTP_PASSWORD = env("TEPLO_SMTP_PASSWORD", "")
+# Первый номер документа в реестре отправленных писем (продолжить нумерацию старой программы).
+TEPLO_PISMO_NOMER = int(env("TEPLO_PISMO_NOMER", "1") or 1)

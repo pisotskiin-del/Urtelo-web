@@ -3,6 +3,7 @@
 используется его лицевой № (potreb_id)."""
 
 import datetime
+import re
 from decimal import Decimal
 
 from django.conf import settings
@@ -718,8 +719,25 @@ def dokument(request, cod_gor, nom_dog, vid):
         response = HttpResponse(path.read_bytes(), content_type="application/pdf")
         response["Content-Disposition"] = f'inline; filename="{path.name}"'
         return response
+    if request.method == "POST" and request.POST.get("action") == "send":
+        if not request.user.has_perm("catalogs.change_potreb"):
+            raise PermissionDenied
+        from . import pochta
+        problem = pochta.gotovo()
+        if problem:
+            messages.error(request, problem)
+        else:
+            z = pochta.otpravit(dok, vid, _dok_context(dok), request.user.get_username())
+            if z.status == z.OK:
+                messages.success(request, f"Документ № {z.nomer} отправлен на {z.email}")
+            else:
+                messages.error(request, f"Не отправлено: {z.oshibka}")
+        return redirect(request.get_full_path())
+    from . import pochta
+    poluch = pochta.poluchatel(dok)
     return render(request, "abonents/dokument.html", {
         **_dok_context(dok), "vid": vid, "title": DOKUMENTY[vid], "doks": [dok],
+        "email": poluch.mail.strip() if poluch else "", "can_send": request.user.has_perm("catalogs.change_potreb"),
         "back": reverse("abonents:karta", args=[int(request.GET["ls"])]) if request.GET.get("ls", "").isdigit()
         else reverse("abonents:dogovor", args=[cod_gor, nom_dog]),
     })
@@ -749,3 +767,78 @@ def dokumenty(request):
         "cities": cities, "city": code, "vidy": DOKUMENTY.items(),
         "back": reverse("abonents:otchety"),
     })
+
+
+@login_required
+@view_required
+def rassylka(request):
+    """Рассылка документов по почте за текущий месяц участка (форма
+    auto_send_mail): договоры с начислением, отметки по признаку «Почта» из
+    карты, отправка отмеченных с записью в реестр."""
+    from . import pochta
+    vid = request.GET.get("vid", "schet")
+    if vid not in DOKUMENTY:
+        raise Http404
+    cities = _cities()
+    code = _current_city(request, cities)
+    city = next((c for c in cities if c.cod_gorod == code), None)
+    if city is None:
+        raise Http404
+    can_send = request.user.has_perm("catalogs.change_potreb")
+    if request.method == "POST":
+        if not can_send:
+            raise PermissionDenied
+        problem = pochta.gotovo()
+        nomera = [int(x) for x in request.POST.getlist("dog") if x.isdigit()]
+        if problem:
+            messages.error(request, problem)
+        elif not nomera:
+            messages.warning(request, "Не отмечено ни одного договора")
+        else:
+            doks = [d for d in (documents.sobrat(code, n) for n in nomera) if d]
+            ctx = _dok_context(doks[0]) if doks else {}
+            res = pochta.rassylka(code, nomera, vid, ctx, request.user.get_username())
+            ok = sum(1 for z in res if z.status == z.OK)
+            (messages.success if ok == len(res) else messages.warning)(
+                request, f"Отправлено: {ok} из {len(res)}. Ошибки — в реестре писем.")
+        return redirect(f"{reverse('abonents:rassylka')}?gorod={code}&vid={vid}")
+    rows = pochta.spisok(code, city.nom_mes, city.god, vid)
+    return render(request, "abonents/rassylka.html", {
+        "rows": rows, "vid": vid, "vidy": DOKUMENTY.items(), "title": DOKUMENTY[vid], "cities": cities, "city": city,
+        "can_send": can_send, "problem": pochta.gotovo(),
+    })
+
+
+@login_required
+@view_required
+def pisma(request):
+    """Реестр отправленных писем (форма reestrmail): фильтр по месяцу и л/№,
+    открытие отправленного PDF."""
+    from .models import Pismo
+    qs = Pismo.objects.all()
+    mes = request.GET.get("mes", "")
+    if re.fullmatch(r"\d{4}-\d{2}", mes):
+        qs = qs.filter(god=int(mes[:4]), nom_mes=int(mes[5:]))
+    ls = request.GET.get("ls", "").strip()
+    if ls.isdigit():
+        qs = qs.filter(Q(potreb_id=int(ls)) | Q(nom_dog=int(ls)))
+    if request.GET.get("oshibki"):
+        qs = qs.filter(status=Pismo.OSHIBKA)
+    page = Paginator(qs, 50).get_page(request.GET.get("page"))
+    return render(request, "abonents/pisma.html", {"page": page, "mes": mes, "ls": ls,
+                                                   "oshibki": bool(request.GET.get("oshibki")),
+                                                   "goroda": dict((c.cod_gorod, c.name_gorod) for c in _cities())})
+
+
+@login_required
+@view_required
+def pismo_pdf(request, pk):
+    from pathlib import Path
+    from .models import Pismo
+    z = get_object_or_404(Pismo, pk=pk)
+    path = Path(z.fail) if z.fail else None
+    if path is None or not path.is_file():
+        raise Http404("Файл не найден")
+    response = HttpResponse(path.read_bytes(), content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="{path.name}"'
+    return response

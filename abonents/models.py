@@ -117,3 +117,42 @@ class TarifGorod(models.Model):
         out = {t.id_tar: (t.zn_tar or 0, t.diz_tar or 0) for t in Tarif.objects.exclude(id_tar=None)}
         out.update({t.id_tar: (t.zn_tar or 0, t.diz_tar or 0) for t in cls.objects.filter(gorod=code)})
         return out
+
+
+class Pismo(models.Model):
+    """Журнал отправки документов абонентам по почте (реестр отправленных
+    писем reestrmail старой программы). Каждая попытка — запись: удачная или
+    с текстом ошибки. Номер записи — номер документа в «Информации-счёте»;
+    первый номер задается TEPLO_PISMO_NOMER (чтобы продолжить нумерацию
+    старой программы)."""
+
+    OK, OSHIBKA = "ok", "err"
+
+    nomer = models.IntegerField("Номер документа", unique=True)
+    created = models.DateTimeField("Отправлено", auto_now_add=True)
+    user = models.CharField("Кто отправил", max_length=150, blank=True)
+    cod_gor = models.IntegerField("Участок")
+    nom_dog = models.IntegerField("Договор №")
+    potreb_id = models.IntegerField("Л/№")
+    name_potre = models.CharField("Потребитель", max_length=120, blank=True)
+    email = models.CharField("Адрес", max_length=254, blank=True)
+    vid = models.CharField("Документ", max_length=10)
+    nom_mes = models.IntegerField("Месяц")
+    god = models.IntegerField("Год")
+    status = models.CharField("Результат", max_length=3, choices=[(OK, "Отправлено"), (OSHIBKA, "Ошибка")])
+    oshibka = models.TextField("Ошибка", blank=True)
+    fail = models.CharField("Файл PDF", max_length=500, blank=True)
+
+    class Meta:
+        verbose_name = "Отправленное письмо"
+        verbose_name_plural = "Реестр отправленных писем"
+        ordering = ["-pk"]
+
+    def __str__(self):
+        return f"№ {self.nomer} {self.name_potre} {self.nom_mes:02d}.{self.god}"
+
+    @classmethod
+    def sleduyushchij_nomer(cls):
+        from django.conf import settings
+        last = cls.objects.aggregate(m=models.Max("nomer"))["m"]
+        return last + 1 if last else int(getattr(settings, "TEPLO_PISMO_NOMER", 1) or 1)

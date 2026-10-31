@@ -11,6 +11,7 @@
     {% endif %}
     <a class="button" href="?{% if paket %}gorod={{ city }}&amp;vid={{ vid }}{% elif request.GET.ls %}ls={{ request.GET.ls }}{% endif %}&amp;pdf=1" target="_blank">{% icon "save" %} PDF</a>
     <button type="button" onclick="window.print()">{% icon "file" %} Печать</button>
+    {% if not paket and can_send %}<form method="post" class="inline">{% csrf_token %}<button name="action" value="send" {% if not email %}disabled title="В карте нет адреса электронной почты"{% endif %} onclick="return confirm('Отправить документ на {{ email|escapejs }}?')">{% icon "open" %} На почту</button></form>{% endif %}
   </div>
 </div>
 {% if paket %}

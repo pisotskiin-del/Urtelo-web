@@ -466,3 +466,4 @@ table.dok-signs { width:100%; margin-top:18px; line-height:1.6; border-collapse:
 table.dok-signs td { width:50%; vertical-align:top; padding:0 12px 0 0; }
 .dok-foot { font-size:9pt; margin-top:18px; }
 @media print { .dok { border:0; padding:0; margin:0; max-width:none; } }
+.err { color:#b42318; }
