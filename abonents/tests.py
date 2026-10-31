@@ -444,9 +444,20 @@ class NovMesTests(KartaBase):
         GvsKot.objects.update(nagr_kot=Decimal("1.5"))
 
     def test_close_month_and_undo(self):
-        from abonents import nov_mes
+        from abonents import nov_mes, reports
+        Potreb.objects.filter(potreb_id=5).update(d_stat=60, nach_otopl=Decimal("3.25"), nach_gvs=Decimal("1"))
         before = {p.potreb_id: p for p in Potreb.objects.all()}
+        polez = reports.polez_data()
+        self.assertTrue(any(v for _, _, rows in polez for row in rows for v in row[1:]))
         r = nov_mes.run("тест")
+        # В архив попадает полезный отпуск закрываемого месяца и тарифы.
+        t = nov_mes.last().tables()
+        self.assertEqual(set(t["polez_otpusk"]), {"", "gvs", "otopl"})
+        self.assertEqual([[g, name, [[row[0]] + [Decimal(v) for v in row[1:]] for row in rows]]
+                          for g, name, rows in t["polez_otpusk"][""]],
+                         [[g, name, rows] for g, name, rows in polez])
+        self.assertIn("tarif", t)
+        self.assertIn("tarif_gorod", t)
         self.assertEqual((r.closed, r.opened), ((12, 2025), (1, 2026)))
         self.assertEqual(set(Danrasch.objects.values_list("nom_mes", "name_mes", "god")), {(1, "Январь", 2026)})
         a = Potreb.objects.get(potreb_id=5)
@@ -499,8 +510,8 @@ class NovMesTests(KartaBase):
         from dbfread import DBF
         arh = nov_mes.last()
         dl = self.client.get(f"/abonents/nov-mes/{arh.pk}/1c/")
-        self.assertIn('filename="Abot2512.dbf"', dl["Content-Disposition"])
-        path = self.tmp_path("Abot2512.dbf")
+        self.assertIn('filename="Abpt2512.dbf"', dl["Content-Disposition"])
+        path = self.tmp_path("Abpt2512.dbf")
         open(path, "wb").write(dl.content)
         recs = list(DBF(path, encoding="cp1251"))
         self.assertEqual(sorted(r["RAS_KOL"] for r in recs), [2.0, 10.5])
@@ -662,3 +673,4 @@ class ReportsTests(KartaBase):
         self.assertIn("ИТОГО:", values)
         self.assertIn(10.5, values)
         self.assertEqual(self.client.get("/abonents/otchety/net/").status_code, 404)
+

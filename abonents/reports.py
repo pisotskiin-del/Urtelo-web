@@ -447,6 +447,26 @@ POLEZ_COLS = [Col("Категории потребителей"),
 POLEZ_VSEGO = (5, 10, 11)
 
 
+def polez_data(vid=None):
+    """Полезный отпуск по участкам: [(код участка, название, [строка П/У,
+    строка Нагр.])], строка — подпись и Гкал по колонкам POLEZ_COLS. Это же
+    кладется в архив месяца при переходе на новый месяц."""
+    out = []
+    for c in Danrasch.objects.exclude(cod_gorod=None).order_by("cod_gorod"):
+        recs = list(_active(Potreb.objects.filter(cod_gor=c.cod_gorod)))
+        k = _polez_doli(c)
+        rows = []
+        for label, row_key in (("П/У", "pu"), ("Нагр.", "nagr")):
+            row = [label]
+            for col in range(1, len(POLEZ_COLS)):
+                row.append(sum((_polez_val(p, vid) * f for p in recs
+                                if _polez_row(p) == row_key and (f := _polez_part(p, col, k)) is not None),
+                               Decimal(0)))
+            rows.append(row)
+        out.append((c.cod_gorod, (c.name_gorod or "").strip(), rows))
+    return out
+
+
 def polez_otpusk(city, opts):
     """Кнопка «Полезный отпуск» (polez_otpusk.frx): отпуск тепловой энергии по
     категориям потребителей по всем участкам — по приборам учета (П/У,
@@ -468,21 +488,11 @@ def polez_otpusk(city, opts):
         return [None if i == 0 or row[i] is None else _polez_url(gorod, row_key, i, vid) for i in range(len(row))]
 
     sections, pu_rows, nagr_rows = [], [], []
-    for c in Danrasch.objects.exclude(cod_gorod=None).order_by("cod_gorod"):
-        recs = list(_active(Potreb.objects.filter(cod_gor=c.cod_gorod)))
-        k = _polez_doli(c)
-        rows = []
-        for label, row_key in (("П/У", "pu"), ("Нагр.", "nagr")):
-            row = [label]
-            for col in range(1, len(POLEZ_COLS)):
-                row.append(sum((_polez_val(p, vid) * f for p in recs
-                                if _polez_row(p) == row_key and (f := _polez_part(p, col, k)) is not None),
-                               Decimal(0)))
-            rows.append(row)
+    for gorod, name, rows in polez_data(vid):
         sec = Section(rows=[shown(r) for r in rows])
-        sec.links = [links(c.cod_gorod, key, r) for key, r in zip(("pu", "nagr"), sec.rows)]
-        sec.foot = _sum_row(POLEZ_COLS, rows, f"Всего по г.{(c.name_gorod or '').strip()}")
-        sec.foot_links = links(c.cod_gorod, "all", sec.foot)
+        sec.links = [links(gorod, key, r) for key, r in zip(("pu", "nagr"), sec.rows)]
+        sec.foot = _sum_row(POLEZ_COLS, rows, f"Всего по г.{name}")
+        sec.foot_links = links(gorod, "all", sec.foot)
         sections.append(sec)
         pu_rows.append(rows[0])
         nagr_rows.append(rows[1])

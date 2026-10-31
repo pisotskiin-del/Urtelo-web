@@ -69,7 +69,7 @@
     <thead><tr><th>Месяц</th><th>Закрыт</th><th>Кто</th><th class="num">Абонентов</th><th class="num">Начислено всего, Гкал</th><th>Выгрузка в 1С</th><th></th></tr></thead>
     <tbody>{% for a in arhiv %}<tr><td>{{ a.nom_mes|stringformat:"02d" }}.{{ a.god }}</td><td>{{ a.created|date:"d.m.Y H:i" }}</td><td>{{ a.user }}</td>
       <td class="num">{{ a.potreb_count }}</td><td class="num">{{ a.nac_vsego|floatformat:3 }}</td>
-      <td><a href="{% url 'abonents:abot_1c' a.pk %}">{% icon "save" %} Abot{{ a.god|stringformat:"d"|slice:"2:" }}{{ a.nom_mes|stringformat:"02d" }}.dbf</a></td>
+      <td><a href="{% url 'abonents:abot_1c' a.pk %}">{% icon "save" %} Abpt{{ a.god|stringformat:"d"|slice:"2:" }}{{ a.nom_mes|stringformat:"02d" }}.dbf</a></td>
       <td>{% if can_run and a.pk == last.pk %}<form method="post" class="inline">{% csrf_token %}<button name="action" value="undo" class="link-btn" onclick="return confirm('Отменить переход и вернуть месяц {{ a.nom_mes|stringformat:"02d" }}.{{ a.god }}? Изменения, сделанные после перехода, в начислениях и показаниях будут потеряны.')">{% icon "back" %} Отменить переход</button></form>{% endif %}</td></tr>{% endfor %}</tbody>
   </table></div>
   {% else %}<p class="muted" style="padding:12px 16px">В новой программе месяцы ещё не закрывались.</p>{% endif %}

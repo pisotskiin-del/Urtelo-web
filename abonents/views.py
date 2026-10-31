@@ -613,7 +613,7 @@ def nov_mes_view(request):
 @login_required
 @permission_required("catalogs.view_potreb", raise_exception=True)
 def abot_1c(request, pk):
-    """Скачать выгрузку в 1С закрытого месяца: Abot<ГГ><ММ>.dbf, как в старой программе."""
+    """Скачать выгрузку в 1С закрытого месяца: Abpt<ГГ><ММ>.dbf, как в старой программе."""
     arh = get_object_or_404(nov_mes.MesArhiv, pk=pk)
     response = HttpResponse(content_type="application/x-dbf")
     response["Content-Disposition"] = f'attachment; filename="{nov_mes.abot_filename(arh.nom_mes, arh.god)}"'
@@ -682,3 +682,4 @@ def otchet(request, key):
         "rdef": rdef, "report": report, "opts": opts, "options": reports.options_for(rdef),
         "cities": cities, "city": code, "xlsx_query": query.urlencode(),
     })
+
