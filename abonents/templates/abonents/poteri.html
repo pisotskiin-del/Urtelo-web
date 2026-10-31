@@ -1,0 +1,29 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Тепловые потери: Л/№ {{ p.potreb_id }}{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a> / <a href="{% url 'abonents:karta' p.potreb_id %}">Л/№ {{ p.potreb_id }}</a> /</p>
+<h1>Тепловые потери</h1>
+<p>{{ p.name_potre }} — {{ p.glav_potre }}. Потребление т/э: {{ p.dnotop|default_if_none:0 }} дн.</p>
+<form method="post">{% csrf_token %}
+<div class="scroll">
+<table class="grid narrow-grid">
+  <thead><tr><th>Участок</th><th>Диаметр</th><th>Длина</th><th class="num">Тепловые потери, Гкал</th></tr></thead>
+  <tbody>
+  {% for i, diam, dlina, loss in rows %}
+    <tr><td>Участок №{{ i }}</td>
+      <td>{% if can_change %}{{ diam }}{% else %}{{ diam.value|default_if_none:"—" }}{% endif %}{% if diam.errors %}<span class="error">{{ diam.errors|join:" " }}</span>{% endif %}</td>
+      <td>{% if can_change %}{{ dlina }}{% else %}{{ dlina.value|default_if_none:"—" }}{% endif %}{% if dlina.errors %}<span class="error">{{ dlina.errors|join:" " }}</span>{% endif %}</td>
+      <td class="num">{{ loss|default_if_none:"" }}</td></tr>
+  {% endfor %}
+  </tbody>
+  <tfoot><tr><th colspan="3">ВСЕГО: Тепловые потери</th><th class="num">{{ sp.vs_poteri|default_if_none:"" }}</th></tr></tfoot>
+</table>
+</div>
+<p class="muted">Потери записываются в карту: по прибору, если расчёт по прибору и есть потребление или потери начисляются; по нагрузке, если расчёт по нагрузке.</p>
+{% if can_change %}<div class="actions">
+  <button class="primary" name="raschet" value="1">{% icon "calc" %} Расчитать</button>
+  <button>{% icon "save" %} Сохранить без расчёта</button>
+  <a href="{% url 'abonents:karta' p.potreb_id %}">Вернуться в карту</a>
+</div>{% else %}<p><a href="{% url 'abonents:karta' p.potreb_id %}">Вернуться в карту</a></p>{% endif %}
+</form>
+{% endblock %}

@@ -1,12 +1,12 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load ui %}
 {% block title %}{{ obj }}{% endblock %}
 {% block content %}
 <p class="crumbs"><a href="{% url 'catalogs:index' %}">Справочники</a> / <a href="{% url 'catalogs:list' slug %}">{{ meta.verbose_name_plural }}</a> /</p>
 <div class="head">
   <h1>{{ obj }}</h1>
   <div>
-    {% if can_change %}<a class="button primary" href="{% url 'catalogs:edit' slug obj.pk %}">Изменить</a>{% endif %}
-    {% if can_delete %}<a class="button danger" href="{% url 'catalogs:delete' slug obj.pk %}">Удалить</a>{% endif %}
+    {% if can_change %}<a class="button primary" href="{% url 'catalogs:edit' slug obj.pk %}">{% icon "edit" %} Изменить</a>{% endif %}
+    {% if can_delete %}<a class="button danger" href="{% url 'catalogs:delete' slug obj.pk %}">{% icon "trash" %} Удалить</a>{% endif %}
   </div>
 </div>
 <dl class="fields">

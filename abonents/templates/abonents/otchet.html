@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{{ rdef.title }}{% endblock %}
+{% block content %}
+<div class="no-print">
+<p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a><span class="sep">›</span><a href="{% url 'abonents:otchety' %}">Отчеты</a><span class="sep">›</span>{{ rdef.title }}</p>
+<div class="page-head"><h1>{{ rdef.title }}</h1>
+  <div class="actions">
+    <button type="button" onclick="window.print()">{% icon "file" %} Печать</button>
+    <a class="button" href="?{{ xlsx_query }}">{% icon "chart" %} Excel</a>
+  </div>
+</div>
+<form method="get" class="toolbar rep-params">
+  {% if rdef.per_city %}<nav class="tabs">{% for c in cities %}<a href="?gorod={{ c.cod_gorod }}{% for name, value in opts.items %}&amp;{{ name }}={{ value }}{% endfor %}" {% if c.cod_gorod == city %}class="active"{% endif %}>{{ c.name_gorod }}</a>{% endfor %}</nav>{% endif %}
+  {% for name, label, choices in options %}
+  <label>{{ label }}
+    {% if choices == "date" %}<input type="date" name="{{ name }}" value="{% for n, v in opts.items %}{% if n == name %}{{ v }}{% endif %}{% endfor %}" onchange="this.form.submit()">
+    {% else %}<select name="{{ name }}" onchange="this.form.submit()">
+      {% for value, title in choices %}<option value="{{ value }}"{% for n, v in opts.items %}{% if n == name and v == value %} selected{% endif %}{% endfor %}>{{ title }}</option>{% endfor %}
+    </select>{% endif %}</label>
+  {% endfor %}
+</form>
+</div>
+
+{% include "abonents/_report.html" %}
+{% endblock %}

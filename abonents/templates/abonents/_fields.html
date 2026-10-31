@@ -1,0 +1,4 @@
+{% for it in items %}<div class="kf{% if it.f.wide %} wide{% endif %}">
+  <span class="kl">{% if it.field %}<label for="{{ it.field.id_for_label }}">{{ it.f.label }}</label>{% else %}{{ it.f.label }}{% endif %}</span>
+  <span class="kv">{% if it.field %}{{ it.field }}{% if it.field.errors %}<span class="error">{{ it.field.errors|join:" " }}</span>{% endif %}{% elif it.value is None %}<span class="muted">—</span>{% elif it.url %}<a href="{{ it.url }}">{{ it.value }}</a>{% elif it.f.name == "inf" %}{{ it.value|linebreaksbr }}{% else %}{{ it.value }}{% endif %}{% if it.f.unit %} <span class="unit">{{ it.f.unit }}</span>{% endif %}</span>
+</div>{% endfor %}

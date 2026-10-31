@@ -10,6 +10,14 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Файл .env рядом с manage.py: строки ИМЯ=значение. Переменные окружения важнее.
+_dotenv = BASE_DIR / ".env"
+if _dotenv.exists():
+    for _line in _dotenv.read_text(encoding="utf-8-sig").splitlines():
+        _name, _sep, _value = _line.partition("=")
+        if _sep and not _line.lstrip().startswith("#"):
+            os.environ.setdefault(_name.strip(), _value.strip().strip('"'))
+
 
 def env(name, default=None):
     return os.environ.get(name, default)
@@ -35,6 +43,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "accounts",
     "catalogs",
+    "abonents",
     "dbfsync",
 ]
 
@@ -66,6 +75,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "accounts.context_processors.roles",
+                "abonents.context_processors.raschet_mes",
             ],
         },
     },
@@ -113,7 +123,7 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "catalogs:index"
+LOGIN_REDIRECT_URL = "abonents:index"
 LOGOUT_REDIRECT_URL = "login"
 
 # Каталог с таблицами DBF старой программы и их кодировка по умолчанию.
@@ -122,3 +132,8 @@ DBF_SOURCE_DIR = env("DBF_SOURCE_DIR", r"D:\teplo_dog\dbf")
 DBF_ENCODING = env("DBF_ENCODING", "")
 
 CATALOG_PAGE_SIZE = 50
+
+# Папка, куда при переходе на новый месяц кладётся файл Abot<ГГ><ММ>.dbf для 1С
+# (в старой программе \\SERVER-B\Abon_teplo1C). Пусто — файл только скачивается
+# со страницы «Новый месяц».
+TEPLO_1C_DIR = env("TEPLO_1C_DIR", "")

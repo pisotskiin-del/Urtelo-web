@@ -1,11 +1,11 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load ui %}
 {% block title %}Удаление{% endblock %}
 {% block content %}
 <div class="card narrow">
   <h1>Удалить запись?</h1>
   <p>«{{ obj }}» из справочника «{{ meta.verbose_name_plural }}» будет удалена.</p>
   <form method="post">{% csrf_token %}
-    <button class="danger">Удалить</button>
+    <button class="danger">{% icon "trash" %} Удалить</button>
     <a href="{% url 'catalogs:detail' slug obj.pk %}">Отмена</a>
   </form>
 </div>
