@@ -1289,3 +1289,64 @@ class KredoSchetTests(DokumentyTests):
         with override_settings(TEPLO_DOC_DIR=self.tmp):
             r = self.client.post("/abonents/dogovor/1/6/schet/", {"action": "kredo_proverka"}, follow=True)
         self.assertContains(r, "pywin32")
+
+
+ORGS_XML = """<?xml version="1.0" encoding="utf-8"?><DataSet><xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"/>
+<records><row><org_id>11111111-2222-3333-4444-555555555555</org_id><s_name>ООО Крипс</s_name><rric_acn>R1</rric_acn>
+<fiscode>0200012345</fiscode><adr_full>г.Рыбница</adr_full></row>
+<row><org_id>AAAAAAAA-2222-3333-4444-555555555555</org_id><s_name>Школа № 1</s_name><fiscode>0300000001</fiscode></row></records></DataSet>"""
+USERS_XML = """<DataSet><records><row><org_id>11111111-2222-3333-4444-555555555555</org_id>
+<pid>99999999-8888-7777-6666-555555555555</pid><l_name>Иванов</l_name><f_name>Иван</f_name><m_name>Петрович</m_name>
+<pos_name>Директор</pos_name></row></records></DataSet>"""
+
+
+class KredoInv:
+    """Ответы КРЭДО по процедурам."""
+
+    def __init__(self, *a):
+        self.calls = []
+
+    def exec_proc(self, name, params):
+        self.calls.append((name, params))
+        return {"Kredo_MainOrgs": ORGS_XML, "Kredo_MainIndividuals": "<DataSet/>", "Kredo_Users": USERS_XML}[name]
+
+
+from django.urls import reverse  # noqa: E402
+
+
+class KredoKodyTests(KartaBase):
+    """Коды абонентов в КРЭДО: организация и представитель."""
+
+    def setUp(self):
+        super().setUp()
+        Potreb.objects.filter(potreb_id=5).update(fisk_cod="0200012345")
+
+    def test_podbor(self):
+        from unittest import mock
+        from abonents import kredo_kody as kk
+        from abonents.models import KredoOrg
+        self.assertEqual(kk.obnovit_organizacii(1, KredoInv()), 2)
+        p = Potreb.objects.get(potreb_id=5)
+        (o,) = kk.najti(p)
+        self.assertEqual(o.s_name, "ООО Крипс")
+        self.login("Оператор")
+        with mock.patch("abonents.kredo.ComInvoker", KredoInv):
+            r = self.client.get(reverse("abonents:kredo_kody") + "?gorod=1")
+            self.assertContains(r, "найдена: ООО Крипс")
+            r = self.client.get(reverse("abonents:kredo_kod", args=[5]))
+            self.assertContains(r, "Иванов Иван Петрович")
+            r = self.client.post(reverse("abonents:kredo_kod", args=[5]),
+                                 {"org": o.org_id, "pid": "99999999-8888-7777-6666-555555555555"})
+        self.assertRedirects(r, reverse("abonents:karta", args=[5]), fetch_redirect_response=False)
+        p.refresh_from_db()
+        self.assertEqual((p.org_in, p.pid_in, p.rric_acn, p.users_name, p.pos_name),
+                         (o.org_id, "99999999-8888-7777-6666-555555555555", "R1", "И.П.Иванов", "Директор"))
+        self.client.post(reverse("abonents:kredo_kod", args=[5]), {"action": "ochistit"})
+        p.refresh_from_db()
+        self.assertEqual((p.org_in, p.pid_in), ("", ""))
+        self.assertEqual(KredoOrg.objects.count(), 2)
+
+    def test_nablyudatel(self):
+        self.login("Наблюдатель")
+        r = self.client.post(reverse("abonents:kredo_kod", args=[5]), {"action": "ochistit"})
+        self.assertEqual(r.status_code, 403)

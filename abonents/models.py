@@ -262,3 +262,24 @@ class KredoPriem(models.Model):
     def izmeneniya(self, value):
         import json
         self.izm = json.dumps(value, ensure_ascii=False)
+
+
+class KredoOrg(models.Model):
+    """Юрлица и ИП, зарегистрированные в КРЭДО (Kredo_MainOrgs,
+    Kredo_MainIndividuals): список для подбора кодов абонентов."""
+
+    org_id = models.CharField("Код организации (org_id)", max_length=36)
+    s_name = models.CharField("Наименование", max_length=250, blank=True)
+    rric_acn = models.CharField("Лицевой № в КРЭДО", max_length=10, blank=True)
+    fiscode = models.CharField("Фискальный код", max_length=20, blank=True)
+    adr_full = models.CharField("Адрес", max_length=250, blank=True)
+    ip = models.BooleanField("Индивидуальный предприниматель", default=False)
+    obnovleno = models.DateTimeField("Получено", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Организация в КРЭДО"
+        verbose_name_plural = "Организации в КРЭДО"
+        ordering = ["s_name"]
+
+    def __str__(self):
+        return self.s_name

@@ -22,5 +22,6 @@
   {% if can_run %}<button class="primary" onclick="this.disabled=true;this.textContent='Идет расчет…';this.form.submit()">{% icon "calc" %} Расчет</button>{% endif %}
   <a href="{% url 'abonents:raschet_itog' %}">Итоги последнего расчета</a>
   <a href="{% url 'abonents:kredo' %}">Показания приборов из КРЭДО</a>
+  <a href="{% url 'abonents:kredo_kody' %}">Коды абонентов в КРЭДО</a>
 </form>
 {% endblock %}

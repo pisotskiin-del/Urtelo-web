@@ -1011,3 +1011,101 @@ def kredo_priem(request, pk):
         "z": z, "city": city, "stroki": stroki, "can_change": can_change, "tekushchij": tekushchij,
         "itogi": [(t, n) for k, t in kredo.STATUSY.items() if (n := Counter(s.status for s in stroki)[k])],
     })
+
+
+@login_required
+@view_required
+def kredo_kody(request):
+    """Коды абонентов в КРЭДО по участку: список организаций КРЭДО и лицевые
+    с подходящей организацией (форма kredo старой программы)."""
+    from . import kredo, kredo_kody as kk
+    from .models import KredoOrg
+    cities = _cities()
+    code = _current_city(request, cities)
+    city = next((c for c in cities if c.cod_gorod == code), None)
+    if city is None:
+        raise Http404
+    can_change = request.user.has_perm("catalogs.change_potreb")
+    if request.method == "POST":
+        if not can_change:
+            raise PermissionDenied
+        try:
+            n = kk.obnovit_organizacii(code)
+            messages.success(request, f"Список организаций КРЭДО получен: {n}")
+        except kredo.KredoError as e:
+            messages.error(request, f"КРЭДО: {e}")
+        return redirect(f"{reverse('abonents:kredo_kody')}?gorod={code}")
+    filtr = request.GET.get("f", "net")
+    qs = Potreb.objects.filter(cod_gor=code).order_by("nom_dog", "potreb_id")
+    if filtr == "net":
+        qs = qs.filter(Q(org_in__isnull=True) | Q(org_in="") | Q(pid_in__isnull=True) | Q(pid_in=""))
+    elif filtr == "kredo":
+        qs = qs.filter(kredo_ras=True)
+    orgs = list(KredoOrg.objects.all())
+    po_fisk = {o.fiscode: o for o in orgs if o.fiscode}
+    po_acn = {o.rric_acn: o for o in orgs if o.rric_acn}
+    rows = []
+    for p in qs:
+        o = po_acn.get((p.rric_acn or "").strip()) or po_fisk.get(kk._fisk(p.fisk_cod))
+        rows.append((p, o))
+    return render(request, "abonents/kredo_kody.html", {
+        "cities": cities, "city": city, "can_change": can_change, "rows": rows, "filtr": filtr,
+        "orgs_n": len(orgs), "orgs_data": orgs[0].obnovleno if orgs else None,
+        "najdeno": sum(1 for _, o in rows if o),
+    })
+
+
+@login_required
+@view_required
+def kredo_kod(request, potreb_id):
+    """Подбор кодов КРЭДО одному лицевому: организация → представитель."""
+    from . import kredo, kredo_kody as kk
+    from .models import KredoOrg
+    p = get_object_or_404(Potreb.objects.select_related("cod_gor"), potreb_id=potreb_id)
+    code = p.cod_gor_id
+    can_change = request.user.has_perm("catalogs.change_potreb")
+    nazad = reverse("abonents:kredo_kod", args=[potreb_id])
+    if request.method == "POST":
+        if not can_change:
+            raise PermissionDenied
+        if request.POST.get("action") == "ochistit":
+            kk.ochistit(p)
+            messages.success(request, "Коды КРЭДО в карте очищены")
+            return redirect(nazad)
+        org = KredoOrg.objects.filter(org_id=request.POST.get("org", "")).first()
+        if org is None:
+            raise Http404
+        predst = None
+        pid = request.POST.get("pid", "")
+        if pid:
+            try:
+                predst = next((r for r in kk.predstaviteli(code, org.org_id) if r["pid"] == pid), None)
+            except kredo.KredoError as e:
+                messages.error(request, f"КРЭДО: {e}")
+                return redirect(f"{nazad}?org={org.org_id}")
+            if predst is None:
+                messages.error(request, "Представитель не найден в КРЭДО")
+                return redirect(f"{nazad}?org={org.org_id}")
+        kk.zapisat(p, org, predst)
+        messages.success(request, f"В карту записаны коды КРЭДО: {org.s_name}"
+                                  + (f", представитель {predst['fio']}" if predst else " (без представителя)"))
+        return redirect("abonents:karta", potreb_id=potreb_id)
+    q = (request.GET.get("q") or "").strip()
+    kandidaty = kk.najti(p)
+    poisk = []
+    if q:
+        poisk = [o for o in KredoOrg.objects.all() if q.lower().replace(" ", "") in (o.s_name or "").lower().replace(" ", "")
+                 or q == o.fiscode or q == o.rric_acn][:50]
+    org = KredoOrg.objects.filter(org_id=request.GET.get("org", "")).first()
+    if org is None and len(kandidaty) == 1 and not q:
+        org = kandidaty[0]
+    predst, oshibka = [], None
+    if org is not None:
+        try:
+            predst = kk.predstaviteli(code, org.org_id)
+        except kredo.KredoError as e:
+            oshibka = str(e)
+    return render(request, "abonents/kredo_kod.html", {
+        "p": p, "can_change": can_change, "kandidaty": kandidaty, "poisk": poisk, "q": q,
+        "org": org, "predst": predst, "oshibka": oshibka, "orgs_n": KredoOrg.objects.count(),
+    })

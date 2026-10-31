@@ -31,4 +31,6 @@ urlpatterns = [
     path("pisma/<int:pk>/pdf/", views.pismo_pdf, name="pismo_pdf"),
     path("kredo/", views.kredo_view, name="kredo"),
     path("kredo/<int:pk>/", views.kredo_priem, name="kredo_priem"),
+    path("kredo/kody/", views.kredo_kody, name="kredo_kody"),
+    path("kredo/kod/<int:potreb_id>/", views.kredo_kod, name="kredo_kod"),
 ]
