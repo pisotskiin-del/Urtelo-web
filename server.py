@@ -18,9 +18,8 @@ BASE = Path(__file__).resolve().parent
 sys.path.insert(0, str(BASE))
 os.chdir(BASE)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "teplo.settings")
-# На общем сервере подписать документ КРЭДО некому (программа работает как служба):
-# обмен с КРЭДО — только из копии начальника (teplo.pyw через удалённый рабочий стол).
-os.environ.setdefault("TEPLO_KREDO_ZDES", "0")
+# Обмен с КРЭДО на общем сервере можно выключить строкой TEPLO_KREDO_ZDES=0 в .env
+# (тогда КРЭДО — только из копии начальника, teplo.pyw через удалённый рабочий стол).
 
 
 def main():
