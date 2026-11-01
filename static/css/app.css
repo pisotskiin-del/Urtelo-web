@@ -507,3 +507,6 @@ table.dok-signs td { width:50%; vertical-align:top; padding:0 12px 0 0; }
 .tabs.karta-tabs a:hover { background:var(--accent-weak); }
 .tabs.karta-tabs a.active { background:var(--accent); border-color:var(--accent); color:#fff; }
 .tabs.karta-tabs a.active .i { color:#fff; }
+/* Реестр писем: кнопка «Отозвать» под статусом КРЭДО */
+form.otozvat { margin-top:4px; }
+form.otozvat .button { height:26px; padding:0 10px; font-size:12px; }

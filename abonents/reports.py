@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from django.db.models import Q
+from django.utils import timezone
 
 from catalogs.models import (Akcept, Danrasch, GvsKot, Kategorpot, Limit, Minist, Potreb, SetUrdevice,
                              SetUrdevicelist)
@@ -851,6 +852,118 @@ def arh_ras_ab(city, opts):
                   notes=notes, signatures=[_ved_spec(city, "\u2003" * 12)], landscape=True)
 
 
+BUDJ_HEAD = [[("Месяц, участок", 1, 2), ("Вед. жильё (хозрасчёт)", 2, 1), ("Вед. жильё (бюджет)", 2, 1),
+              ("Абонентское население", 2, 1), ("Хозрасчёт", 1, 2), ("Местный б.", 1, 2),
+              ("Республ. б.", 1, 2), ("Всего", 1, 2)],
+             [("Отопление", 1, 1), ("ГВС", 1, 1)] * 3]
+
+
+def budj_row(d, recs):
+    """Строка ведомости в разрезе бюджетов по участку d (budj_nak.frx):
+    отопление и ГВС ведомственного жилья и абонентского населения отдельно,
+    хозрасчёт и бюджеты — всего. Суммы — те же, что в «Полезном отпуске»
+    (П/У и нагрузка вместе)."""
+    def vse(vid):
+        pu, nagr = polez_rows(d, recs, vid)
+        return [a + b for a, b in zip(pu[1:], nagr[1:])]
+    o, g, v = vse("otopl"), vse("gvs"), vse(None)
+    # индексы POLEZ_COLS без первой колонки: 0 ведомств. жильё (кат. 4), 3 нас. хозрасчет (5),
+    # 4 всего население (4+5+6), 5 хозрасчёт, 6 местный, 7 республ., 10 ВСЕГО
+    nas = [x[4] - x[0] - x[3] for x in (o, g)]
+    return [o[3], g[3], o[0], g[0], nas[0], nas[1], v[5], v[6], v[7], v[10]]
+
+
+def arh_budj(city, opts):
+    """Ведомость фактического отпуска т/энергии в разрезе бюджетов за период
+    (budj_nak, вариант «по категориям с ГВС» формы arhiv): по каждому
+    закрытому месяцу и участку, итог месяца и итог за период. В старой
+    программе ведомость брала готовые итоги из Arhiv\\OtММГГГГ.dbf, здесь они
+    считаются по сохранённым записям месяца, как «Полезный отпуск за период»."""
+    from . import arhiv
+    spisok, text = _period(opts)
+    cols = [Col("Месяц, участок")] + [Col("", "num", 2, total=True) for _ in range(10)]
+    sections, itogi, missing = [], [], []
+    for mes, god, m in arhiv.zagruzit(spisok):
+        if m is None:
+            missing.append(arhiv.nazvanie(mes, god))
+            continue
+        rows = [[(d.name_gorod or "").strip()] + budj_row(d, m.dejstvuyushchie(d.cod_gorod))
+                for d in sorted(m.danrasch, key=lambda d: d.cod_gorod or 0) if d.cod_gorod is not None]
+        sec = Section(title=m.nazvanie, rows=rows)
+        sec.foot = _sum_row(cols, rows, "Итого за месяц")
+        itogi.append(sec.foot)
+        sections.append(sec)
+    total = _sum_row(cols, itogi, "Итого за период по филиалу")
+    return Report("ВЕДОМОСТЬ ФАКТИЧЕСКОГО ОТПУСКА Т/ЭНЕРГИИ В РАЗРЕЗЕ БЮДЖЕТОВ",
+                  ["по МГУП «Тирастеплоэнерго» (Гкал)", f"за {text}"],
+                  [Table(cols, sections, total=total, head=BUDJ_HEAD)],
+                  notes=_net_arhiva(missing), signatures=[_ved_spec(city, "\u2003" * 12)],
+                  landscape=True, approve=_utverjdau(city))
+
+
+DOG_MAX_MES = 12
+
+
+def _obekt(p):
+    adr = " ".join(x for x in ((p.adres_sd or "").strip(), (p.oba_dom or "").strip(), (p.oba_kv or "").strip()) if x)
+    name = (p.nameobakt or "").strip() or (p.name_potre or "").strip()
+    return f"{name}, {adr}" if adr else name
+
+
+def arh_dog(city, opts):
+    """Расшифровка отпуска по договору за период (ved_budjet.frx, форма
+    arhiv): объекты договора по категориям, Гкал (отопление + ГВС) по
+    месяцам и всего. Без номера договора — все лицевые участка с отпуском:
+    так же старая программа выгружала «Начисление юрлица» в Excel."""
+    from . import arhiv
+    spisok, text = _period(opts)
+    notes = []
+    if len(spisok) > DOG_MAX_MES:
+        notes.append(f"Показаны первые {DOG_MAX_MES} месяцев периода.")
+        spisok = spisok[:DOG_MAX_MES]
+    try:
+        dog = int(opts.get("dog") or 0)
+    except ValueError:
+        dog = 0
+    cols = [Col("Наименование объекта"), Col("Л/№", "int"), Col("№ дог.", "int")] + \
+        [Col(f"{m:02d}.{g}", "num", 3, total=True) for m, g in spisok] + [Col("ВСЕГО", "num", 3, total=True)]
+    data, missing = {}, []
+    for i, (mes, god, m) in enumerate(arhiv.zagruzit(spisok)):
+        if m is None:
+            missing.append(arhiv.nazvanie(mes, god))
+            continue
+        for p in m.potreb:
+            if p.cod_gor_id != city.cod_gorod or (dog and p.nom_dog != dog):
+                continue
+            row = data.setdefault(p.potreb_id, {"p": p, "nac": [Decimal(0)] * len(spisok)})
+            row["p"] = p
+            row["nac"][i] = n(p.nach_otopl) + n(p.nach_gvs)
+    items = [r for r in data.values() if dog or any(r["nac"])]
+    items.sort(key=lambda r: (r["p"].id_kategor or 0, r["p"].nom_dog or 0, r["p"].potreb_id or 0))
+    kateg = _kategor()
+    sections, key = [], object()
+    for r in items:
+        p = r["p"]
+        if p.id_kategor != key:
+            key = p.id_kategor
+            sections.append(Section(title=(kateg.get(p.id_kategor) or "").strip()))
+        sections[-1].rows.append([_obekt(p), p.potreb_id, p.nom_dog] + r["nac"] + [sum(r["nac"])])
+    for sec in sections:
+        sec.foot = _sum_row(cols, sec.rows, f"Итого: {sec.title}" if sec.title else "Итого")
+    total = _sum_row(cols, [x for sec in sections for x in sec.rows], "ВСЕГО")
+    lines = _city_lines(city, month=False)
+    if dog:
+        glav = next((r["p"] for r in items), None) or Potreb.objects.filter(cod_gor=city.cod_gorod, nom_dog=dog).first()
+        if glav is not None:
+            lines.append((glav.glav_potre or glav.name_potre or "").strip())
+    lines.append(f"за {text}")
+    if dog and not items:
+        notes.append(f"Договора № {dog} нет в архиве за выбранный период.")
+    title = f"РАСШИФРОВКА ОТПУСКА ПО ДОГОВОРУ № {dog}" if dog else "РАСШИФРОВКА ОТПУСКА ПО ЛИЦЕВЫМ"
+    return Report(title, lines, [Table(cols, sections, total=total)],
+                  notes=notes + _net_arhiva(missing), signatures=[_ved_spec(city, "\u2003" * 12)], landscape=True)
+
+
 def arh_potreb_god(city, opts):
     """Данные о фактическом потреблении тепловой энергии за год (potreb_god):
     бюджетные потребители (местный и республиканский бюджет, кроме категории
@@ -913,6 +1026,118 @@ def _arh_gody():
     return [(str(g), str(g)) for g in arhiv.gody()] or [(str(datetime.date.today().year), str(datetime.date.today().year))]
 
 
+# --- Ведомости, реестры -------------------------------------------------------
+
+def reestr_dog(city, opts):
+    """«Ведомости, реестры → Реестр действующих договоров» (proced.reestr_dog,
+    reestr_dog.frx): договоры участка с заключённым или возобновлённым
+    статусом по категориям потребителей — абонент, № и дата договора. На
+    договор одна строка (главный лицевой: абонент, затем меньший л/№)."""
+    names = _kategor()
+    recs = _active(Potreb.objects.filter(cod_gor=city.cod_gorod, nom_dog__gt=0)).order_by("nom_dog", "potreb_id")
+    dog = {}
+    for p in recs:
+        cur = dog.get(p.nom_dog)
+        if cur is None or (cur.id_katabon != 1 and p.id_katabon == 1):
+            dog[p.nom_dog] = p
+    items = sorted(dog.values(), key=lambda p: (p.id_kategor or 0, p.nom_dog))
+    cols = [Col("№ п/п", "int"), Col("Абонент"), Col("Номер договора", "int"), Col("Дата заключения договора", "date")]
+    sections, cur, kat = [], None, object()
+    for p in items:
+        if p.id_kategor != kat:
+            kat = p.id_kategor
+            cur = Section(f"Категория потребителя: {names.get(kat) or kat or '—'}")
+            sections.append(cur)
+        cur.rows.append([len(cur.rows) + 1, (p.name_potre or "").strip(), p.nom_dog, p.data_dog])
+    for s in sections:
+        s.foot = [None, f"договоров: {len(s.rows)}", None, None]
+    return Report("Реестр действующих договоров на отпуск тепловой энергии",
+                  [f"г. {(city.name_gorod or '').strip()}",
+                   f"по состоянию на {(city.name_mes or '').strip()} {city.god} г."],
+                  [Table(cols, sections, total=[None, f"Всего договоров: {len(items)}", None, None])],
+                  signatures=_signatures(city))
+
+
+def _pisma_mesyacy():
+    from .models import Pismo
+    mes = sorted(set(Pismo.objects.values_list("god", "nom_mes")), reverse=True)
+    from .nov_mes import MONTHS
+    return [(f"{g}-{m:02d}", f"{MONTHS[m - 1]} {g}") for g, m in mes] or [("", "писем ещё не отправляли")]
+
+
+VID_KANAL = [("", "Почта и КРЭДО"), ("mail", "Почта"), ("kredo", "КРЭДО")]
+
+
+def vedom_pisem(city, opts):
+    """«Ведомости, реестры → Ведомость отправленных писем» (proced.vedom,
+    vedommail.frx): документы, успешно отправленные абонентам участка за
+    месяц, по реестру писем — л/№, № договора, потребитель, дата отправки."""
+    from .models import Pismo
+    from .nov_mes import MONTHS
+    qs = Pismo.objects.filter(cod_gor=city.cod_gorod, status=Pismo.OK)
+    mes = opts.get("mes") or ""
+    if mes:
+        m, g = _ym(mes)
+    else:
+        m, g = city.nom_mes, city.god
+    qs = qs.filter(nom_mes=m, god=g)
+    if opts.get("kanal"):
+        qs = qs.filter(kanal=opts["kanal"])
+    cols = [Col("№ ПП", "int"), Col("Л.№", "int"), Col("№ дог", "int"), Col("Наименование потребителя"),
+            Col("Документ"), Col("Куда"), Col("Дата отправки письма")]
+    vid = {"schet": "Информация-счёт", "akt": "Акт"}
+    rows = [[i, z.potreb_id, z.nom_dog, z.name_potre, vid.get(z.vid, z.vid), z.get_kanal_display(),
+             timezone.localtime(z.created).strftime("%d.%m.%Y %H:%M")]
+            for i, z in enumerate(qs.order_by("created", "nomer"), 1)]
+    mes_txt = f"{MONTHS[m - 1]} {g} г." if m and g else ""
+    return Report("ВЕДОМОСТЬ", ["отправленных писем абонентам", f"г. {(city.name_gorod or '').strip()}",
+                                f"документы за {mes_txt}" if mes_txt else "",
+                                f"сформирована {timezone.localtime().strftime('%d.%m.%Y %H:%M')}"],
+                  [Table(cols, [Section(rows=rows)], total=[None, None, None, f"Всего писем: {len(rows)}", None, None, None])])
+
+
+NAGR_KAT = [(1, "Хозрасчет"), (2, "Местный бюджет"), (3, "Республиканский бюджет"), (4, "Население бюджет"),
+            (5, "Население хозрасчет"), (6, "Население абонентское"), (7, "Организации СКиОД")]
+
+
+def nagr_kot_kat(city, opts):
+    """«Ведомости, реестры → Нагрузка котельных по категориям»
+    (nagr_kot_kat.prg, в старой программе — книга Excel по шаблону): по
+    каждой котельной участка часовая нагрузка действующих договоров на
+    отопление (q_otoppr) и ГВС (q_gvs) по категориям потребителей."""
+    sums = {}
+    for p in _active(Potreb.objects.filter(cod_gor=city.cod_gorod)).only("id_koteln", "id_kategor", "q_otoppr", "q_gvs"):
+        k = (p.id_koteln, p.id_kategor)
+        o, g = sums.get(k, (Decimal(0), Decimal(0)))
+        sums[k] = (o + n(p.q_otoppr), g + n(p.q_gvs))
+    kotly = list(GvsKot.objects.filter(kod_gor=city.cod_gorod).order_by("id_kot"))
+    known = {k.id_kot for k in kotly}
+    # Шапка как в шаблоне «Нагрузка котельных по категориям.xltx»: по каждой
+    # категории «отопл.» и «ГВС», без колонок «Всего».
+    cols = [Col("Наименование котельной")]
+    for _, t in NAGR_KAT:
+        cols += [Col(f"{t}: отопл.", "num", 5, total=True), Col(f"{t}: ГВС", "num", 5, total=True)]
+    rows = []
+
+    def row(name, kot):
+        r = [name]
+        for kat, _ in NAGR_KAT:
+            r += list(sums.get((kot, kat), (Decimal(0), Decimal(0))))
+        return r
+    for k in kotly:
+        r = row((k.name_kot or "").strip() or f"Котельная {k.id_kot}", k.id_kot)
+        if any(r[1:]):
+            rows.append(r)
+    for kot in sorted({k for k, _ in sums if k not in known}, key=lambda v: (v is None, v or 0)):
+        rows.append(row("Котельная не указана" if kot is None else f"Котельная {kot}", kot))
+    head = [[("Наименование котельной", 1, 2)] + [(t, 2, 1) for _, t in NAGR_KAT],
+            [("отопл.", 1, 1), ("ГВС", 1, 1)] * len(NAGR_KAT)]
+    return Report("Нагрузка котельных по категориям потребителей, Гкал/час",
+                  [f"г. {(city.name_gorod or '').strip()} данные на {_today()}"],
+                  [Table(cols, [Section(rows=rows)], total=_sum_row(cols, rows, "Итого по участку"), head=head)],
+                  landscape=True)
+
+
 VID_PRIBOR = [("nach", "Начислено"), ("nenach", "Не начислено")]
 VID_NUL = [("otopl", "Отопление"), ("gvs", "ГВС")]
 
@@ -950,9 +1175,22 @@ REPORTS = [
               hint="Перечень потребителей и нагрузка по котельным"),
     ReportDef("potreb_kategor", "Часовые нагрузки по категориям", "Печать", potreb_kategor, per_city=False,
               hint="Нагрузка по участкам и категориям потребителей"),
+    ReportDef("reestr_dog", "Реестр действующих договоров", "Ведомости, реестры", reestr_dog,
+              hint="Действующие договоры участка по категориям потребителей"),
+    ReportDef("vedom_pisem", "Ведомость отправленных писем", "Ведомости, реестры", vedom_pisem,
+              options=[("mes", "Месяц", _pisma_mesyacy), ("kanal", "Куда", VID_KANAL)],
+              hint="Документы, отправленные абонентам за месяц, по реестру писем"),
+    ReportDef("nagr_kot_kat", "Нагрузка котельных по категориям", "Ведомости, реестры", nagr_kot_kat,
+              hint="Часовая нагрузка отопления и ГВС по котельным и категориям"),
     ReportDef("arh_polez", "Полезный отпуск за период", "Архив (за период)", arh_polez, per_city=False,
               options=[("s", "С", MONTH), ("po", "по", MONTH), ("vid", "Услуга", VID_USLUGA)],
               hint="По закрытым месяцам, по участкам, с итогом за период"),
+    ReportDef("arh_budj", "Отпуск в разрезе бюджетов за период", "Архив (за период)", arh_budj, per_city=False,
+              options=[("s", "С", MONTH), ("po", "по", MONTH)],
+              hint="Ведомость фактического отпуска: ведомственное жильё и население — отопление и ГВС"),
+    ReportDef("arh_dog", "Расшифровка отпуска по договору", "Архив (за период)", arh_dog,
+              options=[("dog", "Договор №", NUMBER), ("s", "С", MONTH), ("po", "по", MONTH)],
+              hint="Гкал по объектам договора по месяцам; без номера — все лицевые участка (для Excel)"),
     ReportDef("arh_ras_ab", "Расшифровка отпуска по лицевому", "Архив (за период)", arh_ras_ab, per_city=False,
               options=[("ls", "Л/№", NUMBER), ("s", "С", MONTH), ("po", "по", MONTH)],
               hint="Расчет количества тепла, отпущенного абоненту, по месяцам"),

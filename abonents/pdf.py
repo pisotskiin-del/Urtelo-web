@@ -107,11 +107,15 @@ def filename(dok, vid):
     return f"{'akt' if vid == 'akt' else 'schet'}_{dok.filename}.pdf"
 
 
+def base_dir():
+    """Папка документов: TEPLO_DOC_DIR или dokumenty рядом с программой."""
+    return Path(getattr(settings, "TEPLO_DOC_DIR", "") or Path(settings.BASE_DIR) / "dokumenty")
+
+
 def folder(dok):
     """Папка документов месяца: TEPLO_DOC_DIR\\<участок>\\<год>\\<месяц>, как
     D:\\Teplo_dog\\Akt_potreb\\<город>\\<год>\\<месяц> в старой программе."""
-    base = Path(getattr(settings, "TEPLO_DOC_DIR", "") or Path(settings.BASE_DIR) / "dokumenty")
-    return base / GORODA.get(dok.gorod.cod_gorod, str(dok.gorod.cod_gorod)) / str(dok.god) / str(dok.mes)
+    return base_dir() / GORODA.get(dok.gorod.cod_gorod, str(dok.gorod.cod_gorod)) / str(dok.god) / str(dok.mes)
 
 
 def save(dok, vid, context):

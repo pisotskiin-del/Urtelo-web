@@ -283,11 +283,12 @@ def karta_edit(request, potreb_id):
     return render(request, "abonents/karta_edit.html", context)
 
 
-# Показания прибора, которые вводятся прямо в карточке, без «Изменить»:
+# Показания прибора и дни потребления т/э, которые вводятся прямо в карточке, без «Изменить»:
 # поле → (название, наибольшее значение, знаков после запятой).
 POKAZANIYA = {
     "pok_new": ("Показания настоящие (отопление)", Decimal("999999.999"), 3),
     "pok_newg": ("Показания настоящие (ГВС)", Decimal("999999999999"), 0),
+    "dnotop": ("Потребление т/э, дней", Decimal("999.9"), 1),
 }
 
 
@@ -310,7 +311,7 @@ def pokazanie(request, potreb_id, pole):
         raw = "ошибка"
     if raw and (znach is None or not znach.is_finite() or znach < 0 or znach > maks
                 or znach != round(znach, znakov)):
-        messages.error(request, f"{nazv}: «{request.POST.get('znach')}» — не показание "
+        messages.error(request, f"{nazv}: «{request.POST.get('znach')}» — неверное значение "
                                 f"(число от 0 до {formats.localize(maks)}"
                                 + (f", не больше {znakov} знаков после запятой" if znakov else ", целое") + ")")
         return redirect(nazad)
@@ -932,6 +933,32 @@ def pisma(request):
     """Реестр отправленных писем (форма reestrmail): фильтр по месяцу и л/№,
     открытие отправленного PDF."""
     from .models import Pismo
+    if request.method == "POST" and request.POST.get("action") == "kredo":
+        if not request.user.has_perm("catalogs.change_potreb"):
+            raise PermissionDenied
+        from . import kredo, kredo_dok
+        goroda = sorted(set(Pismo.objects.filter(kanal=Pismo.KREDO, status=Pismo.OK).exclude(kredo_doc="")
+                            .values_list("cod_gor", flat=True)))
+        if not goroda:
+            messages.info(request, "Нет отправленных в КРЭДО документов")
+        for g in goroda:
+            try:
+                obn, vsego = kredo_dok.obnovit_statusy(g)
+                messages.success(request, f"Участок {g}: обновлены статусы {obn} документов (в КРЭДО найдено {vsego})")
+            except kredo.KredoError as e:
+                messages.error(request, f"Участок {g}: {e}")
+        return redirect(request.get_full_path())
+    if request.method == "POST" and request.POST.get("action") == "otozvat":
+        if not request.user.has_perm("catalogs.change_potreb"):
+            raise PermissionDenied
+        from . import kredo, kredo_dok
+        z = get_object_or_404(Pismo, pk=request.POST.get("pk"))
+        try:
+            kredo_dok.otozvat(z, request.user.get_username())
+            messages.success(request, f"Документ № {z.nomer} отозван из КРЭДО")
+        except kredo.KredoError as e:
+            messages.error(request, str(e))
+        return redirect(request.get_full_path())
     qs = Pismo.objects.all()
     mes = request.GET.get("mes", "")
     if re.fullmatch(r"\d{4}-\d{2}", mes):
@@ -944,6 +971,7 @@ def pisma(request):
     page = Paginator(qs, 50).get_page(request.GET.get("page"))
     return render(request, "abonents/pisma.html", {"page": page, "mes": mes, "ls": ls,
                                                    "oshibki": bool(request.GET.get("oshibki")),
+                                                   "can_send": request.user.has_perm("catalogs.change_potreb"),
                                                    "goroda": dict((c.cod_gorod, c.name_gorod) for c in _cities())})
 
 

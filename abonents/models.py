@@ -183,7 +183,7 @@ class Pismo(models.Model):
     первый номер задается TEPLO_PISMO_NOMER (чтобы продолжить нумерацию
     старой программы)."""
 
-    OK, OSHIBKA, PROVERKA = "ok", "err", "chk"
+    OK, OSHIBKA, PROVERKA, OTOZVANO = "ok", "err", "chk", "del"
     POCHTA, KREDO = "mail", "kredo"
 
     nomer = models.IntegerField("Номер документа", unique=True)
@@ -200,10 +200,19 @@ class Pismo(models.Model):
     nom_mes = models.IntegerField("Месяц")
     god = models.IntegerField("Год")
     status = models.CharField("Результат", max_length=3,
-                              choices=[(OK, "Отправлено"), (OSHIBKA, "Ошибка"), (PROVERKA, "Проверка (не отправлялось)")])
+                              choices=[(OK, "Отправлено"), (OSHIBKA, "Ошибка"), (PROVERKA, "Проверка (не отправлялось)"),
+                                       (OTOZVANO, "Отозвано из КРЭДО")])
     oshibka = models.TextField("Ошибка", blank=True)
     otvet = models.TextField("Ответ КРЭДО", blank=True)
     fail = models.CharField("Файл PDF", max_length=500, blank=True)
+    # Документ в КРЭДО: код (ret_val ответа Set_URDocument) и его статусы из
+    # Kredo_DocumentsOut — у отправителя (dstn_out) и у получателя (dstn_in).
+    kredo_doc = models.CharField("Код документа в КРЭДО", max_length=40, blank=True)
+    kredo_out = models.CharField("Статус у отправителя", max_length=200, blank=True)
+    kredo_in = models.CharField("Статус у получателя", max_length=200, blank=True)
+    kredo_data = models.DateTimeField("Статус получен", null=True, blank=True)
+    otozvano = models.DateTimeField("Отозвано", null=True, blank=True)
+    otozval = models.CharField("Кто отозвал", max_length=150, blank=True)
 
     class Meta:
         verbose_name = "Отправленное письмо"

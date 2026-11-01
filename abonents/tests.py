@@ -837,9 +837,49 @@ class ArhivTests(KartaBase):
         call_command("arhiv_import", dir=str(folder), stdout=io.StringIO())
         self.assertEqual(nov_mes_model().objects.filter(nom_mes=3, god=2024).count(), 1)
 
+    def test_tarify_iz_ta_i_tar(self):
+        import tempfile
+        from pathlib import Path
+        from django.core.management import call_command
+        from abonents import arhiv
+        folder = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__("shutil").rmtree, folder)
+        spec = "potreb_id N(6,0); cod_gor N(2,0); nom_dog N(6,0); id_kategor N(2,0); nac_vsego N(12,3)"
+        for f in ("Po032024.dbf", "Po042024.dbf"):
+            self.make_dbf(folder, f, spec, [(21, 1, 30, 1, 1)])
+        # ta — тарифы одной строкой (TAR_n, TAR_nD); tar — копия tarif.dbf, она важнее.
+        self.make_dbf(folder, "ta032024.dbf", "TAR_1 N(9,2); TAR_2 N(9,2); TAR_2D N(9,2)", [(996.68, 692.46, 311.15)])
+        self.make_dbf(folder, "ta042024.dbf", "TAR_1 N(9,2)", [(1.0,)])
+        self.make_dbf(folder, "tar042024.dbf", "id_tar N(3,0); zn_tar N(9,2); diz_tar N(9,2)", [(1, 900.5, 0)])
+        call_command("arhiv_import", dir=str(folder), stdout=io.StringIO())
+        t = arhiv.zagruzit([(3, 2024)])[0][2].tarify(1)
+        self.assertEqual({k: (Decimal(a), Decimal(b)) for k, (a, b) in t.items()},
+                         {1: (Decimal("996.68"), Decimal("0")), 2: (Decimal("692.46"), Decimal("311.15"))})
+        self.assertEqual(Decimal(arhiv.zagruzit([(4, 2024)])[0][2].tarify(1)[1][0]), Decimal("900.5"))
+
+    def test_budj_za_period(self):
+        rep, _ = reports.build(reports.BY_KEY["arh_budj"], self.ryb, {"s": "2026-11", "po": "2026-12"})
+        t = rep.tables[0]
+        self.assertEqual([s.title for s in t.sections], ["ноябрь 2026", "декабрь 2026"])
+        self.assertEqual(len(t.cols), 11)
+        self.assertEqual(t.total[-1], Decimal("9.000"))
+        self.assertEqual(t.total[7], Decimal("9.000"))      # хозрасчёт — всего (отопление и ГВС)
+
+    def test_dog_za_period(self):
+        rep, _ = reports.build(reports.BY_KEY["arh_dog"], self.ryb, {"dog": "6", "s": "2026-11", "po": "2026-12"})
+        rows = [r for s in rep.tables[0].sections for r in s.rows]
+        self.assertEqual(sorted(r[1] for r in rows), [5, 7])         # оба лицевых договора № 6
+        row = next(r for r in rows if r[1] == 5)
+        self.assertTrue(row[0].startswith('ООО "Крипс"'))       # объекта нет — наименование
+        self.assertEqual(row[3:], [Decimal("4"), Decimal("5"), Decimal("9")])
+        self.assertEqual([c.title for c in rep.tables[0].cols][3:5], ["11.2026", "12.2026"])
+        rep, _ = reports.build(reports.BY_KEY["arh_dog"], self.ryb, {"dog": "", "s": "2026-11", "po": "2026-12"})
+        self.assertEqual(rep.title, "РАСШИФРОВКА ОТПУСКА ПО ЛИЦЕВЫМ")
+        self.assertEqual(rep.tables[0].total[-1], Decimal("9"))
+
     def test_excel(self):
         self.login("Наблюдатель")
-        for key in ("arh_polez", "arh_ras_ab", "arh_potreb_god"):
+        for key in ("arh_polez", "arh_ras_ab", "arh_potreb_god", "arh_budj", "arh_dog"):
             r = self.client.get(f"/abonents/otchety/{key}/?xlsx=1&ls=5&s=2026-11&po=2026-12&god=2026")
             self.assertEqual(r.status_code, 200, key)
 
@@ -849,6 +889,11 @@ class ArhivTests(KartaBase):
         self.assertContains(r, 'type="month"')
         self.assertContains(r, "декабрь 2026")
         self.assertContains(self.client.get("/abonents/otchety/"), "Полезный отпуск за период")
+
+
+def timezone_now():
+    from django.utils import timezone
+    return timezone.now()
 
 
 def nov_mes_model():
@@ -1277,6 +1322,87 @@ class KredoSchetTests(DokumentyTests):
             z = kredo_dok.otpravit(documents.sobrat(1, 6), {}, crypto=FakeCrypto(), invoker=inv)
             self.assertIn("org_in, pid_in", z.oshibka)
 
+    def test_status_iz_kredo(self):
+        from django.test import override_settings
+        from abonents import documents, kredo_dok
+        from abonents.models import Pismo
+        guid = "730007F7-EADA-4BA8-8EDF-AC6974ED1F4B"
+        otvet = f'<?xml version="1.0" encoding="windows-1251"?><records><row><ret_kod>0</ret_kod><ret_val>{guid}</ret_val></row></records>'
+        with override_settings(TEPLO_DOC_DIR=self.tmp):
+            z = kredo_dok.otpravit(documents.sobrat(1, 6), {}, crypto=FakeCrypto(), invoker=FakeInvoker(otvet))
+            self.assertEqual(z.kredo_doc, guid)
+            spisok = (f"<DataSet><records><row><doc_id>{guid.lower()}</doc_id><fam_in>Иванов</fam_in>"
+                      "<dstn_out>Отправлен</dstn_out><dstn_in>Прочитан</dstn_in></row>"
+                      "<row><doc_id>00000000-0000-0000-0000-000000000000</doc_id><dstn_out>Отправлен</dstn_out></row>"
+                      "</records></DataSet>")
+            inv = FakeInvoker(spisok)
+            self.assertEqual(kredo_dok.obnovit_statusy(1, invoker=inv), (1, 2))
+        self.assertEqual(inv.calls, [("Kredo_DocumentsOut", "@comorg=210,@pid_out=527172a2-82e2-41fb-bc50-0984d4321163")])
+        z.refresh_from_db()
+        self.assertEqual((z.kredo_out, z.kredo_in), ("Отправлен", "Прочитан"))
+        self.assertIsNotNone(z.kredo_data)
+        from pathlib import Path
+        self.assertTrue((Path(self.tmp) / "kredo" / "documentsout_1.xml").exists())
+        self.login("Оператор")
+        r = self.client.get("/abonents/pisma/")
+        self.assertContains(r, "у абонента: Прочитан")
+        self.assertContains(r, "Статусы из КРЭДО")
+        # Без pywin32 — понятная ошибка, страница не падает.
+        r = self.client.post("/abonents/pisma/", {"action": "kredo"}, follow=True)
+        self.assertContains(r, "pywin32")
+        self.assertEqual(Pismo.objects.filter(kredo_doc=guid).count(), 1)
+
+    def test_otozvat(self):
+        from django.test import override_settings
+        from abonents import documents, kredo, kredo_dok
+        from abonents.models import Pismo
+        guid = "730007F7-EADA-4BA8-8EDF-AC6974ED1F4B"
+
+        class Inv:
+            def __init__(self, dstn_in):
+                self.dstn_in, self.calls = dstn_in, []
+
+            def exec_proc(self, name, params):
+                self.calls.append((name, params))
+                if name == "Kredo_DocumentsOut":
+                    return (f"<records><row><doc_id>{guid}</doc_id><dstn_out>отправлен получателю</dstn_out>"
+                            f"<dstn_in>{self.dstn_in}</dstn_in></row></records>")
+                return "<records><row><ret_kod>0</ret_kod></row></records>"
+
+        otvet = f"<records><row><ret_kod>0</ret_kod><ret_val>{guid}</ret_val></row></records>"
+        with override_settings(TEPLO_DOC_DIR=self.tmp):
+            z = kredo_dok.otpravit(documents.sobrat(1, 6), {}, crypto=FakeCrypto(), invoker=FakeInvoker(otvet))
+            # Абонент уже получил — не отзывается, удаление не вызывается.
+            inv = Inv("получен")
+            with self.assertRaisesMessage(kredo.KredoError, "отозвать можно только неполученный"):
+                kredo_dok.otozvat(z, "op", invoker=inv)
+            self.assertNotIn("Set_URDocumentDelete", [c[0] for c in inv.calls])
+            inv = Inv("ожидает получения")
+            z = kredo_dok.otozvat(z, "op", invoker=inv)
+        self.assertEqual(inv.calls[-1], ("Set_URDocumentDelete", f"@doc_id={guid}"))
+        z.refresh_from_db()
+        self.assertEqual((z.status, z.otozval), (Pismo.OTOZVANO, "op"))
+        self.assertIsNotNone(z.otozvano)
+        with self.assertRaises(kredo.KredoError):
+            kredo_dok.otozvat(z, invoker=inv)     # второй раз нельзя
+        self.login("Оператор")
+        self.assertContains(self.client.get("/abonents/pisma/"), "отозвано из КРЭДО")
+
+    def test_knopka_otozvat(self):
+        from abonents.models import Pismo
+        z = Pismo.objects.create(nomer=7, kanal=Pismo.KREDO, cod_gor=1, nom_dog=6, potreb_id=5, vid="schet",
+                                 nom_mes=10, god=2026, status=Pismo.OK, kredo_doc="X", kredo_in="ожидает получения",
+                                 kredo_data=timezone_now())
+        self.login("Наблюдатель")
+        self.assertNotContains(self.client.get("/abonents/pisma/"), 'value="otozvat"')
+        self.assertEqual(self.client.post("/abonents/pisma/", {"action": "otozvat", "pk": z.pk}).status_code, 403)
+        self.login("Оператор")
+        self.assertContains(self.client.get("/abonents/pisma/"), 'value="otozvat"')
+        r = self.client.post("/abonents/pisma/", {"action": "otozvat", "pk": z.pk}, follow=True)
+        self.assertContains(r, "pywin32")      # в Linux КРЭДО недоступен — понятная ошибка
+        z.refresh_from_db()
+        self.assertEqual(z.status, Pismo.OK)
+
     def test_stranicy(self):
         from django.test import override_settings
         self.login("Оператор")
@@ -1365,11 +1491,15 @@ class PokazanieTests(KartaBase):
         self.assertContains(r, "было 12,500, стало 15,125")
         self.assertEqual(Potreb.objects.get(potreb_id=5).pok_new, Decimal("15.125"))
         r = self.client.post(url, {"znach": "1,23456"}, follow=True)
-        self.assertContains(r, "не показание")
+        self.assertContains(r, "неверное значение")
         self.client.post(url, {"znach": "-1"})
         self.assertEqual(Potreb.objects.get(potreb_id=5).pok_new, Decimal("15.125"))
         self.client.post(reverse("abonents:pokazanie", args=[5, "pok_newg"]), {"znach": "120", "tab": "gvs"})
         self.assertEqual(Potreb.objects.get(potreb_id=5).pok_newg, 120)
+        self.client.post(reverse("abonents:pokazanie", args=[5, "dnotop"]), {"znach": "30,5", "tab": "otop"})
+        self.assertEqual(Potreb.objects.get(potreb_id=5).dnotop, Decimal("30.5"))
+        r = self.client.post(reverse("abonents:pokazanie", args=[5, "dnotop"]), {"znach": "1000"}, follow=True)
+        self.assertContains(r, "неверное значение")
         self.assertEqual(self.client.post(reverse("abonents:pokazanie", args=[5, "name_potre"]),
                                           {"znach": "x"}).status_code, 404)
 
@@ -1378,3 +1508,49 @@ class PokazanieTests(KartaBase):
         url = reverse("abonents:pokazanie", args=[5, "pok_new"])
         self.assertNotContains(self.client.get(reverse("abonents:karta", args=[5])), url)
         self.assertEqual(self.client.post(url, {"znach": "1"}).status_code, 403)
+
+
+class VedomostiTests(KartaBase):
+    """Ведомости, реестры: реестр договоров, ведомость писем, нагрузка котельных."""
+
+    def setUp(self):
+        super().setUp()
+        Potreb.objects.filter(potreb_id__in=[5, 7, 9]).update(d_stat=60, data_dog=date(2025, 1, 15))
+        Potreb.objects.filter(potreb_id=5).update(q_otoppr=Decimal("0.1"), q_gvs=Decimal("0.02"))
+        Potreb.objects.filter(potreb_id=9).update(id_kategor=None)
+
+    def test_reestr_dog(self):
+        from abonents import reports
+        r = reports.reestr_dog(self.ryb, {})
+        rows = [row for s in r.tables[0].sections for row in s.rows]
+        self.assertEqual([(row[1], row[2]) for row in rows], [("Школа  № 1", 8), ('ООО "Крипс"', 6)])
+        self.assertIn("Всего договоров: 2", r.tables[0].total)
+
+    def test_vedom_pisem(self):
+        from abonents import reports
+        from abonents.models import Pismo
+        Danrasch.objects.filter(cod_gorod=1).update(nom_mes=10)
+        self.ryb.refresh_from_db()
+        for nomer, st, kanal in ((1, Pismo.OK, Pismo.POCHTA), (2, Pismo.OSHIBKA, Pismo.POCHTA), (3, Pismo.OK, Pismo.KREDO)):
+            Pismo.objects.create(nomer=nomer, cod_gor=1, nom_dog=6, potreb_id=5, name_potre="Крипс", vid="schet",
+                                 nom_mes=10, god=2026, status=st, kanal=kanal)
+        r = reports.vedom_pisem(self.ryb, {})
+        self.assertEqual(len(r.tables[0].sections[0].rows), 2)
+        r = reports.vedom_pisem(self.ryb, {"mes": "2026-10", "kanal": "kredo"})
+        self.assertEqual([row[5] for row in r.tables[0].sections[0].rows], ["КРЭДО"])
+        self.assertEqual(reports._pisma_mesyacy(), [("2026-10", "Октябрь 2026")])
+
+    def test_nagr_kot_kat(self):
+        from abonents import reports
+        r = reports.nagr_kot_kat(self.ryb, {})
+        (row,) = r.tables[0].sections[0].rows
+        self.assertEqual(row[0], "(Р) Котельная №2")
+        self.assertEqual((row[1], row[2]), (Decimal("0.1"), Decimal("0.02")))
+        self.assertEqual(len(row), 15)
+
+    def test_stranicy(self):
+        self.login("Оператор")
+        for key in ("reestr_dog", "vedom_pisem", "nagr_kot_kat"):
+            r = self.client.get(reverse("abonents:otchet", args=[key]) + "?gorod=1")
+            self.assertEqual(r.status_code, 200, key)
+        self.assertContains(self.client.get(reverse("abonents:otchety")), "Ведомости, реестры")

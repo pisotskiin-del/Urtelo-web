@@ -210,8 +210,69 @@ def otpravit(dok, context, user="", proverka=False, crypto=None, invoker=None):
         pismo.save()
         return pismo
     pismo.status = Pismo.OK
+    pismo.kredo_doc = doc_id(otvet)
     pismo.save()
     return pismo
+
+
+def doc_id(otvet):
+    """Код документа в КРЭДО из ответа Set_URDocument (<ret_val>GUID</ret_val>)."""
+    m = re.search(r"<ret_val>\s*([0-9A-Fa-f]{8}-[0-9A-Fa-f-]{27})\s*</ret_val>", otvet or "")
+    return m.group(1).upper() if m else ""
+
+
+def obnovit_statusy(cod_gor, invoker=None):
+    """Статусы отправленных участком документов (Kredo_DocumentsOut, кнопка
+    «Данные об исходящих электронных документах» старой программы) — в реестр
+    писем. Ответ сохраняется в dokumenty\\kredo\\documentsout_<участок>.xml.
+    Возвращает (обновлено писем, документов в ответе КРЭДО)."""
+    from django.utils import timezone
+    from .kredo_kody import tablica
+    _, pid_out = otpravitel(cod_gor)
+    comorg = kredo.nastrojki(cod_gor)["comorg"]
+    otvet = kredo.proverit((invoker or kredo.ComInvoker(cod_gor)).exec_proc(
+        "Kredo_DocumentsOut", f"@comorg={comorg},@pid_out={pid_out}"))
+    with contextlib.suppress(OSError):
+        papka = pdf.base_dir() / "kredo"
+        papka.mkdir(parents=True, exist_ok=True)
+        (papka / f"documentsout_{cod_gor}.xml").write_text(otvet, encoding="utf-8")
+    rows = {r["doc_id"].strip().upper(): r for r in tablica(otvet, "doc_id") if r.get("doc_id")}
+    obnovleno, sejchas = 0, timezone.now()
+    for z in Pismo.objects.filter(kanal=Pismo.KREDO, status=Pismo.OK, cod_gor=cod_gor).exclude(kredo_doc=""):
+        r = rows.get(z.kredo_doc.upper())
+        if r is None:
+            continue
+        z.kredo_out, z.kredo_in = (r.get("dstn_out") or "")[:200], (r.get("dstn_in") or "")[:200]
+        z.kredo_data = sejchas
+        z.save(update_fields=["kredo_out", "kredo_in", "kredo_data"])
+        obnovleno += 1
+    return obnovleno, len(rows)
+
+
+def ne_prochitan(z):
+    """Документ ещё не получен абонентом: статус у получателя «ожидает…»."""
+    return "ожида" in (z.kredo_in or "").lower()
+
+
+def otozvat(z, user="", invoker=None):
+    """Отозвать (удалить) из КРЭДО отправленный документ, пока абонент его не
+    получил: процедура Set_URDocumentDelete (кнопка «Удалить документ» формы
+    doc_kredo старой программы). Перед удалением статус запрашивается заново.
+    Возвращает запись реестра; при отказе — KredoError."""
+    from django.utils import timezone
+    if z.kanal != Pismo.KREDO or z.status != Pismo.OK or not z.kredo_doc:
+        raise kredo.KredoError("Отозвать можно только документ, отправленный в КРЭДО")
+    inv = invoker or kredo.ComInvoker(z.cod_gor)
+    obnovit_statusy(z.cod_gor, invoker=inv)
+    z.refresh_from_db()
+    if not ne_prochitan(z):
+        raise kredo.KredoError(f"Документ № {z.nomer} не отозван: статус у абонента «{z.kredo_in or 'неизвестен'}», "
+                               f"отозвать можно только неполученный")
+    otvet = kredo.proverit(inv.exec_proc("Set_URDocumentDelete", f"@doc_id={z.kredo_doc}"))
+    z.status, z.otozvano, z.otozval = Pismo.OTOZVANO, timezone.now(), user[:150]
+    z.otvet = (z.otvet + "\n--- отзыв ---\n" + otvet)[:4000]
+    z.save(update_fields=["status", "otozvano", "otozval", "otvet"])
+    return z
 
 
 def rassylka(cod_gor, nomera, context, user="", mesyac=None, proverka=False):
