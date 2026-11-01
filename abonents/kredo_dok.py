@@ -249,6 +249,32 @@ def obnovit_statusy(cod_gor, invoker=None):
     return obnovleno, len(rows)
 
 
+def ne_prochitan(z):
+    """Документ ещё не получен абонентом: статус у получателя «ожидает…»."""
+    return "ожида" in (z.kredo_in or "").lower()
+
+
+def otozvat(z, user="", invoker=None):
+    """Отозвать (удалить) из КРЭДО отправленный документ, пока абонент его не
+    получил: процедура Set_URDocumentDelete (кнопка «Удалить документ» формы
+    doc_kredo старой программы). Перед удалением статус запрашивается заново.
+    Возвращает запись реестра; при отказе — KredoError."""
+    from django.utils import timezone
+    if z.kanal != Pismo.KREDO or z.status != Pismo.OK or not z.kredo_doc:
+        raise kredo.KredoError("Отозвать можно только документ, отправленный в КРЭДО")
+    inv = invoker or kredo.ComInvoker(z.cod_gor)
+    obnovit_statusy(z.cod_gor, invoker=inv)
+    z.refresh_from_db()
+    if not ne_prochitan(z):
+        raise kredo.KredoError(f"Документ № {z.nomer} не отозван: статус у абонента «{z.kredo_in or 'неизвестен'}», "
+                               f"отозвать можно только неполученный")
+    otvet = kredo.proverit(inv.exec_proc("Set_URDocumentDelete", f"@doc_id={z.kredo_doc}"))
+    z.status, z.otozvano, z.otozval = Pismo.OTOZVANO, timezone.now(), user[:150]
+    z.otvet = (z.otvet + "\n--- отзыв ---\n" + otvet)[:4000]
+    z.save(update_fields=["status", "otozvano", "otozval", "otvet"])
+    return z
+
+
 def rassylka(cod_gor, nomera, context, user="", mesyac=None, proverka=False):
     from . import documents
     out = []

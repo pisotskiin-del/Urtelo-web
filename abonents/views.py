@@ -948,6 +948,17 @@ def pisma(request):
             except kredo.KredoError as e:
                 messages.error(request, f"Участок {g}: {e}")
         return redirect(request.get_full_path())
+    if request.method == "POST" and request.POST.get("action") == "otozvat":
+        if not request.user.has_perm("catalogs.change_potreb"):
+            raise PermissionDenied
+        from . import kredo, kredo_dok
+        z = get_object_or_404(Pismo, pk=request.POST.get("pk"))
+        try:
+            kredo_dok.otozvat(z, request.user.get_username())
+            messages.success(request, f"Документ № {z.nomer} отозван из КРЭДО")
+        except kredo.KredoError as e:
+            messages.error(request, str(e))
+        return redirect(request.get_full_path())
     qs = Pismo.objects.all()
     mes = request.GET.get("mes", "")
     if re.fullmatch(r"\d{4}-\d{2}", mes):

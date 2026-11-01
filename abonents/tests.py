@@ -891,6 +891,11 @@ class ArhivTests(KartaBase):
         self.assertContains(self.client.get("/abonents/otchety/"), "Полезный отпуск за период")
 
 
+def timezone_now():
+    from django.utils import timezone
+    return timezone.now()
+
+
 def nov_mes_model():
     from abonents.models import MesArhiv
     return MesArhiv
@@ -1346,6 +1351,57 @@ class KredoSchetTests(DokumentyTests):
         r = self.client.post("/abonents/pisma/", {"action": "kredo"}, follow=True)
         self.assertContains(r, "pywin32")
         self.assertEqual(Pismo.objects.filter(kredo_doc=guid).count(), 1)
+
+    def test_otozvat(self):
+        from django.test import override_settings
+        from abonents import documents, kredo, kredo_dok
+        from abonents.models import Pismo
+        guid = "730007F7-EADA-4BA8-8EDF-AC6974ED1F4B"
+
+        class Inv:
+            def __init__(self, dstn_in):
+                self.dstn_in, self.calls = dstn_in, []
+
+            def exec_proc(self, name, params):
+                self.calls.append((name, params))
+                if name == "Kredo_DocumentsOut":
+                    return (f"<records><row><doc_id>{guid}</doc_id><dstn_out>отправлен получателю</dstn_out>"
+                            f"<dstn_in>{self.dstn_in}</dstn_in></row></records>")
+                return "<records><row><ret_kod>0</ret_kod></row></records>"
+
+        otvet = f"<records><row><ret_kod>0</ret_kod><ret_val>{guid}</ret_val></row></records>"
+        with override_settings(TEPLO_DOC_DIR=self.tmp):
+            z = kredo_dok.otpravit(documents.sobrat(1, 6), {}, crypto=FakeCrypto(), invoker=FakeInvoker(otvet))
+            # Абонент уже получил — не отзывается, удаление не вызывается.
+            inv = Inv("получен")
+            with self.assertRaisesMessage(kredo.KredoError, "отозвать можно только неполученный"):
+                kredo_dok.otozvat(z, "op", invoker=inv)
+            self.assertNotIn("Set_URDocumentDelete", [c[0] for c in inv.calls])
+            inv = Inv("ожидает получения")
+            z = kredo_dok.otozvat(z, "op", invoker=inv)
+        self.assertEqual(inv.calls[-1], ("Set_URDocumentDelete", f"@doc_id={guid}"))
+        z.refresh_from_db()
+        self.assertEqual((z.status, z.otozval), (Pismo.OTOZVANO, "op"))
+        self.assertIsNotNone(z.otozvano)
+        with self.assertRaises(kredo.KredoError):
+            kredo_dok.otozvat(z, invoker=inv)     # второй раз нельзя
+        self.login("Оператор")
+        self.assertContains(self.client.get("/abonents/pisma/"), "отозвано из КРЭДО")
+
+    def test_knopka_otozvat(self):
+        from abonents.models import Pismo
+        z = Pismo.objects.create(nomer=7, kanal=Pismo.KREDO, cod_gor=1, nom_dog=6, potreb_id=5, vid="schet",
+                                 nom_mes=10, god=2026, status=Pismo.OK, kredo_doc="X", kredo_in="ожидает получения",
+                                 kredo_data=timezone_now())
+        self.login("Наблюдатель")
+        self.assertNotContains(self.client.get("/abonents/pisma/"), 'value="otozvat"')
+        self.assertEqual(self.client.post("/abonents/pisma/", {"action": "otozvat", "pk": z.pk}).status_code, 403)
+        self.login("Оператор")
+        self.assertContains(self.client.get("/abonents/pisma/"), 'value="otozvat"')
+        r = self.client.post("/abonents/pisma/", {"action": "otozvat", "pk": z.pk}, follow=True)
+        self.assertContains(r, "pywin32")      # в Linux КРЭДО недоступен — понятная ошибка
+        z.refresh_from_db()
+        self.assertEqual(z.status, Pismo.OK)
 
     def test_stranicy(self):
         from django.test import override_settings
