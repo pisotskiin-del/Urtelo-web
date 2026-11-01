@@ -8,7 +8,7 @@ if not exist manage.py (
   exit /b 1
 )
 if not exist .env (
-  echo File .env not found in this folder. Create it first (see the instruction).
+  echo File .env not found in this folder. Create it first - see the instruction.
   pause
   exit /b 1
 )
@@ -44,7 +44,7 @@ if errorlevel 1 goto error
 if errorlevel 1 goto error
 
 echo.
-echo DONE. Start server.bat and open http://localhost:8020/ (port from TEPLO_SERVER_PORT).
+echo DONE. Start server.bat and open http://localhost:8020/, port from TEPLO_SERVER_PORT.
 pause
 exit /b 0
 
