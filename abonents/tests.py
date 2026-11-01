@@ -1398,6 +1398,16 @@ class KredoSchetTests(DokumentyTests):
         self.assertContains(r, "pywin32")
         self.assertEqual(Pismo.objects.filter(kredo_doc=guid).count(), 1)
 
+    def test_kredo_vyklyuchen_na_obshchem_servere(self):
+        from django.test import override_settings
+        from abonents import kredo, kredo_dok
+        with override_settings(TEPLO_KREDO_ZDES=False):
+            with self.assertRaisesMessage(kredo.KredoError, "удалённый рабочий стол"):
+                kredo.ComInvoker(1).exec_proc("Kredo_DocumentsOut", {})
+            with self.assertRaisesMessage(kredo.KredoError, "удалённый рабочий стол"):
+                with kredo_dok.ComCrypto().objekt():
+                    pass
+
     def test_otozvat(self):
         from django.test import override_settings
         from abonents import documents, kredo, kredo_dok

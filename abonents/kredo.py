@@ -59,6 +59,16 @@ def period(mes, god):
     return nach.strftime("%d.%m.%Y"), kon.strftime("%d.%m.%Y")
 
 
+NE_ZDES = ("Отправка в КРЭДО на общем сервере отключена: подпись — сертификатом "
+           "начальника. Войдите на сервер через удалённый рабочий стол и откройте программу "
+           "ярлыком «Теплоснабжение».")
+
+
+def razresheno():
+    if not getattr(settings, "TEPLO_KREDO_ZDES", True):
+        raise KredoError(NE_ZDES)
+
+
 class ComInvoker:
     """Вызов процедур КРЭДО через RRIC_COM_OBJECT.Invoker."""
 
@@ -66,6 +76,7 @@ class ComInvoker:
         self.n = nastrojki(cod_gor)
 
     def exec_proc(self, name, params):
+        razresheno()
         try:
             import pythoncom
             import win32com.client

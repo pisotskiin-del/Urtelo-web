@@ -164,6 +164,9 @@ TEPLO_PISMO_NOMER = int(env("TEPLO_PISMO_NOMER", "1") or 1)
 # Обмен с КРЭДО (РРИЦ) через COM-объект RRIC_COM_OBJECT (только Windows, pywin32).
 # Сертификаты клиента — в хранилище «Личные» пользователя Windows, под которым работает
 # программа; здесь — их отпечатки по участкам.
+# 0 — в этой копии программы обмен с КРЭДО выключен (общий сервер для входа по адресу:
+# подписать там нечем, подписывает начальник в своей копии через удалённый рабочий стол).
+TEPLO_KREDO_ZDES = env_bool("TEPLO_KREDO_ZDES", True)
 TEPLO_KREDO_ENDPOINT = env("TEPLO_KREDO_ENDPOINT", "http://www.rric.org:7742/RRIC_EP_SERVICE/WcfService")
 TEPLO_KREDO_SERVICE_CERT = env("TEPLO_KREDO_SERVICE_CERT", "Rric Wcf Service")
 TEPLO_KREDO_THUMB = {
