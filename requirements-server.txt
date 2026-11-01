@@ -3,3 +3,4 @@
 -r requirements-postgres.txt
 waitress>=3.0
 whitenoise>=6.6
+pywin32>=306; sys_platform == "win32"   # КРЭДО (COM-объект РРИЦ)
