@@ -933,6 +933,21 @@ def pisma(request):
     """Реестр отправленных писем (форма reestrmail): фильтр по месяцу и л/№,
     открытие отправленного PDF."""
     from .models import Pismo
+    if request.method == "POST" and request.POST.get("action") == "kredo":
+        if not request.user.has_perm("catalogs.change_potreb"):
+            raise PermissionDenied
+        from . import kredo, kredo_dok
+        goroda = sorted(set(Pismo.objects.filter(kanal=Pismo.KREDO, status=Pismo.OK).exclude(kredo_doc="")
+                            .values_list("cod_gor", flat=True)))
+        if not goroda:
+            messages.info(request, "Нет отправленных в КРЭДО документов")
+        for g in goroda:
+            try:
+                obn, vsego = kredo_dok.obnovit_statusy(g)
+                messages.success(request, f"Участок {g}: обновлены статусы {obn} документов (в КРЭДО найдено {vsego})")
+            except kredo.KredoError as e:
+                messages.error(request, f"Участок {g}: {e}")
+        return redirect(request.get_full_path())
     qs = Pismo.objects.all()
     mes = request.GET.get("mes", "")
     if re.fullmatch(r"\d{4}-\d{2}", mes):
@@ -945,6 +960,7 @@ def pisma(request):
     page = Paginator(qs, 50).get_page(request.GET.get("page"))
     return render(request, "abonents/pisma.html", {"page": page, "mes": mes, "ls": ls,
                                                    "oshibki": bool(request.GET.get("oshibki")),
+                                                   "can_send": request.user.has_perm("catalogs.change_potreb"),
                                                    "goroda": dict((c.cod_gorod, c.name_gorod) for c in _cities())})
 
 

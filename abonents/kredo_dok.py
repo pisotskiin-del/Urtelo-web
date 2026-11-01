@@ -210,8 +210,43 @@ def otpravit(dok, context, user="", proverka=False, crypto=None, invoker=None):
         pismo.save()
         return pismo
     pismo.status = Pismo.OK
+    pismo.kredo_doc = doc_id(otvet)
     pismo.save()
     return pismo
+
+
+def doc_id(otvet):
+    """Код документа в КРЭДО из ответа Set_URDocument (<ret_val>GUID</ret_val>)."""
+    m = re.search(r"<ret_val>\s*([0-9A-Fa-f]{8}-[0-9A-Fa-f-]{27})\s*</ret_val>", otvet or "")
+    return m.group(1).upper() if m else ""
+
+
+def obnovit_statusy(cod_gor, invoker=None):
+    """Статусы отправленных участком документов (Kredo_DocumentsOut, кнопка
+    «Данные об исходящих электронных документах» старой программы) — в реестр
+    писем. Ответ сохраняется в dokumenty\\kredo\\documentsout_<участок>.xml.
+    Возвращает (обновлено писем, документов в ответе КРЭДО)."""
+    from django.utils import timezone
+    from .kredo_kody import tablica
+    _, pid_out = otpravitel(cod_gor)
+    comorg = kredo.nastrojki(cod_gor)["comorg"]
+    otvet = kredo.proverit((invoker or kredo.ComInvoker(cod_gor)).exec_proc(
+        "Kredo_DocumentsOut", f"@comorg={comorg},@pid_out={pid_out}"))
+    with contextlib.suppress(OSError):
+        papka = pdf.base_dir() / "kredo"
+        papka.mkdir(parents=True, exist_ok=True)
+        (papka / f"documentsout_{cod_gor}.xml").write_text(otvet, encoding="utf-8")
+    rows = {r["doc_id"].strip().upper(): r for r in tablica(otvet, "doc_id") if r.get("doc_id")}
+    obnovleno, sejchas = 0, timezone.now()
+    for z in Pismo.objects.filter(kanal=Pismo.KREDO, status=Pismo.OK, cod_gor=cod_gor).exclude(kredo_doc=""):
+        r = rows.get(z.kredo_doc.upper())
+        if r is None:
+            continue
+        z.kredo_out, z.kredo_in = (r.get("dstn_out") or "")[:200], (r.get("dstn_in") or "")[:200]
+        z.kredo_data = sejchas
+        z.save(update_fields=["kredo_out", "kredo_in", "kredo_data"])
+        obnovleno += 1
+    return obnovleno, len(rows)
 
 
 def rassylka(cod_gor, nomera, context, user="", mesyac=None, proverka=False):

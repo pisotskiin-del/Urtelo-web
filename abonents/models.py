@@ -204,6 +204,12 @@ class Pismo(models.Model):
     oshibka = models.TextField("Ошибка", blank=True)
     otvet = models.TextField("Ответ КРЭДО", blank=True)
     fail = models.CharField("Файл PDF", max_length=500, blank=True)
+    # Документ в КРЭДО: код (ret_val ответа Set_URDocument) и его статусы из
+    # Kredo_DocumentsOut — у отправителя (dstn_out) и у получателя (dstn_in).
+    kredo_doc = models.CharField("Код документа в КРЭДО", max_length=40, blank=True)
+    kredo_out = models.CharField("Статус у отправителя", max_length=200, blank=True)
+    kredo_in = models.CharField("Статус у получателя", max_length=200, blank=True)
+    kredo_data = models.DateTimeField("Статус получен", null=True, blank=True)
 
     class Meta:
         verbose_name = "Отправленное письмо"

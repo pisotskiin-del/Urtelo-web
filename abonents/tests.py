@@ -1317,6 +1317,36 @@ class KredoSchetTests(DokumentyTests):
             z = kredo_dok.otpravit(documents.sobrat(1, 6), {}, crypto=FakeCrypto(), invoker=inv)
             self.assertIn("org_in, pid_in", z.oshibka)
 
+    def test_status_iz_kredo(self):
+        from django.test import override_settings
+        from abonents import documents, kredo_dok
+        from abonents.models import Pismo
+        guid = "730007F7-EADA-4BA8-8EDF-AC6974ED1F4B"
+        otvet = f'<?xml version="1.0" encoding="windows-1251"?><records><row><ret_kod>0</ret_kod><ret_val>{guid}</ret_val></row></records>'
+        with override_settings(TEPLO_DOC_DIR=self.tmp):
+            z = kredo_dok.otpravit(documents.sobrat(1, 6), {}, crypto=FakeCrypto(), invoker=FakeInvoker(otvet))
+            self.assertEqual(z.kredo_doc, guid)
+            spisok = (f"<DataSet><records><row><doc_id>{guid.lower()}</doc_id><fam_in>Иванов</fam_in>"
+                      "<dstn_out>Отправлен</dstn_out><dstn_in>Прочитан</dstn_in></row>"
+                      "<row><doc_id>00000000-0000-0000-0000-000000000000</doc_id><dstn_out>Отправлен</dstn_out></row>"
+                      "</records></DataSet>")
+            inv = FakeInvoker(spisok)
+            self.assertEqual(kredo_dok.obnovit_statusy(1, invoker=inv), (1, 2))
+        self.assertEqual(inv.calls, [("Kredo_DocumentsOut", "@comorg=210,@pid_out=527172a2-82e2-41fb-bc50-0984d4321163")])
+        z.refresh_from_db()
+        self.assertEqual((z.kredo_out, z.kredo_in), ("Отправлен", "Прочитан"))
+        self.assertIsNotNone(z.kredo_data)
+        from pathlib import Path
+        self.assertTrue((Path(self.tmp) / "kredo" / "documentsout_1.xml").exists())
+        self.login("Оператор")
+        r = self.client.get("/abonents/pisma/")
+        self.assertContains(r, "у абонента: Прочитан")
+        self.assertContains(r, "Статусы из КРЭДО")
+        # Без pywin32 — понятная ошибка, страница не падает.
+        r = self.client.post("/abonents/pisma/", {"action": "kredo"}, follow=True)
+        self.assertContains(r, "pywin32")
+        self.assertEqual(Pismo.objects.filter(kredo_doc=guid).count(), 1)
+
     def test_stranicy(self):
         from django.test import override_settings
         self.login("Оператор")
