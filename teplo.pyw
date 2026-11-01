@@ -8,6 +8,11 @@
 
     pythonw teplo.pyw              — запустить
     python teplo.pyw --shortcut    — создать ярлыки на рабочем столе и в меню «Пуск»
+
+На сервере, где через удалённый рабочий стол работают несколько операторов, в .env
+пишется TEPLO_PORT=auto. Тогда у каждого оператора запускается своя копия сервера
+на свободном порту под его учётной записью (подпись в КРЭДО — его сертификатом), а
+профиль окна и журнал лежат в его папке %LOCALAPPDATA%\\Teplo.
 """
 
 import base64
@@ -37,7 +42,45 @@ def _dotenv(name):
     return ""
 
 
-PORT = int(os.environ.get("TEPLO_PORT", "8000"))
+def _user_dir():
+    root = os.environ.get("LOCALAPPDATA") or str(Path.home() / ".local" / "share")
+    path = Path(root) / "Teplo"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _free_port():
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def _port_alive(port):
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+            return True
+    except OSError:
+        return False
+
+
+# TEPLO_PORT=auto — у каждого пользователя Windows своя копия сервера (см. выше).
+AUTO = _dotenv("TEPLO_PORT").strip().lower() == "auto"
+if AUTO:
+    USER_DIR = _user_dir()
+    PORT_FILE = USER_DIR / "port"
+    try:
+        PORT = int(PORT_FILE.read_text().strip())
+    except (OSError, ValueError):
+        PORT = 0
+    if not PORT or not _port_alive(PORT):
+        PORT = _free_port()
+    LOG = USER_DIR / "teplo.log"
+    PROFILE = USER_DIR / "app-profile"
+else:
+    PORT = int(_dotenv("TEPLO_PORT") or "8000")
+    PORT_FILE = None
+    LOG = BASE / "teplo.log"
+    PROFILE = BASE / ".app-profile"
 # TEPLO_SERVER=http://server-ff:8000/ — программа работает на сервере: ярлык только
 # открывает её окно, своя копия на этом компьютере не запускается.
 SERVER = _dotenv("TEPLO_SERVER").rstrip("/")
@@ -55,11 +98,7 @@ def message(text):
 
 
 def server_running():
-    try:
-        with socket.create_connection(("127.0.0.1", PORT), timeout=0.5):
-            return True
-    except OSError:
-        return False
+    return _port_alive(PORT)
 
 
 def python_exe():
@@ -73,7 +112,7 @@ def python_exe():
 
 
 def start_server():
-    log = open(BASE / "teplo.log", "a", encoding="utf-8")
+    log = open(LOG, "a", encoding="utf-8")
     flags = subprocess.CREATE_NO_WINDOW if WINDOWS else 0
     server = subprocess.Popen(
         [python_exe(), "manage.py", "runserver", "--noreload", f"127.0.0.1:{PORT}"],
@@ -81,12 +120,14 @@ def start_server():
     )
     for _ in range(120):
         if server_running():
+            if PORT_FILE:
+                PORT_FILE.write_text(str(PORT))
             return server
         if server.poll() is not None:
             break
         time.sleep(0.25)
     server.kill()
-    message(f"Сервер не запустился. Подробности в файле\n{BASE / 'teplo.log'}")
+    message(f"Сервер не запустился. Подробности в файле\n{LOG}")
     sys.exit(1)
 
 
@@ -118,9 +159,8 @@ def open_window():
         return False
     # Отдельный профиль: окно живёт своим процессом (его закрытие видно) и
     # помнит вход пользователя.
-    profile = BASE / ".app-profile"
     window = subprocess.Popen([
-        browser, f"--app={URL}", f"--user-data-dir={profile}", "--no-first-run",
+        browser, f"--app={URL}", f"--user-data-dir={PROFILE}", "--no-first-run",
         "--no-default-browser-check", "--start-maximized",
     ])
     window.wait()
@@ -167,6 +207,11 @@ def main():
     finally:
         if server is not None:
             server.terminate()
+            if PORT_FILE:
+                try:
+                    PORT_FILE.unlink()
+                except OSError:
+                    pass
 
 
 if __name__ == "__main__":
