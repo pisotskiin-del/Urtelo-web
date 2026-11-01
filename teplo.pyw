@@ -21,8 +21,27 @@ import webbrowser
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent
+
+
+def _dotenv(name):
+    """Значение из .env рядом с программой (переменная окружения важнее)."""
+    if name in os.environ:
+        return os.environ[name]
+    try:
+        for line in (BASE / ".env").read_text(encoding="utf-8-sig").splitlines():
+            key, sep, value = line.partition("=")
+            if sep and not line.lstrip().startswith("#") and key.strip() == name:
+                return value.strip().strip('"')
+    except OSError:
+        pass
+    return ""
+
+
 PORT = int(os.environ.get("TEPLO_PORT", "8000"))
-URL = f"http://127.0.0.1:{PORT}/"
+# TEPLO_SERVER=http://server-ff:8000/ — программа работает на сервере: ярлык только
+# открывает её окно, своя копия на этом компьютере не запускается.
+SERVER = _dotenv("TEPLO_SERVER").rstrip("/")
+URL = SERVER + "/" if SERVER else f"http://127.0.0.1:{PORT}/"
 TITLE = "Теплоснабжение"
 WINDOWS = sys.platform == "win32"
 
@@ -136,6 +155,9 @@ foreach ($dir in @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFo
 def main():
     if "--shortcut" in sys.argv:
         make_shortcuts()
+        return
+    if SERVER:
+        open_window()
         return
     server = None if server_running() else start_server()
     try:

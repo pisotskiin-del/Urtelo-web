@@ -1,0 +1,5 @@
+# Сервер для нескольких компьютеров: PostgreSQL, waitress (веб-сервер для Windows) и
+# whitenoise (оформление и картинки без отдельного веб-сервера).
+-r requirements-postgres.txt
+waitress>=3.0
+whitenoise>=6.6

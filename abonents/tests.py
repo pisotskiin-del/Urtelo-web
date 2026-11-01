@@ -916,6 +916,27 @@ class PokazaniyaImportTests(KartaBase):
         self.assertEqual(p.org_in, "ORG")          # остальное не тронуто
 
 
+class PerenosTests(KartaBase):
+    def test_obrezat_dlinnye_stroki(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        from dbfsync.management.commands.perenos_v_postgres import obrezat
+        d = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__("shutil").rmtree, d)
+        f = d / "x.json"
+        f.write_text(json.dumps([{"model": "catalogs.potreb", "pk": 1, "fields": {"name_kot": "Я" * 30, "liz": "1"}}]),
+                     encoding="utf-8")
+        self.assertEqual(obrezat(f, io.StringIO()), 1)
+        self.assertEqual(json.loads(f.read_text(encoding="utf-8"))[0]["fields"]["name_kot"], "Я" * 25)
+
+    def test_tolko_postgres(self):
+        from django.core.management import call_command
+        from django.core.management.base import CommandError
+        with self.assertRaisesMessage(CommandError, "не на PostgreSQL"):
+            call_command("perenos_v_postgres", iz=__file__)
+
+
 def timezone_now():
     from django.utils import timezone
     return timezone.now()
