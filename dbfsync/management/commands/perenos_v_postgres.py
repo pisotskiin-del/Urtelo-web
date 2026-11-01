@@ -70,8 +70,11 @@ class Command(BaseCommand):
         self.stdout.write("Выгрузка из SQLite…")
         with tempfile.TemporaryDirectory() as tmp:
             fail = Path(tmp) / "dannye.json"
-            call_command("dumpdata", database="istochnik", natural_foreign=True, natural_primary=True,
-                         exclude=ISKLYUCHIT, output=str(fail), verbosity=0)
+            # Файл открываем сами в UTF-8: Django 4.2 (старый Python) пишет --output
+            # в кодировке Windows (cp1251).
+            with open(fail, "w", encoding="utf-8") as f:
+                call_command("dumpdata", database="istochnik", natural_foreign=True, natural_primary=True,
+                             exclude=ISKLYUCHIT, stdout=f, verbosity=0)
             pravki = obrezat(fail, self.stdout)
             self.stdout.write("Загрузка в PostgreSQL…")
             call_command("loaddata", str(fail), database="default", verbosity=0)
