@@ -3,7 +3,7 @@ from django.contrib.auth import views as auth_views
 
 # Логотип предприятия на заставке: положите файл logo.png (или logo.svg) в
 # static/img. Пока его нет, показывается значок программы.
-LOGO_FILES = ("img/logo.png", "img/logo.svg", "img/logo.jpg")
+LOGO_FILES = ("img/zastavka.png", "img/logo.png", "img/logo.svg", "img/logo.jpg")
 
 
 def logo_path():
