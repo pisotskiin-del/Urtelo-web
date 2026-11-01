@@ -891,6 +891,31 @@ class ArhivTests(KartaBase):
         self.assertContains(self.client.get("/abonents/otchety/"), "Полезный отпуск за период")
 
 
+class PokazaniyaImportTests(KartaBase):
+    def test_tolko_pokazaniya(self):
+        import tempfile
+        from pathlib import Path
+        import dbf
+        from django.core.management import call_command
+        folder = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__("shutil").rmtree, folder)
+        Potreb.objects.filter(potreb_id=5).update(pok_new=Decimal("1.000"), pok_old=Decimal("0.500"), org_in="ORG")
+        t = dbf.Table(str(folder / "potreb.dbf"), "potreb_id N(6,0); pok_new N(9,3); pok_old N(9,3); pok_newg N(10,0); "
+                      "org_in C(40)", codepage="cp1251", dbf_type="vfp")
+        t.open(dbf.READ_WRITE)
+        t.append((5, 12.5, 1.0, 7, "СТАРОЕ"))
+        t.append((99999, 1, 1, 1, ""))
+        t.close()
+        out = io.StringIO()
+        call_command("pokazaniya_import", dir=str(folder), stdout=out)
+        self.assertIn("Ничего не записано", out.getvalue())
+        self.assertEqual(Potreb.objects.get(potreb_id=5).pok_new, Decimal("1.000"))
+        call_command("pokazaniya_import", dir=str(folder), zapisat=True, stdout=out)
+        p = Potreb.objects.get(potreb_id=5)
+        self.assertEqual((p.pok_new, p.pok_old, p.pok_newg), (Decimal("12.500"), Decimal("1.000"), 7))
+        self.assertEqual(p.org_in, "ORG")          # остальное не тронуто
+
+
 def timezone_now():
     from django.utils import timezone
     return timezone.now()
