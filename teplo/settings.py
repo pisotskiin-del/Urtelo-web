@@ -32,7 +32,7 @@ def env_bool(name, default=False):
 
 SECRET_KEY = env("DJANGO_SECRET_KEY", "dev-only-insecure-key-change-me")
 DEBUG = env_bool("DJANGO_DEBUG", True)
-ALLOWED_HOSTS = [h for h in env("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h]
+ALLOWED_HOSTS = [h.strip() for h in env("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -62,6 +62,14 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "teplo.middleware.PonyatnyeOshibki",
 ]
+
+# На сервере (requirements-server.txt) оформление и картинки отдаёт whitenoise:
+# при DJANGO_DEBUG=0 сам Django их не отдаёт.
+try:
+    import whitenoise  # noqa: F401
+    MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
+except ImportError:
+    pass
 
 ROOT_URLCONF = "teplo.urls"
 
@@ -156,6 +164,9 @@ TEPLO_PISMO_NOMER = int(env("TEPLO_PISMO_NOMER", "1") or 1)
 # Обмен с КРЭДО (РРИЦ) через COM-объект RRIC_COM_OBJECT (только Windows, pywin32).
 # Сертификаты клиента — в хранилище «Личные» пользователя Windows, под которым работает
 # программа; здесь — их отпечатки по участкам.
+# 0 — в этой копии программы обмен с КРЭДО выключен (общий сервер для входа по адресу:
+# подписать там нечем, подписывает начальник в своей копии через удалённый рабочий стол).
+TEPLO_KREDO_ZDES = env_bool("TEPLO_KREDO_ZDES", True)
 TEPLO_KREDO_ENDPOINT = env("TEPLO_KREDO_ENDPOINT", "http://www.rric.org:7742/RRIC_EP_SERVICE/WcfService")
 TEPLO_KREDO_SERVICE_CERT = env("TEPLO_KREDO_SERVICE_CERT", "Rric Wcf Service")
 TEPLO_KREDO_THUMB = {

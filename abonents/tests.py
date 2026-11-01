@@ -891,6 +891,52 @@ class ArhivTests(KartaBase):
         self.assertContains(self.client.get("/abonents/otchety/"), "Полезный отпуск за период")
 
 
+class PokazaniyaImportTests(KartaBase):
+    def test_tolko_pokazaniya(self):
+        import tempfile
+        from pathlib import Path
+        import dbf
+        from django.core.management import call_command
+        folder = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__("shutil").rmtree, folder)
+        Potreb.objects.filter(potreb_id=5).update(pok_new=Decimal("1.000"), pok_old=Decimal("0.500"), org_in="ORG")
+        t = dbf.Table(str(folder / "potreb.dbf"), "potreb_id N(6,0); pok_new N(9,3); pok_old N(9,3); pok_newg N(10,0); "
+                      "org_in C(40)", codepage="cp1251", dbf_type="vfp")
+        t.open(dbf.READ_WRITE)
+        t.append((5, 12.5, 1.0, 7, "СТАРОЕ"))
+        t.append((99999, 1, 1, 1, ""))
+        t.close()
+        out = io.StringIO()
+        call_command("pokazaniya_import", dir=str(folder), stdout=out)
+        self.assertIn("Ничего не записано", out.getvalue())
+        self.assertEqual(Potreb.objects.get(potreb_id=5).pok_new, Decimal("1.000"))
+        call_command("pokazaniya_import", dir=str(folder), zapisat=True, stdout=out)
+        p = Potreb.objects.get(potreb_id=5)
+        self.assertEqual((p.pok_new, p.pok_old, p.pok_newg), (Decimal("12.500"), Decimal("1.000"), 7))
+        self.assertEqual(p.org_in, "ORG")          # остальное не тронуто
+
+
+class PerenosTests(KartaBase):
+    def test_obrezat_dlinnye_stroki(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        from dbfsync.management.commands.perenos_v_postgres import obrezat
+        d = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__("shutil").rmtree, d)
+        f = d / "x.json"
+        f.write_text(json.dumps([{"model": "catalogs.potreb", "pk": 1, "fields": {"name_kot": "Я" * 30, "liz": "1"}}]),
+                     encoding="utf-8")
+        self.assertEqual(obrezat(f, io.StringIO()), 1)
+        self.assertEqual(json.loads(f.read_text(encoding="utf-8"))[0]["fields"]["name_kot"], "Я" * 25)
+
+    def test_tolko_postgres(self):
+        from django.core.management import call_command
+        from django.core.management.base import CommandError
+        with self.assertRaisesMessage(CommandError, "не на PostgreSQL"):
+            call_command("perenos_v_postgres", iz=__file__)
+
+
 def timezone_now():
     from django.utils import timezone
     return timezone.now()
@@ -1351,6 +1397,16 @@ class KredoSchetTests(DokumentyTests):
         r = self.client.post("/abonents/pisma/", {"action": "kredo"}, follow=True)
         self.assertContains(r, "pywin32")
         self.assertEqual(Pismo.objects.filter(kredo_doc=guid).count(), 1)
+
+    def test_kredo_vyklyuchen_na_obshchem_servere(self):
+        from django.test import override_settings
+        from abonents import kredo, kredo_dok
+        with override_settings(TEPLO_KREDO_ZDES=False):
+            with self.assertRaisesMessage(kredo.KredoError, "удалённый рабочий стол"):
+                kredo.ComInvoker(1).exec_proc("Kredo_DocumentsOut", {})
+            with self.assertRaisesMessage(kredo.KredoError, "удалённый рабочий стол"):
+                with kredo_dok.ComCrypto().objekt():
+                    pass
 
     def test_otozvat(self):
         from django.test import override_settings

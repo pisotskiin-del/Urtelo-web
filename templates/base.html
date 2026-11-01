@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Система расчётов с юридическими потребителями{% endblock %}</title>
-  <link rel="icon" href="{% static 'img/teplo.svg' %}" type="image/svg+xml">
+  <link rel="icon" href="{% static 'img/teplo-256.png' %}" type="image/png">
   <link rel="icon" href="{% static 'img/teplo.ico' %}" sizes="any">
   <link rel="manifest" href="{% static 'manifest.webmanifest' %}">
   <meta name="theme-color" content="#13284b">
@@ -15,7 +15,7 @@
 <script>try { if (localStorage.getItem("side-mini") === "1") document.documentElement.classList.add("side-mini"); } catch (e) {}</script>
 <header class="topbar">
   {% if user.is_authenticated %}<button class="burger" type="button" onclick="toggleSide()" title="Свернуть / развернуть меню">{% icon "menu" %}</button>{% endif %}
-  <a class="brand" href="{% url 'abonents:index' %}"><img class="brand-logo" src="{% static 'img/logo.png' %}" alt="ГУП «Тирастеплоэнерго»">
+  <a class="brand" href="{% url 'abonents:index' %}"><img class="brand-logo" src="{% static 'img/emblema.png' %}" alt="Теплоснабжение">
     <span class="bt"><b>Система расчётов</b><small>с юридическими потребителями</small></span></a>
   {% if user.is_authenticated %}
   <div class="topmes">{% if raschet_mes %}<small>Расчетный месяц</small><b>{{ raschet_mes }}</b>{% endif %}</div>

@@ -84,6 +84,7 @@ class ComCrypto:
 
     @contextlib.contextmanager
     def objekt(self):
+        kredo.razresheno()
         try:
             import pythoncom
             import win32com.client

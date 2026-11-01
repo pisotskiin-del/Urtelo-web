@@ -453,8 +453,12 @@ def dan_rasch(request):
                     in_city.exclude(d_stat__in=layout.OTKLUCHEN).update(**changes)
                     in_city.filter(d_stat__in=layout.OTKLUCHEN).update(**{name: 0 for name in changes})
                 # Как кнопка «Выход» старой формы: название котельной в записях абонентов.
+                # В potreb.name_kot помещается меньше символов, чем в справочнике (C(25) в
+                # старой программе) — лишнее обрезается, как обрезала старая программа.
+                dlina = Potreb._meta.get_field("name_kot").max_length
                 for kot in GvsKot.objects.filter(kod_gor=city):
-                    in_city.filter(id_koteln=kot.id_kot).exclude(name_kot=kot.name_kot).update(name_kot=kot.name_kot)
+                    name = (kot.name_kot or "")[:dlina] if kot.name_kot is not None else None
+                    in_city.filter(id_koteln=kot.id_kot).exclude(name_kot=name).update(name_kot=name)
             messages.success(request, f"Сохранено. t коэффициент: {formats.localize(d.tkoef)}"
                              + (f"; дни записаны {in_city.exclude(d_stat__in=layout.OTKLUCHEN).count()} абонентам, "
                                 f"у отключённых 0" if changes else ""))
