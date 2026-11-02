@@ -56,6 +56,11 @@ def ssl_kontekst():
         ctx.load_verify_locations(certifi.where())
     except (ImportError, OSError):
         pass
+    # Свой корневой сертификат организации или почтового сервера (файл .crt/.pem),
+    # если почтовый сервер подписан им: TEPLO_SMTP_CA=D:\teplo-web\smtp.crt в .env.
+    ca = getattr(settings, "TEPLO_SMTP_CA", "")
+    if ca:
+        ctx.load_verify_locations(ca)
     return ctx
 
 
