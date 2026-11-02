@@ -1990,9 +1990,10 @@ class SetUrdevice(DbfModel):
     d_num = models.CharField("Номер прибора", max_length=10, null=True, blank=True)
     d_date = models.DateField("Дата установки", null=True, blank=True)
     d_mesto = models.BigIntegerField("Код места установки", null=True, blank=True)
-    d_pok = models.BigIntegerField("Показания при установке", null=True, blank=True)
+    # 3 знака после запятой (02.11.2026, как в старой программе).
+    d_pok = models.DecimalField("Показания при установке", max_digits=15, decimal_places=3, null=True, blank=True)
     d_pov = models.DateField("Дата последней поверки", null=True, blank=True)
-    d_prov = models.DateField("Дата последней проверки", null=True, blank=True)
+    d_prov = models.DateField("Дата проверки", null=True, blank=True)
     d_stat = models.BigIntegerField("Статус прибора учёта", null=True, blank=True)
     d_next_pov = models.DateField("Дата следующей поверки", null=True, blank=True)
     balans = models.IntegerField("BALANS", null=True, blank=True)

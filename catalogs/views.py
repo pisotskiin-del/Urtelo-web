@@ -1,3 +1,5 @@
+import datetime
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -16,7 +18,10 @@ def _value(obj, f):
     """Значение поля; для поля со списком выбора — его подпись."""
     if f.choices:
         return getattr(obj, f"get_{f.name}_display")()
-    return getattr(obj, f.name)
+    v = getattr(obj, f.name)
+    if isinstance(v, datetime.date) and not isinstance(v, datetime.datetime):
+        return v.strftime("%d.%m.%Y")
+    return v
 
 
 def _perm(user, model, action):
