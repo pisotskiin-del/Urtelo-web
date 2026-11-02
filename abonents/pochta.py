@@ -44,15 +44,33 @@ def gotovo():
     return ""
 
 
+def ssl_kontekst():
+    """Проверка сертификата почтового сервера: корневые сертификаты Windows
+    плюс набор certifi. На Windows Server 2016 без обновлений в хранилище
+    Windows может не быть нужного корневого сертификата (ошибка
+    CERTIFICATE_VERIFY_FAILED), а в certifi он есть."""
+    import ssl as _ssl
+    ctx = _ssl.create_default_context()
+    try:
+        import certifi
+        ctx.load_verify_locations(certifi.where())
+    except (ImportError, OSError):
+        pass
+    return ctx
+
+
 def connection():
     s = nastrojki()
     port = s.port or 25
     ssl = bool(s.puses) and port == 465
-    return get_connection(
+    conn = get_connection(
         host=(s.smtp or "").strip(), port=port,
         username=(s.senduserna or "").strip() or None if s.paunt else None,
         password=(settings.TEPLO_SMTP_PASSWORD or (s.password or "").strip()) if s.paunt else None,
         use_ssl=ssl, use_tls=bool(s.puses) and not ssl, timeout=s.timeout or 30, fail_silently=False)
+    if hasattr(type(conn), "ssl_context"):   # только SMTP (в тестах — почта в памяти)
+        conn.ssl_context = ssl_kontekst()
+    return conn
 
 
 def poluchatel(dok):
