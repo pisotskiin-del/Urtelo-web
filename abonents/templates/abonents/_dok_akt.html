@@ -11,11 +11,11 @@
     <tr><td class="num">{{ s.p.potreb_id }}</td><td>{{ s.p.nameobakt|default:"" }}</td>{% if not dok.akt_staryi %}<td>{{ s.adres }}</td>{% endif %}
       <td class="num">{{ s.otopl|floatformat:3 }}</td><td class="num">{{ s.gvs|floatformat:3 }}</td><td class="num">{{ s.poteri|floatformat:3 }}</td><td class="num">{{ s.gkal|floatformat:3 }}</td></tr>
     {% endfor %}
-    <tr class="dok-sub"><td></td><td>{{ k.name }}</td>{% if not dok.akt_staryi %}<td>{% if k.tarif is not None %}тариф {{ k.tarif|floatformat:2 }} руб.{% endif %}</td>{% endif %}
+    <tr class="dok-sub"><td>&nbsp;</td><td>{{ k.name }}</td>{% if not dok.akt_staryi %}<td>{% if k.tarif is not None %}тариф {{ k.tarif|floatformat:2 }} руб.{% endif %}</td>{% endif %}
       <td class="num">{{ k.otopl|floatformat:3 }}</td><td class="num">{{ k.gvs|floatformat:3 }}</td><td class="num">{{ k.poteri|floatformat:3 }}</td><td class="num">{{ k.gkal|floatformat:3 }}</td></tr>
   </tbody>
   {% endfor %}
-  <tfoot><tr><th></th><th class="left" {% if not dok.akt_staryi %}colspan="2"{% endif %}>ИТОГО Гкал:</th>
+  <tfoot><tr><th>&nbsp;</th><th class="left" {% if not dok.akt_staryi %}colspan="2"{% endif %}>ИТОГО Гкал:</th>
     <th class="num">{{ dok.otopl|floatformat:3 }}</th><th class="num">{{ dok.gvs|floatformat:3 }}</th><th class="num">{{ dok.poteri|floatformat:3 }}</th><th class="num">{{ dok.gkal|floatformat:3 }}</th></tr></tfoot>
 </table>
 <table class="dok-signs"><tr>
