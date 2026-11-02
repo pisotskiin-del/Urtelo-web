@@ -1,6 +1,6 @@
 @echo off
 rem teplo-web: backup of the PostgreSQL database. Run daily from Task Scheduler.
-rem Copies are kept in BACKUP_DIR for 30 days.
+rem Copies are kept in BACKUP_DIR for 30 days. In Task Scheduler add the argument /auto - no pause at the end.
 setlocal
 cd /d "%~dp0"
 set BACKUP_DIR=D:\teplo_backup
@@ -26,9 +26,11 @@ set FILE=%BACKUP_DIR%\teplo_%STAMP%.dump
 if errorlevel 1 (
   echo %date% %time% ERROR backup %FILE%>> "%BACKUP_DIR%\backup.log"
   echo ERROR: backup failed.
+  if /i not "%~1"=="/auto" pause
   exit /b 1
 )
 echo %date% %time% OK %FILE%>> "%BACKUP_DIR%\backup.log"
 forfiles /p "%BACKUP_DIR%" /m teplo_*.dump /d -%KEEP_DAYS% /c "cmd /c del @path" 2>nul
 echo Backup OK: %FILE%
+if /i not "%~1"=="/auto" pause
 exit /b 0
