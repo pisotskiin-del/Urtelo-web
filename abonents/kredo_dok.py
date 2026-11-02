@@ -180,11 +180,11 @@ def otpravit(dok, context, user="", proverka=False, crypto=None, invoker=None):
     proverka, только подписать). Возвращает запись реестра."""
     p = poluchatel(dok)
     glav = p or dok.glav
-    nomer = Pismo.sleduyushchij_nomer()
-    pismo = Pismo(nomer=nomer, user=user, kanal=Pismo.KREDO, cod_gor=dok.gorod.cod_gorod, nom_dog=dok.nom_dog,
+    pismo = Pismo.zarezervirovat(user=user, kanal=Pismo.KREDO, cod_gor=dok.gorod.cod_gorod, nom_dog=dok.nom_dog,
                   potreb_id=glav.potreb_id, name_potre=(glav.name_potre or "").strip()[:120],
                   email=(f"{glav.org_in.strip()} / {glav.pid_in.strip()}" if p else ""),
                   vid="schet", nom_mes=dok.mes, god=dok.god, status=Pismo.OSHIBKA)
+    nomer = pismo.nomer
     if p is None:
         pismo.oshibka = "В карте нет кодов организации и представителя в КРЭДО (org_in, pid_in)"
         pismo.save()
@@ -211,6 +211,7 @@ def otpravit(dok, context, user="", proverka=False, crypto=None, invoker=None):
         pismo.save()
         return pismo
     pismo.status = Pismo.OK
+    pismo.oshibka = ""
     pismo.kredo_doc = doc_id(otvet)
     pismo.save()
     return pismo

@@ -1398,6 +1398,15 @@ class KredoSchetTests(DokumentyTests):
         self.assertContains(r, "pywin32")
         self.assertEqual(Pismo.objects.filter(kredo_doc=guid).count(), 1)
 
+    def test_nomer_zanyat_drugim(self):
+        from unittest import mock
+        from abonents.models import Pismo
+        Pismo.objects.create(nomer=8, cod_gor=1, nom_dog=1, potreb_id=1, nom_mes=1, god=2026)
+        # другой пользователь успел занять 8, пока мы считали номер
+        with mock.patch.object(Pismo, "sleduyushchij_nomer", side_effect=[8, 9]):
+            z = Pismo.zarezervirovat(cod_gor=1, nom_dog=1, potreb_id=1, nom_mes=1, god=2026)
+        self.assertEqual(z.nomer, 9)
+
     def test_kredo_vyklyuchen_na_obshchem_servere(self):
         from django.test import override_settings
         from abonents import kredo, kredo_dok

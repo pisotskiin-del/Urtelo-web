@@ -75,10 +75,10 @@ def otpravit(dok, vid, context, user="", conn=None):
     """Отправить один документ по договору. Возвращает запись реестра."""
     p = poluchatel(dok) or dok.glav
     to = adresa(p.mail)
-    nomer = Pismo.sleduyushchij_nomer()
-    pismo = Pismo(nomer=nomer, user=user, cod_gor=dok.gorod.cod_gorod, nom_dog=dok.nom_dog, potreb_id=p.potreb_id,
+    pismo = Pismo.zarezervirovat(user=user, cod_gor=dok.gorod.cod_gorod, nom_dog=dok.nom_dog, potreb_id=p.potreb_id,
                   name_potre=(p.name_potre or "").strip()[:120], email=", ".join(to), vid=vid,
                   nom_mes=dok.mes, god=dok.god, status=Pismo.OSHIBKA)
+    nomer = pismo.nomer
     if not to:
         pismo.oshibka = "Нет адреса электронной почты в карте абонента"
         pismo.save()
@@ -97,6 +97,7 @@ def otpravit(dok, vid, context, user="", conn=None):
         pismo.save()
         return pismo
     pismo.status = Pismo.OK
+    pismo.oshibka = ""
     pismo.save()
     Potreb.objects.filter(cod_gor=dok.gorod.cod_gorod, nom_dog=dok.nom_dog).update(dataotpr=timezone.now())
     return pismo
