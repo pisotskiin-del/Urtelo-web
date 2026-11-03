@@ -1945,3 +1945,24 @@ class ProverkaFormulTests(KartaBase):
         self.assertIn("nach_otpr: расходится у 1 лицевых", out.getvalue())
         self.assertIn("Л/№ 5 (участок 1): старая 5.000, новая 10.000", out.getvalue())
         self.assertNotIn("nac_vsego:", out.getvalue())
+
+
+class RaschetOshibkiTests(KartaBase):
+    """Ошибки, на которых старая программа пишет «переполнение данных»."""
+
+    def test_nol_na_nol_i_perepolnenie(self):
+        from abonents import raschet
+        # Главный по договору с общим прибором, нагрузка группы 0: в старой
+        # программе 0 / 0 — «переполнение данных».
+        Potreb.objects.filter(potreb_id=5).update(d_stat=60, nom_dogab=6, nom_pribor=4, q_otop=0, tip_rasot=1,
+                                                  pok_new=1, pok_old=1)
+        Potreb.objects.filter(potreb_id=7).update(d_stat=60, nom_pribor=0, pok_new=Decimal("999999"), pok_old=0,
+                                                  koef_pok=Decimal("50"), tip_rasot=1)
+        recs = list(Potreb.objects.order_by("pk"))
+        cities = {d.cod_gorod: d for d in Danrasch.objects.all()}
+        result, _, _ = raschet.compute(recs, cities, {})
+        self.assertIn((5, "нагрузка субабонентов договора"), result.zero_division)
+        self.assertEqual(len([z for z in result.zero_division if z[0] == 5]), 1)
+        (pid, pole, _), *_ = result.perepolnenie
+        self.assertEqual((pid, pole), (7, "nach_otpr"))
+        self.assertIsNone(next(r for r in recs if r.potreb_id == 7).nach_otpr)

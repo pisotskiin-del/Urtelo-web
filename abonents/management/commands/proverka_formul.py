@@ -42,14 +42,14 @@ def zagruzit(model, papka):
 
 
 def sravnit(papka):
-    """(старые записи, новые записи, {поле: [(л/№, город, старое, новое)]}, города)."""
+    """(старые записи, новые записи, {поле: [(л/№, город, старое, новое)]}, города, итоги расчёта)."""
     recs = zagruzit(Potreb, papka)
     cities = {d.cod_gorod: d for d in zagruzit(Danrasch, papka) if d.cod_gorod is not None}
     sp_by_ln = {}
     for sp in zagruzit(SpTeplpoteri, papka):
         sp_by_ln.setdefault(sp.ln, sp)
     old = [copy.copy(r) for r in recs]
-    _, pt, _ = raschet.compute(recs, cities, sp_by_ln)
+    result, pt, _ = raschet.compute(recs, cities, sp_by_ln)
     diff = defaultdict(list)
     for o, r in zip(old, recs):
         # Старая программа считает только статус 60, новая — 60 и 62.
@@ -59,7 +59,7 @@ def sravnit(papka):
             a, b = Decimal(getattr(o, f) or 0), Decimal(getattr(r, f) or 0)
             if abs(a - b) > POROG:
                 diff[f].append((r.potreb_id, r.cod_gor_id, a, b))
-    return old, recs, diff, cities
+    return old, recs, diff, cities, result
 
 
 class Command(BaseCommand):
@@ -72,8 +72,13 @@ class Command(BaseCommand):
         papka = opts["dir"] or ""
         if not Path(papka).is_dir():
             raise CommandError(f"Нет папки {papka}")
-        old, recs, diff, cities = sravnit(papka)
+        old, recs, diff, cities, result = sravnit(papka)
         self.stdout.write(f"Лицевых в старой программе: {len(old)}")
+        for pid, what in result.zero_division:
+            self.stdout.write(self.style.WARNING(f"Деление на ноль (в старой программе — «переполнение данных»): "
+                                                 f"Л/№ {pid} — {what}"))
+        for pid, pole, zn in result.perepolnenie:
+            self.stdout.write(self.style.WARNING(f"Переполнение: Л/№ {pid} — {pole} = {zn}"))
         for code, c in sorted(cities.items()):
             a = sum(Decimal(o.nac_vsego or 0) for o in old if o.cod_gor_id == code and o.d_stat == 60)
             b = sum(Decimal(r.nac_vsego or 0) for r in recs if r.cod_gor_id == code and r.d_stat in RASCHET)

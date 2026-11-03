@@ -490,6 +490,7 @@ def raschet_view(request):
             "potreb": result.potreb,
             "created_poteri": result.created_poteri,
             "zero_division": result.zero_division,
+            "perepolnenie": result.perepolnenie,
             "otkluchen": result.otkluchen,
         }
         messages.success(request, f"Расчет закончен: рассчитано абонентов {result.potreb}")
