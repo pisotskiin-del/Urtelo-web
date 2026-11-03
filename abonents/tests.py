@@ -1832,3 +1832,54 @@ class KredoPriboryTests(KartaBase):
             self.client.post(reverse("abonents:kredo_pokazaniya_otpr") + "?gorod=1", {"action": "peredat"})
         self.assertEqual([c[0] for c in inv.calls], ["Set_URDeviceMeters"])
         self.assertEqual(KredoPeredacha.objects.first().vid, "pokazaniya")
+
+
+class ObnovitIzStarojTests(KartaBase):
+    """obnovit-iz-staroj.bat: показания, дни отопления карточек и исходные данные
+    для расчёта из DBF старой программы."""
+
+    def setUp(self):
+        super().setUp()
+        import tempfile
+        from pathlib import Path
+        import dbf
+        self.folder = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__("shutil").rmtree, self.folder)
+        Danrasch.objects.filter(cod_gorod=1).update(nom_mes=10, t_proekt=-17)
+        Danrasch.objects.filter(cod_gorod=2).update(nom_mes=10)
+        Potreb.objects.filter(potreb_id=5).update(pok_new=Decimal("1.000"), dnotop=Decimal("10.0"), org_in="ORG")
+        t = dbf.Table(str(self.folder / "danrasch.dbf"), "cod_gorod N(2,0); nom_mes N(2,0); god N(4,0); "
+                      "t_vozd N(5,1); t_proekt N(3,0); tkoef N(5,3); dnotop N(4,1); name_gorod C(20)",
+                      codepage="cp1251", dbf_type="vfp")
+        t.open(dbf.READ_WRITE)
+        t.append((1, 10, 2026, 4.0, -17, 0.4, 31.0, "Старое имя"))
+        t.append((2, 11, 2026, 1.0, -17, 0.5, 30.0, ""))     # другой месяц — не переносится
+        t.close()
+        t = dbf.Table(str(self.folder / "potreb.dbf"), "potreb_id N(6,0); cod_gor N(2,0); pok_new N(9,3); "
+                      "date_pok D; dnotop N(4,1); org_in C(40)", codepage="cp1251", dbf_type="vfp")
+        t.open(dbf.READ_WRITE)
+        t.append((5, 1, 12.5, dbf.Date(2026, 10, 25), 31.0, "СТАРОЕ"))
+        t.append((11, 2, 99, None, 5.0, ""))
+        t.append((99999, 1, 1, None, 1, ""))
+        t.close()
+
+    def test_proverka_i_zapis(self):
+        out = io.StringIO()
+        call_command("obnovit_iz_staroj", dir=str(self.folder), proverka=True, stdout=out)
+        self.assertIn("ничего не записано", out.getvalue())
+        self.assertIn("Дубоссары: расчётный месяц в старой программе 11.2026", out.getvalue())
+        self.assertEqual(Potreb.objects.get(potreb_id=5).pok_new, Decimal("1.000"))
+        call_command("obnovit_iz_staroj", dir=str(self.folder), stdout=out)
+        p = Potreb.objects.get(potreb_id=5)
+        self.assertEqual((p.pok_new, p.date_pok, p.dnotop, p.org_in),
+                         (Decimal("12.500"), date(2026, 10, 25), Decimal("31.0"), "ORG"))
+        d = Danrasch.objects.get(cod_gorod=1)
+        self.assertEqual((d.t_vozd, d.tkoef, d.dnotop, d.name_gorod), (Decimal("4.0"), Decimal("0.400"), Decimal("31.0"), "Рыбница"))
+        self.assertIsNone(Potreb.objects.get(potreb_id=11).pok_new)          # другой месяц
+        self.assertIsNone(Danrasch.objects.get(cod_gorod=2).t_vozd)
+        self.assertIn("есть только в старой (не переносятся): 1", out.getvalue())
+
+    def test_net_papki(self):
+        from django.core.management.base import CommandError
+        with self.assertRaisesMessage(CommandError, "Нет папки"):
+            call_command("obnovit_iz_staroj", dir=str(self.folder / "net"))
