@@ -1883,3 +1883,38 @@ class ObnovitIzStarojTests(KartaBase):
         from django.core.management.base import CommandError
         with self.assertRaisesMessage(CommandError, "Нет папки"):
             call_command("obnovit_iz_staroj", dir=str(self.folder / "net"))
+
+
+class SverkaRaschetaTests(KartaBase):
+    def test_sverka(self):
+        import tempfile
+        from pathlib import Path
+        import dbf
+        from openpyxl import load_workbook
+        folder = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__("shutil").rmtree, folder)
+        Danrasch.objects.filter(cod_gorod__in=[1, 2]).update(nom_mes=10)
+        Potreb.objects.filter(potreb_id=5).update(d_stat=60, nac_vsego=Decimal("10.5"), nach_otpr=Decimal("3"),
+                                                     gkl_perer=0)
+        Potreb.objects.filter(potreb_id=7).update(d_stat=60, nac_vsego=Decimal("2"))
+        t = dbf.Table(str(folder / "danrasch.dbf"), "cod_gorod N(2,0); nom_mes N(2,0); god N(4,0)",
+                      codepage="cp1251", dbf_type="vfp")
+        t.open(dbf.READ_WRITE)
+        t.append((1, 10, 2026))
+        t.append((2, 10, 2026))
+        t.close()
+        t = dbf.Table(str(folder / "potreb.dbf"), "potreb_id N(6,0); cod_gor N(2,0); d_stat N(2,0); "
+                      "nac_vsego N(12,3); nach_otpr N(12,3); pok_new N(9,3)", codepage="cp1251", dbf_type="vfp")
+        t.open(dbf.READ_WRITE)
+        t.append((5, 1, 60, 10.5, 3, 0))
+        t.append((7, 1, 60, 5, 0, 1))
+        t.close()
+        out = io.StringIO()
+        f = folder / "s.xlsx"
+        call_command("sverka_rascheta", dir=str(folder), out=str(f), stdout=out)
+        self.assertIn("Лицевых с расхождениями: 1", out.getvalue())
+        wb = load_workbook(f)
+        rows = list(wb["Расхождения"].iter_rows(values_only=True))
+        self.assertEqual(rows[1][0], 7)
+        itog = {r[0]: r[1:4] for r in wb["Итоги"].iter_rows(min_row=2, values_only=True)}
+        self.assertEqual(itog["Предъявлено к оплате"], (15.5, 12.5, -3.0))
