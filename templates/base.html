@@ -12,7 +12,7 @@
 </head>
 <body>
 {% include "_icons.html" %}
-<script>try { if (localStorage.getItem("side-mini") === "1") document.documentElement.classList.add("side-mini"); } catch (e) {}</script>
+<script>try { if (localStorage.getItem("side-mini") === "1") document.documentElement.classList.add("side-mini"); if (localStorage.getItem("tema") === "dark") document.documentElement.setAttribute("data-theme", "dark"); } catch (e) {}</script>
 <header class="topbar">
   {% if user.is_authenticated %}<button class="burger" type="button" onclick="toggleSide()" title="Свернуть / развернуть меню">{% icon "menu" %}</button>{% endif %}
   <a class="brand" href="{% url 'abonents:index' %}"><img class="brand-logo" src="{% static 'img/emblema.png' %}" alt="Теплоснабжение">
@@ -20,6 +20,7 @@
   {% if user.is_authenticated %}
   <div class="topmes">{% if raschet_mes %}<small>Расчетный месяц</small><b>{{ raschet_mes }}</b>{% endif %}</div>
   <div class="user">
+    <button class="tema" type="button" onclick="toggleTema()" title="Тёмная / светлая тема"><span class="t-dark">{% icon "moon" %}</span><span class="t-light">{% icon "sun" %}</span></button>
     <span class="ava">{% icon "user" %}</span>
     <span class="who">{{ user.get_full_name|default:user.username }}{% if user_roles %}<small>{{ user_roles|join:", " }}</small>{% endif %}</span>
     <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="link">{% icon "logout" %} Выход</button></form>
@@ -54,6 +55,12 @@
 </main>
 </div>
 <script>
+function toggleTema() {
+  var dark = document.documentElement.getAttribute("data-theme") !== "dark";
+  if (dark) document.documentElement.setAttribute("data-theme", "dark");
+  else document.documentElement.removeAttribute("data-theme");
+  try { localStorage.setItem("tema", dark ? "dark" : "light"); } catch (e) {}
+}
 function toggleSide() {
   var on = document.documentElement.classList.toggle("side-mini");
   try { localStorage.setItem("side-mini", on ? "1" : "0"); } catch (e) {}
