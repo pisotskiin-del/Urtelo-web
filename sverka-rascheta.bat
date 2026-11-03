@@ -16,12 +16,10 @@ if not exist .venv\Scripts\python.exe (
   exit /b 1
 )
 set DBF_DIR=D:\Teplo_dog\dbf
-set OUT=%~dp0dokumenty\sverka\sverka_rascheta.xlsx
-.venv\Scripts\python.exe manage.py sverka_rascheta --dir "%DBF_DIR%" --out "%OUT%"
+.venv\Scripts\python.exe manage.py sverka_rascheta --dir "%DBF_DIR%" --otkryt
 if errorlevel 1 (
   echo ERROR. Send the text of this window to Claude.
   pause
   exit /b 1
 )
-start "" "%OUT%"
 pause

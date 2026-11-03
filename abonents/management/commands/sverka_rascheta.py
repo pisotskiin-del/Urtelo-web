@@ -44,6 +44,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--dir", default=settings.DBF_SOURCE_DIR, help="Папка dbf старой программы")
         parser.add_argument("--out", default="", help="Файл Excel (по умолчанию dokumenty\\sverka\\...)")
+        parser.add_argument("--otkryt", action="store_true", help="Открыть файл после записи (Windows)")
 
     def handle(self, *args, **opts):
         from openpyxl import Workbook
@@ -129,7 +130,7 @@ class Command(BaseCommand):
             out = Path(opts["out"])
         else:
             from abonents.pdf import base_dir
-            out = base_dir() / "sverka" / f"sverka_rascheta_{datetime.datetime.now():%Y-%m-%d_%H%M}.xlsx"
+            out = base_dir() / "sverka" / f"sverka_rascheta_{datetime.datetime.now():%Y-%m-%d_%H%M%S}.xlsx"
         out.parent.mkdir(parents=True, exist_ok=True)
         wb.save(out)
         self.stdout.write(f"Лицевых с расхождениями: {len(rasx)}")
@@ -137,3 +138,9 @@ class Command(BaseCommand):
             a, b = summy.get((kod, "nac_vsego"), [0, 0])
             self.stdout.write(f"{goroda[kod].name_gorod}: предъявлено к оплате — старая {a}, новая {b}, разница {b - a}")
         self.stdout.write(self.style.SUCCESS(f"Файл сверки: {out}"))
+        if opts["otkryt"]:
+            import os
+            try:
+                os.startfile(str(out))
+            except (AttributeError, OSError) as e:
+                self.stdout.write(f"Не удалось открыть файл: {e}")
