@@ -815,8 +815,13 @@ def dokument(request, cod_gor, nom_dog, vid):
     if request.method == "POST" and request.POST.get("action") in ("kredo", "kredo_proverka") and vid == "schet":
         if not request.user.has_perm("catalogs.change_potreb"):
             raise PermissionDenied
-        from . import kredo_dok
+        from . import kredo, kredo_dok
         proverka = request.POST["action"] == "kredo_proverka"
+        try:
+            kredo.podpis_razreshena()
+        except kredo.KredoError as e:
+            messages.error(request, f"КРЭДО: {e}")
+            return redirect(request.get_full_path())
         z = kredo_dok.otpravit(dok, _dok_context(dok), request.user.get_username(), proverka=proverka)
         if z.status == z.OK:
             messages.success(request, f"Документ № {z.nomer} подписан и отправлен в КРЭДО")
@@ -890,9 +895,16 @@ def rassylka(request):
     if request.method == "POST" and kanal == Pismo.KREDO:
         if not can_send:
             raise PermissionDenied
-        from . import kredo_dok
+        from . import kredo, kredo_dok
         nomera = [int(x) for x in request.POST.getlist("dog") if x.isdigit()]
-        if not nomera:
+        try:
+            kredo.podpis_razreshena()
+        except kredo.KredoError as e:
+            messages.error(request, f"КРЭДО: {e}")
+            nomera = None
+        if nomera is None:
+            pass
+        elif not nomera:
             messages.warning(request, "Не отмечено ни одного договора")
         else:
             doks = [d for d in (documents.sobrat(code, n, mesyac=mesyac) for n in nomera) if d]

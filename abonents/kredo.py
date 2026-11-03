@@ -64,9 +64,21 @@ NE_ZDES = ("Отправка в КРЭДО на общем сервере отк
            "ярлыком «Теплоснабжение».")
 
 
+NE_PODPIS = ("На общем сервере документы в КРЭДО не подписываются: окно выбора сертификата "
+             "там некому показать. Войдите на сервер через удалённый рабочий стол, откройте "
+             "программу ярлыком «Теплоснабжение» и отправьте документ оттуда.")
+
+
 def razresheno():
     if not getattr(settings, "TEPLO_KREDO_ZDES", True):
         raise KredoError(NE_ZDES)
+
+
+def podpis_razreshena():
+    """Подпись документа (окно выбора сертификата) — не в общем фоновом сервере."""
+    razresheno()
+    if not getattr(settings, "TEPLO_KREDO_PODPIS", True):
+        raise KredoError(NE_PODPIS)
 
 
 class ComInvoker:

@@ -1407,6 +1407,19 @@ class KredoSchetTests(DokumentyTests):
             z = Pismo.zarezervirovat(cod_gor=1, nom_dog=1, potreb_id=1, nom_mes=1, god=2026)
         self.assertEqual(z.nomer, 9)
 
+    def test_podpis_vyklyuchena_na_obshchem_servere(self):
+        from django.test import override_settings
+        from abonents import kredo, kredo_dok
+        with override_settings(TEPLO_KREDO_PODPIS=False):
+            with self.assertRaisesMessage(kredo.KredoError, "удалённый рабочий стол"):
+                with kredo_dok.ComCrypto().objekt():
+                    pass
+            kredo.razresheno()   # статусы и показания — можно
+        self.login("Оператор")
+        with override_settings(TEPLO_KREDO_PODPIS=False):
+            r = self.client.post(reverse("abonents:dokument", args=[1, 6, "schet"]), {"action": "kredo"}, follow=True)
+        self.assertContains(r, "не подписываются")
+
     def test_kredo_vyklyuchen_na_obshchem_servere(self):
         from django.test import override_settings
         from abonents import kredo, kredo_dok
