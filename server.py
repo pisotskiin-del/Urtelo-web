@@ -29,11 +29,21 @@ def main():
     import django
     from django.core.management import call_command
     django.setup()
+    port = int(os.environ.get("TEPLO_SERVER_PORT", "8000"))
+    # Защита от повторного запуска: если порт уже занят (сервер работает из
+    # Планировщика или из другого окна server.bat), второй экземпляр не стартует.
+    import socket
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=1):
+            print(f"Сервер уже запущен: порт {port} занят. Второй экземпляр не запускается.")
+            print("Остановить работающий сервер: stop-server.bat (от имени администратора).")
+            return
+    except OSError:
+        pass
     call_command("collectstatic", interactive=False, verbosity=0)
     call_command("migrate", verbosity=0)
     from waitress import serve
     from teplo.wsgi import application
-    port = int(os.environ.get("TEPLO_SERVER_PORT", "8000"))
     print(f"Теплоснабжение: сервер работает на порту {port}. Не закрывайте это окно (или запустите как службу).")
     serve(application, host="0.0.0.0", port=port, threads=8)
 
