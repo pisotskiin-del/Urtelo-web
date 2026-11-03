@@ -1918,3 +1918,30 @@ class SverkaRaschetaTests(KartaBase):
         self.assertEqual(rows[1][0], 7)
         itog = {r[0]: r[1:4] for r in wb["Итоги"].iter_rows(min_row=2, values_only=True)}
         self.assertEqual(itog["Предъявлено к оплате"], (15.5, 12.5, -3.0))
+
+
+class ProverkaFormulTests(KartaBase):
+    def test_raschet_po_dannym_staroj(self):
+        import tempfile
+        from pathlib import Path
+        import dbf
+        folder = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__("shutil").rmtree, folder)
+        t = dbf.Table(str(folder / "danrasch.dbf"), "cod_gorod N(2,0); nom_mes N(2,0); god N(4,0); tkoef N(5,3); "
+                      "qpfakt N(10,2); name_gorod C(20)", codepage="cp1251", dbf_type="vfp")
+        t.open(dbf.READ_WRITE)
+        t.append((1, 10, 2026, 0.5, 0, "Рыбница"))
+        t.close()
+        t = dbf.Table(str(folder / "sp_teplpoteri.dbf"), "ln N(6,0)", codepage="cp1251", dbf_type="vfp")
+        t.close()
+        t = dbf.Table(str(folder / "potreb.dbf"), "potreb_id N(6,0); cod_gor N(2,0); d_stat N(2,0); tip_rasot N(1,0); "
+                      "pok_new N(9,3); pok_old N(9,3); koef_pok N(6,2); nach_otpr N(12,3); nac_vsego N(12,3); "
+                      "nach_otopl N(12,3)", codepage="cp1251", dbf_type="vfp")
+        t.open(dbf.READ_WRITE)
+        t.append((5, 1, 60, 1, 20, 10, 1, 5, 0, 0))      # в старой nach_otpr 5, по формуле 10
+        t.close()
+        out = io.StringIO()
+        call_command("proverka_formul", dir=str(folder), stdout=out)
+        self.assertIn("nach_otpr: расходится у 1 лицевых", out.getvalue())
+        self.assertIn("Л/№ 5 (участок 1): старая 5.000, новая 10.000", out.getvalue())
+        self.assertNotIn("nac_vsego:", out.getvalue())
