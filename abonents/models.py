@@ -228,6 +228,21 @@ class Pismo(models.Model):
         last = cls.objects.aggregate(m=models.Max("nomer"))["m"]
         return last + 1 if last else int(getattr(settings, "TEPLO_PISMO_NOMER", 1) or 1)
 
+    @classmethod
+    def zarezervirovat(cls, **polya):
+        """Создать запись реестра со следующим свободным номером. На сервере
+        документы могут отправлять одновременно несколько человек: если номер
+        уже занят другим, берётся следующий."""
+        from django.db import IntegrityError, transaction
+        polya.setdefault("oshibka", "Отправка не завершилась")
+        for _ in range(50):
+            try:
+                with transaction.atomic():
+                    return cls.objects.create(nomer=cls.sleduyushchij_nomer(), **polya)
+            except IntegrityError:
+                continue
+        raise RuntimeError("Не удалось получить номер документа в реестре писем")
+
 
 class KredoPriem(models.Model):
     """Полученные из КРЭДО показания приборов учёта (кнопки «Прием

@@ -12,7 +12,7 @@
   <button>{% icon "search" %} Найти</button>{% if query %} <a href="?">Сбросить</a>{% endif %}
 </form>
 <div class="scroll">
-<table class="grid">
+<table class="grid katalog">
   <thead><tr>
     {% for title, param, arrow in headers %}<th><a href="?o={{ param }}{% if query %}&q={{ query|urlencode }}{% endif %}">{{ title }}</a> {{ arrow }}</th>{% endfor %}
   </tr></thead>

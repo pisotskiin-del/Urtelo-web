@@ -510,3 +510,76 @@ table.dok-signs td { width:50%; vertical-align:top; padding:0 12px 0 0; }
 /* Реестр писем: кнопка «Отозвать» под статусом КРЭДО */
 form.otozvat { margin-top:4px; }
 form.otozvat .button { height:26px; padding:0 10px; font-size:12px; }
+
+/* Таблица справочника: длинные заголовки столбцов переносятся. */
+.grid.katalog th { white-space:normal; vertical-align:bottom; min-width:6em; }
+
+/* Кнопка темы в шапке */
+.user button.tema { background:none; border:0; min-height:0; padding:7px; border-radius:8px; color:#dbe7f7; }
+.user button.tema:hover { background:rgba(255,255,255,.1); color:#fff; }
+.user button.tema .i { width:20px; height:20px; }
+.user button.tema .t-light, html[data-theme="dark"] .user button.tema .t-dark { display:none; }
+html[data-theme="dark"] .user button.tema .t-light { display:inline; }
+
+/* Тёмная тема (кнопка-луна в шапке; запоминается в браузере). Только на экране:
+   печать и PDF остаются светлыми. Бланки документов (.dok) — белые, как бумага. */
+@media screen {
+html[data-theme="dark"] {
+  color-scheme:dark;
+  --bg:#0f1622; --card:#172131; --text:#e3e9f2; --muted:#93a0b4; --line:#263246; --line-strong:#34425a;
+  --accent:#4d94ee; --accent-weak:#1a2c47; --accent-text:#8bbaf5;
+  --danger:#f0716c; --danger-weak:#3a1d1f; --ok:#4cc38a; --ok-weak:#16302a;
+  --warn:#e9a84a; --warn-weak:#352a17; --off:#7c8698; --off-weak:#1f2836;
+  --navy:#0c1a30; --navy-2:#11264a; --navy-3:#173160;
+}
+html[data-theme="dark"] input, html[data-theme="dark"] select, html[data-theme="dark"] textarea,
+html[data-theme="dark"] button:not(.link):not(.burger):not(.collapse):not(.tema), html[data-theme="dark"] .button, html[data-theme="dark"] kbd, html[data-theme="dark"] .pager a,
+html[data-theme="dark"] .navbtns, html[data-theme="dark"] .danger, html[data-theme="dark"] .chip,
+html[data-theme="dark"] .seg button, html[data-theme="dark"] .tabs.karta-tabs a { background:#1b2638; color:var(--text); }
+html[data-theme="dark"] input:hover, html[data-theme="dark"] select:hover, html[data-theme="dark"] textarea:hover { border-color:#4a5a75; }
+html[data-theme="dark"] button:not(.link):not(.burger):not(.collapse):not(.tema):hover, html[data-theme="dark"] .button:hover, html[data-theme="dark"] .pager a:hover,
+html[data-theme="dark"] .seg button:hover { background:#233149; }
+html[data-theme="dark"] .button.off:hover { background:#1b2638; }
+html[data-theme="dark"] .primary, html[data-theme="dark"] .tabs.karta-tabs a.active,
+html[data-theme="dark"] .toolbar .tabs a.active { background:var(--accent); border-color:var(--accent); color:#fff !important; }
+html[data-theme="dark"] .primary:hover { background:#3a82dd; }
+html[data-theme="dark"] .danger { border-color:#5a2a2a; color:var(--danger) !important; }
+html[data-theme="dark"] .seg button { border-color:#34425a; }
+html[data-theme="dark"] .seg button.on { background:linear-gradient(#3f7fcc, #2a5fa3); color:#fff; }
+html[data-theme="dark"] .actions.sticky { background:rgba(15,22,34,.92); }
+html[data-theme="dark"] .msg { color:#bfe8d2; border-color:#245040; }
+html[data-theme="dark"] .msg.error, html[data-theme="dark"] .msg.warning { color:#f6c4c1; border-color:#5a2a2a; }
+html[data-theme="dark"] .chip.off, html[data-theme="dark"] .karta-head.otkl .kv { color:#9aa3b2; }
+html[data-theme="dark"] .card, html[data-theme="dark"] .scroll { border-color:var(--line); box-shadow:none; }
+html[data-theme="dark"] .grid th, html[data-theme="dark"] .grid tfoot th { background:#1c2739; color:#b8c4d6; border-bottom-color:var(--line); }
+html[data-theme="dark"] .grid th a { color:#b8c4d6; }
+html[data-theme="dark"] .grid tbody tr:nth-child(even) td { background:#192334; }
+html[data-theme="dark"] tr.clickable:hover td, html[data-theme="dark"] .grid tbody tr.clickable:hover td { background:#1f3150; }
+html[data-theme="dark"] .grid tr.current td { background:#3a3218; }
+html[data-theme="dark"] .grid tr.otkl td, html[data-theme="dark"] .karta-head.otkl, html[data-theme="dark"] .hero.otkl { background:#1a2130; }
+html[data-theme="dark"] .grid tr.otkl:hover td { background:#212a3b; }
+html[data-theme="dark"] .tabs { border-bottom-color:var(--line); }
+html[data-theme="dark"] .tabs a { color:#b8c4d6; }
+html[data-theme="dark"] .tabs a.active { color:var(--text); background:#1b2638; }
+html[data-theme="dark"] .toolbar .tabs { background:#1b2638; }
+html[data-theme="dark"] .tabs a .i, html[data-theme="dark"] .hero dt .i { color:#8794a8; }
+html[data-theme="dark"] .kgroup h2, html[data-theme="dark"] .kgroup .kf, html[data-theme="dark"] .kf, html[data-theme="dark"] .plist li,
+html[data-theme="dark"] .hero > div + div, html[data-theme="dark"] .hero .nums > div, html[data-theme="dark"] .hero .links { border-color:var(--line); }
+html[data-theme="dark"] .kgroup .kf:nth-child(odd) { background:#1a2435; }
+html[data-theme="dark"] .kgroup .kl, html[data-theme="dark"] .hero .nums small, html[data-theme="dark"] .hero dt { color:#a3afc2; }
+html[data-theme="dark"] .hero .avatar { background:#1f3150; }
+html[data-theme="dark"] .hero.otkl .avatar { background:#222b3a; }
+html[data-theme="dark"] .gsearch input { background:#1b2638; color:var(--text); }
+html[data-theme="dark"] .rep-list li a:hover { background:#1f2b40; }
+html[data-theme="dark"] .nm-warn { background:#332914; color:#f0d9a6; }
+html[data-theme="dark"] table.rep tr.sec td { background:#1f2d45; color:#cfe0f7; }
+html[data-theme="dark"] table.rep tr.foot td { background:#1a2435; }
+html[data-theme="dark"] table.rep tr.total td { background:#22324d; }
+html[data-theme="dark"] table.rep tr.mark td { background:#253a5a; }
+html[data-theme="dark"] .err { color:#ff8a80; }
+html[data-theme="dark"] .kv .pok-inline input:focus { background:#1b2638; }
+html[data-theme="dark"] dialog.confirm { background:var(--card); color:var(--text); }
+html[data-theme="dark"] .dok, html[data-theme="dark"] .dok * { color:#000; }
+html[data-theme="dark"] .dok input, html[data-theme="dark"] .dok select { background:#fff; color:#000; }
+html[data-theme="dark"] .add-pop > form { background:var(--card); }
+}

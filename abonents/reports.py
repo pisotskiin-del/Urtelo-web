@@ -523,8 +523,7 @@ def polez_otpusk(city, opts):
     return Report("ПОЛЕЗНЫЙ ОТПУСК", lines,
                   [Table(POLEZ_COLS, [Section(rows=[tarif_row], mark_rows=True)] + sections + [itog], head=head)],
                   signatures=[_ved_spec(city, "\u2003" * 12)],
-                  landscape=True,
-                  approve=_utverjdau(city))
+                  landscape=True)   # без грифа «УТВЕРЖДАЮ»: отчет не утверждается (03.11.2026)
 
 
 def _ved_spec(city, sep):
