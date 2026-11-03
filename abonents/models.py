@@ -311,12 +311,16 @@ class KredoOrg(models.Model):
 
 class KredoPeredacha(models.Model):
     """Передача в КРЭДО абонентов, договоров и точек потребления (Set_URAbon,
-    Set_URDogv, Set_URPotr): по договору из карты или по всему участку.
+    Set_URDogv, Set_URPotr) по договору из карты или по всему участку, приборов
+    учёта (Set_URDevice и справочники) и последних показаний (Set_URDeviceMeters).
     Пакеты XML и ответы сервиса хранятся целиком."""
 
     OK, OSHIBKA, PROVERKA = "ok", "oshibka", "proverka"
+    VIDY = [("dogovory", "Абоненты и договоры"), ("pribory", "Приборы учёта"), ("pokazaniya", "Последние показания")]
 
     created = models.DateTimeField("Когда", auto_now_add=True)
+    vid = models.CharField("Что передано", max_length=10, default="dogovory", choices=VIDY)
+    itogo = models.CharField("Строк в пакетах", max_length=500, blank=True)
     user = models.CharField("Кто", max_length=150, blank=True)
     cod_gor = models.IntegerField("Участок")
     nom_dog = models.IntegerField("Договор", null=True, blank=True, help_text="Пусто — весь участок")

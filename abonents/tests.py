@@ -1756,3 +1756,79 @@ class KredoDogovoryTests(KartaBase):
         url = reverse("abonents:kredo_dogovor", args=[5])
         self.assertNotContains(self.client.get(url), 'value="proverka"')
         self.assertEqual(self.client.post(url, {"action": "peredat"}).status_code, 403)
+
+
+class KredoPriboryTests(KartaBase):
+    """Передача в КРЭДО приборов учёта (Set_URDevice и справочники) и
+    последних показаний (Set_URDeviceMeters)."""
+
+    def setUp(self):
+        super().setUp()
+        from catalogs.models import SetUrdevice, SetUrdevicelist, SetUrdevplacelist, SetUrdevtypelist
+        SetUrdevicelist.objects.create(kod="3", name="ВКТ-7", tip_kod=1, koef=Decimal("2"), edn="Гкал")
+        SetUrdevtypelist.objects.create(kod=1, name="Теплосчётчик", stat=1)
+        SetUrdevplacelist.objects.create(kod=1, name="Подвал", stat=1)
+        SetUrdevice.objects.create(liz="000005", p_kod="000005", d_kod="3", d_tip=1, d_num="123",
+                                   d_date=date(2020, 5, 1), d_pok=Decimal("1.5"), koef=Decimal("1"))
+        SetUrdevice.objects.create(liz="000005", p_kod="000007", d_kod="9", d_tip=1, d_num="456")
+        SetUrdevice.objects.create(liz="000011", p_kod="000011", d_kod="3", d_num="789")   # Дубоссары
+        SetUrdevice.objects.create(liz="000099", p_kod="000099", d_kod="3", d_num="000")   # нет лицевого
+        Potreb.objects.filter(potreb_id=5).update(pok_new=Decimal("12.345"), rric_acn="R5")
+        Potreb.objects.filter(potreb_id=7).update(pok_new=None)
+
+    def test_pribory(self):
+        from abonents import kredo_dogovory as kd, kredo_pribory as kp
+        paket, zamech = kp.pakety_priborov(1)
+        self.assertEqual(list(paket), ["Set_URDeviceList", "Set_URDevTypeList", "Set_URDevPlaceList", "Set_URDevice"])
+        self.assertEqual([r["d_num"] for r in paket["Set_URDevice"]], ["123", "456"])
+        self.assertEqual(len(zamech), 1)
+        self.assertIn("p_kod 000099", zamech[0])
+        x = kd.xml_paketa("Set_URDevice", paket["Set_URDevice"])
+        self.assertIn("<d_pok>1.500</d_pok>", x)
+        self.assertIn("<d_date>2020-05-01</d_date>", x)
+        self.assertIn("<d_mesto>0</d_mesto>", x)     # пусто — 0, как в старой программе
+        self.assertIn("<del>0</del>", x)
+        self.assertIn("<koef>2.00</koef>", kd.xml_paketa("Set_URDeviceList", paket["Set_URDeviceList"]))
+
+    def test_pokazaniya(self):
+        from abonents import kredo_dogovory as kd, kredo_pribory as kp
+        paket, zamech = kp.pakety_pokazanij(1, date(2026, 11, 3))
+        (r,) = paket["Set_URDeviceMeters"]
+        self.assertEqual((r["p_kod"], r["last_pok"], r["tip_pok"], r["rric_acn"], r["edn"]),
+                         ("000005", Decimal("12.35"), 2, "R5", "Гкал"))
+        self.assertTrue(any("Л/с 7" in z for z in zamech))
+        x = kd.xml_paketa("Set_URDeviceMeters", paket["Set_URDeviceMeters"])
+        self.assertIn("<last_pok>12.35</last_pok>\n\t\t<pok_date>2026-11-03</pok_date>", x)
+        Potreb.objects.filter(potreb_id=7).update(pok_new=Decimal("4"))
+        paket, _ = kp.pakety_pokazanij(1)
+        self.assertEqual([r["edn"] for r in paket["Set_URDeviceMeters"]], ["Гкал", "-"])
+
+    def test_peredat(self):
+        from abonents import kredo_dogovory as kd, kredo_pribory as kp
+        from abonents.models import KredoPeredacha
+        inv = PaketInv()
+        paket, zamech = kp.pakety_priborov(1)
+        z = kd.otpravit_pakety(1, "pribory", paket, zamech, invoker=inv)
+        self.assertEqual(z.status, KredoPeredacha.OK)
+        self.assertEqual([c[0] for c in inv.calls],
+                         ["Set_URDeviceList", "Set_URDevTypeList", "Set_URDevPlaceList", "Set_URDevice"])
+        self.assertIn("Приборы учёта абонентов: 2", z.itogo)
+
+    def test_stranicy(self):
+        from unittest import mock
+        from abonents import kredo
+        from abonents.models import KredoPeredacha
+        self.login("Оператор")
+        for name in ("abonents:kredo_pribory", "abonents:kredo_pokazaniya_otpr"):
+            url = reverse(name) + "?gorod=1"
+            self.assertContains(self.client.get(url), "Проверить без отправки")
+            r = self.client.post(url, {"action": "proverka"})
+            z = KredoPeredacha.objects.first()
+            self.assertRedirects(r, reverse("abonents:kredo_peredacha", args=[z.pk]))
+            self.assertEqual(z.status, KredoPeredacha.PROVERKA)
+            self.assertContains(self.client.get(reverse("abonents:kredo_peredacha", args=[z.pk])), url)
+        inv = PaketInv()
+        with mock.patch.object(kredo, "ComInvoker", lambda cod_gor: inv):
+            self.client.post(reverse("abonents:kredo_pokazaniya_otpr") + "?gorod=1", {"action": "peredat"})
+        self.assertEqual([c[0] for c in inv.calls], ["Set_URDeviceMeters"])
+        self.assertEqual(KredoPeredacha.objects.first().vid, "pokazaniya")

@@ -1,12 +1,12 @@
 {% extends "base.html" %}{% load ui %}
 {% block title %}Передача в КРЭДО № {{ z.pk }}{% endblock %}
 {% block content %}
-<p class="crumbs"><a href="{{ nazad }}">Передача договоров в КРЭДО</a><span class="sep">›</span>№ {{ z.pk }}</p>
+<p class="crumbs"><a href="{{ nazad }}">{{ z.get_vid_display }}: передача в КРЭДО</a><span class="sep">›</span>№ {{ z.pk }}</p>
 <div class="page-head"><h1>Передача в КРЭДО № {{ z.pk }}</h1>
   <div class="actions"><a class="button" href="?xml=1">{% icon "file" %} Скачать пакеты XML</a><a class="button" href="{{ nazad }}">Назад</a></div></div>
 <section class="card">
-  <p>{{ z.created|date:"d.m.Y H:i" }}, {{ z.user|default:"—" }}; участок {{ z.cod_gor }}, {% if z.nom_dog %}договор № {{ z.nom_dog }}{% else %}все абоненты участка{% endif %}.</p>
-  <p>Результат: <b>{{ z.get_status_display }}</b>. Абонентов {{ z.abon }}, договоров {{ z.dogv }}, точек потребления {{ z.potr }}.</p>
+  <p>{{ z.created|date:"d.m.Y H:i" }}, {{ z.user|default:"—" }}; участок {{ z.cod_gor }}; {{ z.get_vid_display|lower }}{% if z.nom_dog %}, договор № {{ z.nom_dog }}{% else %}, весь участок{% endif %}.</p>
+  <p>Результат: <b>{{ z.get_status_display }}</b>. {{ z.itogo }}.</p>
   {% if z.oshibka %}<div class="msg error">{{ z.oshibka }}</div>{% endif %}
   {% if z.otvet %}<p>Ответ сервера РРИЦ:</p><pre>{{ z.otvet }}</pre>{% endif %}
   {% if z.zamechaniya %}<details><summary>Замечания</summary><pre>{{ z.zamechaniya }}</pre></details>{% endif %}

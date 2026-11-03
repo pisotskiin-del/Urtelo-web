@@ -1199,9 +1199,20 @@ def kredo_kod(request, potreb_id):
     })
 
 
-def _kredo_peredacha(request, cod_gor, zapisi, nom_dog, zagolovok, nazad, crumbs, cities=None, city=None):
-    """Общая страница передачи абонентов, договоров и точек потребления в
-    КРЭДО: предпросмотр пакетов, проверка без отправки и передача."""
+OPISANIE_PEREDACHI = {
+    "dogovory": "Информация об абонентах (Set_URAbon), договорах с абонентами (Set_URDogv) и объектах (точках) "
+                "потребления (Set_URPotr). Договоры передаются только у абонентов (категория 1) с датой договора.",
+    "pribory": "Справочники приборов учёта, их типов и мест установки (Set_URDeviceList, Set_URDevTypeList, "
+               "Set_URDevPlaceList) и приборы учёта абонентов участка (Set_URDevice) — как они записаны в "
+               "«Справочники → Приборы учёта».",
+    "pokazaniya": "Последние показания приборов учёта абонентов участка (Set_URDeviceMeters): по каждому прибору — "
+                  "показание из карты лицевого, дата — сегодня. Лицевые без показания в карте не передаются.",
+}
+
+
+def _kredo_peredacha(request, cod_gor, vid, sobrat, nom_dog, zagolovok, nazad, crumbs, cities=None, city=None):
+    """Общая страница передачи пакетов в КРЭДО: предпросмотр, проверка без
+    отправки и передача. sobrat() — ({процедура: [строка]}, [замечание])."""
     from . import kredo, kredo_dogovory as kd
     from .models import KredoPeredacha
     can_change = request.user.has_perm("catalogs.change_potreb")
@@ -1209,27 +1220,28 @@ def _kredo_peredacha(request, cod_gor, zapisi, nom_dog, zagolovok, nazad, crumbs
         if not can_change:
             raise PermissionDenied
         proverka = request.POST.get("action") != "peredat"
-        z = kd.peredat(cod_gor, zapisi, user=request.user.get_username(), nom_dog=nom_dog, proverka=proverka)
+        paket, zamech = sobrat()
+        z = kd.otpravit_pakety(cod_gor, vid, paket, zamech, user=request.user.get_username(), nom_dog=nom_dog,
+                               proverka=proverka)
         if z.status == KredoPeredacha.OSHIBKA:
             messages.error(request, f"КРЭДО: {z.oshibka}")
         elif proverka:
-            messages.success(request, f"Пакеты собраны, в КРЭДО не передавались: абонентов {z.abon}, "
-                                      f"договоров {z.dogv}, точек потребления {z.potr}")
+            messages.success(request, f"Пакеты собраны, в КРЭДО не передавались. {z.itogo}")
         else:
-            messages.success(request, f"Данные переданы в КРЭДО: абонентов {z.abon}, договоров {z.dogv}, "
-                                      f"точек потребления {z.potr}")
+            messages.success(request, f"Данные переданы в КРЭДО. {z.itogo}")
         return redirect("abonents:kredo_peredacha", pk=z.pk)
-    paket, zamech = kd.stroki(zapisi)
+    paket, zamech = sobrat()
     try:
         nast = kredo.nastrojki(cod_gor)
     except kredo.KredoError as e:
         nast = None
         messages.warning(request, str(e))
-    zhurnal = KredoPeredacha.objects.filter(cod_gor=cod_gor, nom_dog=nom_dog)[:20]
+    zhurnal = KredoPeredacha.objects.filter(cod_gor=cod_gor, nom_dog=nom_dog, vid=vid)[:20]
     return render(request, "abonents/kredo_dogovory.html", {
-        "zagolovok": zagolovok, "nazad": nazad, "crumbs": crumbs, "nom_dog": nom_dog,
+        "zagolovok": zagolovok, "nazad": nazad, "crumbs": crumbs, "nom_dog": nom_dog, "vid": vid,
+        "opisanie": OPISANIE_PEREDACHI[vid], "itogo": kd.itogo(paket),
         "pakety": [(proc, kd.NAZVANIYA[proc], [f for f, _ in kd.POLYA[proc]],
-                    [kd.kolonki(proc, r) for r in paket[proc]]) for proc in kd.POLYA],
+                    [kd.kolonki(proc, r) for r in rows]) for proc, rows in paket.items()],
         "zamech": zamech, "nast": nast, "can_change": can_change, "zhurnal": zhurnal,
         "zdes": getattr(settings, "TEPLO_KREDO_ZDES", True), "ne_zdes": kredo.NE_ZDES,
         "cities": cities, "city": city,
@@ -1246,8 +1258,19 @@ def kredo_dogovor(request, potreb_id):
         raise Http404
     nazad = reverse("abonents:karta", args=[potreb_id])
     zag = f"Договор № {p.nom_dog}: {p.name_potre}" if p.nom_dog else f"Л/с {p.potreb_id}: {p.name_potre}"
-    return _kredo_peredacha(request, p.cod_gor_id, kd.zapisi_dogovora(p), p.nom_dog or None, zag, nazad,
-                            [(nazad, "Карточка абонента")])
+    return _kredo_peredacha(request, p.cod_gor_id, "dogovory", lambda: kd.stroki(kd.zapisi_dogovora(p)),
+                            p.nom_dog or None, zag, nazad, [(nazad, "Карточка абонента")])
+
+
+def _kredo_uchastok(request, vid, url_name, zagolovok, sobrat):
+    cities = _cities()
+    code = _current_city(request, cities)
+    city = next((c for c in cities if c.cod_gorod == code), None)
+    if city is None:
+        raise Http404
+    nazad = f"{reverse(url_name)}?gorod={code}"
+    return _kredo_peredacha(request, code, vid, lambda: sobrat(code), None,
+                            f"{zagolovok} участка {city.name_gorod}", nazad, [], cities=cities, city=city)
 
 
 @login_required
@@ -1255,14 +1278,25 @@ def kredo_dogovor(request, potreb_id):
 def kredo_dogovory(request):
     """Регистрация в КРЭДО абонентов участка (apk_kredo.prg, кнопка формы rric)."""
     from . import kredo_dogovory as kd
-    cities = _cities()
-    code = _current_city(request, cities)
-    city = next((c for c in cities if c.cod_gorod == code), None)
-    if city is None:
-        raise Http404
-    nazad = f"{reverse('abonents:kredo_dogovory')}?gorod={code}"
-    return _kredo_peredacha(request, code, kd.zapisi_uchastka(code), None,
-                            f"Абоненты участка {city.name_gorod}", nazad, [], cities=cities, city=city)
+    return _kredo_uchastok(request, "dogovory", "abonents:kredo_dogovory", "Абоненты",
+                           lambda code: kd.stroki(kd.zapisi_uchastka(code)))
+
+
+@login_required
+@view_required
+def kredo_pribory(request):
+    """Информация о приборах учёта абонентов (кнопка Command35 формы rric)."""
+    from . import kredo_pribory as kp
+    return _kredo_uchastok(request, "pribory", "abonents:kredo_pribory", "Приборы учёта", kp.pakety_priborov)
+
+
+@login_required
+@view_required
+def kredo_pokazaniya_otpr(request):
+    """Последние показания приборов учёта абонентов (кнопка Command31 формы rric)."""
+    from . import kredo_pribory as kp
+    return _kredo_uchastok(request, "pokazaniya", "abonents:kredo_pokazaniya_otpr", "Показания приборов",
+                           kp.pakety_pokazanij)
 
 
 @login_required
@@ -1271,11 +1305,15 @@ def kredo_peredacha(request, pk):
     """Одна передача: пакеты XML, ответ сервиса, замечания."""
     from .models import KredoPeredacha
     z = get_object_or_404(KredoPeredacha, pk=pk)
+    p = None
     if z.nom_dog:
         p = Potreb.objects.filter(cod_gor=z.cod_gor, nom_dog=z.nom_dog).order_by("-id_katabon", "potreb_id").first()
-        nazad = reverse("abonents:kredo_dogovor", args=[p.potreb_id]) if p else reverse("abonents:kredo_dogovory")
+    if p is not None:
+        nazad = reverse("abonents:kredo_dogovor", args=[p.potreb_id])
     else:
-        nazad = f"{reverse('abonents:kredo_dogovory')}?gorod={z.cod_gor}"
+        url = {"pribory": "abonents:kredo_pribory", "pokazaniya": "abonents:kredo_pokazaniya_otpr"}.get(
+            z.vid, "abonents:kredo_dogovory")
+        nazad = f"{reverse(url)}?gorod={z.cod_gor}"
     if request.GET.get("xml"):
         response = HttpResponse(z.xml, content_type="text/xml; charset=utf-8")
         response["Content-Disposition"] = f'attachment; filename="kredo_peredacha_{z.pk}.xml"'

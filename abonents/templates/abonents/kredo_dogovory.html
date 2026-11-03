@@ -1,19 +1,18 @@
 {% extends "base.html" %}{% load ui %}
 {% block title %}КРЭДО: {{ zagolovok }}{% endblock %}
 {% block content %}
-<p class="crumbs">{% for url, t in crumbs %}<a href="{{ url }}">{{ t }}</a><span class="sep">›</span>{% endfor %}КРЭДО<span class="sep">›</span>Передача договоров</p>
+<p class="crumbs">{% for url, t in crumbs %}<a href="{{ url }}">{{ t }}</a><span class="sep">›</span>{% endfor %}КРЭДО<span class="sep">›</span>{{ zagolovok }}</p>
 <div class="page-head"><h1>Передать в КРЭДО: {{ zagolovok }}</h1></div>
 {% if cities %}<nav class="tabs">{% for c in cities %}<a href="?gorod={{ c.cod_gorod }}" {% if c.cod_gorod == city.cod_gorod %}class="active"{% endif %}>{{ c.name_gorod }}</a>{% endfor %}</nav>{% endif %}
 <section class="card">
-  <p>Информация об абонентах (Set_URAbon), договорах с абонентами (Set_URDogv) и объектах (точках) потребления (Set_URPotr)
-    {% if nom_dog %}по договору № {{ nom_dog }}{% else %}по всем абонентам участка, у которых заполнено название объекта{% endif %}{% if nast %}; организация в КРЭДО {{ nast.comorg }}, сертификат {{ nast.cert }}{% endif %}.
-    Договоры передаются только у абонентов (категория 1) с датой договора.</p>
+  <p>{{ opisanie }}{% if vid == "dogovory" %} {% if nom_dog %}Передаётся договор № {{ nom_dog }}.{% else %}Передаются все абоненты участка, у которых заполнено название объекта.{% endif %}{% endif %}
+    {% if nast %}Организация в КРЭДО {{ nast.comorg }}, сертификат {{ nast.cert }}.{% endif %}</p>
   {% if zamech %}<details class="msg warning"><summary>Замечания: {{ zamech|length }}</summary><ul>{% for z in zamech %}<li>{{ z }}</li>{% endfor %}</ul></details>{% endif %}
   {% if can_change and nast %}
   <form method="post" class="actions">{% csrf_token %}
     <button name="action" value="proverka" title="Собрать пакеты XML и сохранить их в журнале, ничего не отправляя">{% icon "file" %} Проверить без отправки</button>
     {% if zdes %}<button class="primary" name="action" value="peredat"
-      onclick="if(!confirm('Передать в КРЭДО абонентов: {{ pakety.0.3|length }}, договоров: {{ pakety.1.3|length }}, точек потребления: {{ pakety.2.3|length }}?'))return false;this.disabled=true;this.textContent='Передаю в КРЭДО…';this.form.insertAdjacentHTML('beforeend','<input type=hidden name=action value=peredat>');this.form.submit()">{% icon "open" %} Передать в КРЭДО</button>
+      data-itogo="{{ itogo }}" onclick="if(!confirm('Передать в КРЭДО?\n\n'+this.dataset.itogo))return false;this.disabled=true;this.textContent='Передаю в КРЭДО…';this.form.insertAdjacentHTML('beforeend','<input type=hidden name=action value=peredat>');this.form.submit()">{% icon "open" %} Передать в КРЭДО</button>
     {% else %}<span class="muted">{{ ne_zdes }}</span>{% endif %}
   </form>
   {% endif %}
@@ -27,11 +26,11 @@
 {% endfor %}
 <h2>Журнал передач</h2>
 <div class="scroll"><table class="grid">
-  <thead><tr><th>Когда</th><th>Кто</th><th>Результат</th><th class="num">Абонентов</th><th class="num">Договоров</th><th class="num">Точек</th><th></th></tr></thead>
+  <thead><tr><th>Когда</th><th>Кто</th><th>Результат</th><th>Строк в пакетах</th><th></th></tr></thead>
   <tbody>
   {% for z in zhurnal %}<tr><td>{{ z.created|date:"d.m.Y H:i" }}</td><td>{{ z.user }}</td><td>{{ z.get_status_display }}{% if z.oshibka %}: {{ z.oshibka|truncatechars:80 }}{% endif %}</td>
-    <td class="num">{{ z.abon }}</td><td class="num">{{ z.dogv }}</td><td class="num">{{ z.potr }}</td><td><a href="{% url 'abonents:kredo_peredacha' z.pk %}">открыть</a></td></tr>
-  {% empty %}<tr><td colspan="7" class="muted">Ещё не передавали</td></tr>{% endfor %}
+    <td>{{ z.itogo|default:"—" }}</td><td><a href="{% url 'abonents:kredo_peredacha' z.pk %}">открыть</a></td></tr>
+  {% empty %}<tr><td colspan="5" class="muted">Ещё не передавали</td></tr>{% endfor %}
   </tbody>
 </table></div>
 {% endblock %}
