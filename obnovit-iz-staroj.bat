@@ -5,6 +5,11 @@ rem   obnovit-iz-staroj.bat            - update
 rem   obnovit-iz-staroj.bat /proverka  - only show what would change
 rem   obnovit-iz-staroj.bat /auto      - no pause at the end (Task Scheduler)
 setlocal
+if "%~d0"=="\\" (
+  echo Run this file on the server itself ^(Remote Desktop^), not from a network folder \\Server-b\...
+  pause
+  exit /b 1
+)
 cd /d "%~dp0"
 chcp 65001 >nul
 set PYTHONIOENCODING=utf-8
