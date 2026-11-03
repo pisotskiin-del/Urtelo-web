@@ -87,7 +87,10 @@ class ComInvoker:
     def __init__(self, cod_gor):
         self.n = nastrojki(cod_gor)
 
-    def exec_proc(self, name, params):
+    def exec_proc(self, name, params, xml=None):
+        """Вызвать процедуру. xml — пакет данных: добавляется параметром
+        @xmlData={base64}…, закодированный методом ToBase64 объекта (как в
+        старой программе)."""
         razresheno()
         try:
             import pythoncom
@@ -107,6 +110,8 @@ class ComInvoker:
             x.ServiceCertName = self.n["service"]
             x.EndpointUrl = self.n["endpoint"]
             x.MaxMessageSize = 1000000000
+            if xml is not None:
+                params = f"{params},@xmlData={{base64}}{x.ToBase64(xml)}"
             # Метод без аргументов при позднем связывании читается как свойство:
             # со скобками pywin32 вызвал бы ToString() результата.
             c = x.CreateChannel

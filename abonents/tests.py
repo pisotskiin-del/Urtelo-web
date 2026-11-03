@@ -1632,3 +1632,127 @@ class VedomostiTests(KartaBase):
             r = self.client.get(reverse("abonents:otchet", args=[key]) + "?gorod=1")
             self.assertEqual(r.status_code, 200, key)
         self.assertContains(self.client.get(reverse("abonents:otchety")), "Ведомости, реестры")
+
+
+class PaketInv:
+    """Поддельный RRIC_COM_OBJECT.Invoker для пакетов Set_UR*."""
+
+    def __init__(self, otvet="<root><row><ret_val>OK</ret_val></row></root>"):
+        self.otvet, self.calls = otvet, []
+
+    def exec_proc(self, name, params, xml=None):
+        self.calls.append((name, params, xml))
+        return self.otvet
+
+
+class KredoDogovoryTests(KartaBase):
+    """Передача в КРЭДО абонентов, договоров и точек потребления (Set_URAbon,
+    Set_URDogv, Set_URPotr)."""
+
+    def setUp(self):
+        super().setUp()
+        Potreb.objects.filter(potreb_id=5).update(
+            nameobakt="Магазин", d_stat=60, data_dog=date(2020, 1, 15), dn_dog=date(2020, 1, 1),
+            fisk_cod="0200012345", telefon="0555 123456789", ras_chet=2211290000000026, name_banka="Агропромбанк",
+            ao_code="AO1", ura_dom="5", oba_dom="7", direktor="Иванов", a_type=1)
+        Potreb.objects.filter(potreb_id=7).update(nameobakt="Склад & гараж", d_stat=60, ao_code="AO1")
+        Potreb.objects.filter(potreb_id=9).update(nameobakt="-----")
+
+    def test_stroki(self):
+        from abonents import kredo_dogovory as kd
+        paket, zamech = kd.stroki(kd.zapisi_dogovora(Potreb.objects.get(potreb_id=7)))
+        self.assertEqual([r["liz"] for r in paket["Set_URAbon"]], ["000005", "000007"])
+        (d,) = paket["Set_URDogv"]
+        self.assertEqual((d["liz"], d["n_dog"], d["d_dog"], d["d_stat"]), ("000005", "000006", date(2020, 1, 15), 60))
+        self.assertEqual([(r["liz"], r["p_kod"], r["stat"]) for r in paket["Set_URPotr"]],
+                         [("000005", "000005", 1), ("000005", "000007", 1)])
+        self.assertEqual(paket["Set_URAbon"][0]["rs"], "2211290000000026")
+        self.assertEqual(paket["Set_URAbon"][0]["account"], "5")
+        self.assertEqual(zamech, [])
+
+    def test_xml(self):
+        from abonents import kredo_dogovory as kd
+        paket, _ = kd.stroki([Potreb.objects.get(potreb_id=5), Potreb.objects.get(potreb_id=7)])
+        x = kd.xml_paketa("Set_URDogv", paket["Set_URDogv"])
+        self.assertTrue(x.startswith('<?xml version = "1.0" encoding="Windows-1251" standalone="yes"?>\n<root>'))
+        self.assertIn("<tip>Юрлица Теп</tip>", x)          # ширина поля TIP — 10
+        self.assertIn("<d_dog>2020-01-15</d_dog>", x)
+        self.assertIn("<dk_dog/>", x)
+        a = kd.xml_paketa("Set_URAbon", paket["Set_URAbon"])
+        self.assertIn("<ru_phone>0555 12345</ru_phone>", a)
+        self.assertIn('<a_name_full>ООО "Крипс"</a_name_full>', a)
+        self.assertIn("<p_name>Склад &amp; гараж</p_name>", kd.xml_paketa("Set_URPotr", paket["Set_URPotr"]))
+        import xml.etree.ElementTree as ET
+        ET.fromstring(x.split("?>", 1)[1])
+
+    def test_porcii(self):
+        from abonents import kredo_dogovory as kd
+        rows = [{"liz": kod, "p_kod": kod} for kod in map(kd.kod6, range(2500))] + [{"liz": "000001", "p_kod": "000001"}]
+        self.assertEqual([x.count("<row>") for x in kd.porcii("Set_URPotr", rows)], [1000, 1000, 500])
+
+    def test_uchastok_bez_ne_objektov(self):
+        from abonents import kredo_dogovory as kd
+        self.assertEqual([p.potreb_id for p in kd.zapisi_uchastka(1)], [5, 7])
+        # Кнопка карты передаёт и сам лицевой без названия объекта.
+        self.assertEqual([p.potreb_id for p in kd.zapisi_dogovora(Potreb.objects.get(potreb_id=9))], [9])
+
+    def test_peredat(self):
+        from abonents import kredo_dogovory as kd
+        from abonents.models import KredoPeredacha
+        inv = PaketInv()
+        z = kd.peredat(1, kd.zapisi_uchastka(1), user="op", nom_dog=None, invoker=inv)
+        self.assertEqual(z.status, KredoPeredacha.OK)
+        self.assertEqual([(c[0], c[1]) for c in inv.calls],
+                         [("Set_URAbon", "@comorg_id=210"), ("Set_URDogv", "@comorg_id=210"), ("Set_URPotr", "@comorg_id=210")])
+        self.assertIn("<n_dog>000006</n_dog>", inv.calls[1][2])
+        self.assertIn("Set_URAbon: OK", z.otvet)
+        self.assertEqual((z.abon, z.dogv, z.potr), (2, 1, 2))
+
+    def test_oshibka_ostanavlivaet(self):
+        from abonents import kredo_dogovory as kd
+        from abonents.models import KredoPeredacha
+        inv = PaketInv("<root><error>Нет прав</error></root>")
+        z = kd.peredat(1, kd.zapisi_uchastka(1), invoker=inv)
+        self.assertEqual((z.status, z.oshibka, len(inv.calls)), (KredoPeredacha.OSHIBKA, "Нет прав", 1))
+
+    def test_proverka_bez_vyzova(self):
+        from abonents import kredo_dogovory as kd
+        from abonents.models import KredoPeredacha
+        inv = PaketInv()
+        z = kd.peredat(1, kd.zapisi_uchastka(1), proverka=True, invoker=inv)
+        self.assertEqual((z.status, inv.calls), (KredoPeredacha.PROVERKA, []))
+        self.assertIn("<!-- Set_URPotr -->", z.xml)
+
+    def test_stranicy(self):
+        from unittest import mock
+        from abonents import kredo, kredo_dogovory as kd
+        from abonents.models import KredoPeredacha
+        self.login("Оператор")
+        self.assertContains(self.client.get(reverse("abonents:karta", args=[5])), "Договор в КРЭДО")
+        url = reverse("abonents:kredo_dogovor", args=[7])
+        r = self.client.get(url)
+        self.assertContains(r, "Договор № 6")
+        self.assertContains(r, "Юрлица Теп<")
+        r = self.client.post(url, {"action": "proverka"})
+        z = KredoPeredacha.objects.get()
+        self.assertRedirects(r, reverse("abonents:kredo_peredacha", args=[z.pk]))
+        self.assertEqual((z.nom_dog, z.status), (6, KredoPeredacha.PROVERKA))
+        self.assertContains(self.client.get(reverse("abonents:kredo_peredacha", args=[z.pk])), "Проверка")
+        self.assertEqual(self.client.get(reverse("abonents:kredo_peredacha", args=[z.pk]) + "?xml=1")["Content-Type"],
+                         "text/xml; charset=utf-8")
+        inv = PaketInv()
+        with mock.patch.object(kredo, "ComInvoker", lambda cod_gor: inv):
+            self.client.post(reverse("abonents:kredo_dogovory") + "?gorod=1", {"action": "peredat"})
+        self.assertEqual(len(inv.calls), 3)
+        self.assertContains(self.client.get(reverse("abonents:kredo_dogovory") + "?gorod=1"), "Передано")
+        with self.settings(TEPLO_KREDO_ZDES=False):
+            z = kd.peredat(1, kd.zapisi_uchastka(1))
+            self.assertEqual(z.status, KredoPeredacha.OSHIBKA)
+            self.assertIn("общем сервере", z.oshibka)
+            self.assertNotContains(self.client.get(url), 'value="peredat"')
+
+    def test_nablyudatel_ne_peredaet(self):
+        self.login("Наблюдатель")
+        url = reverse("abonents:kredo_dogovor", args=[5])
+        self.assertNotContains(self.client.get(url), 'value="proverka"')
+        self.assertEqual(self.client.post(url, {"action": "peredat"}).status_code, 403)
