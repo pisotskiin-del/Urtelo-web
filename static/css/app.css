@@ -640,3 +640,19 @@ html[data-theme="dark"] .karta-top { background:var(--bg); }
 .uzel .u-nach { margin-top:3px; }
 html[data-theme="dark"] .uzel.tek { background:#3a3210; }
 html[data-theme="dark"] .uzel.abon, html[data-theme="dark"] .shema-leg .lg.abon::before { background:#1c2f52; }
+
+/* Подтверждение изменения показания рядом с галочкой (карточка). */
+.podtv { position:absolute; z-index:60; min-width:220px; max-width:320px; background:var(--card); color:var(--text);
+  border:1px solid var(--line-strong); border-radius:var(--radius); padding:12px 14px;
+  box-shadow:0 10px 30px rgba(16,24,40,.18), 0 2px 6px rgba(16,24,40,.08); animation:podtv-in .12s ease-out; }
+.podtv::before { content:""; position:absolute; top:-7px; left:var(--ugol, 50%); width:12px; height:12px; margin-left:-6px;
+  background:var(--card); border-left:1px solid var(--line-strong); border-top:1px solid var(--line-strong); transform:rotate(45deg); }
+.podtv.verh::before { top:auto; bottom:-7px; transform:rotate(225deg); }
+.podtv-z { font-weight:600; margin-bottom:8px; }
+.podtv-r { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-variant-numeric:tabular-nums; margin-bottom:12px; }
+.podtv-bylo { color:var(--muted); text-decoration:line-through; }
+.podtv-str { color:var(--muted); }
+.podtv-stalo { font-weight:700; color:var(--accent-text); background:var(--accent-weak); border-radius:6px; padding:1px 7px; }
+.podtv-b { display:flex; gap:8px; justify-content:flex-end; }
+@keyframes podtv-in { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
+.podtv-b .primary, html[data-theme="dark"] .podtv-b button.primary { background:var(--accent) !important; border-color:var(--accent); color:#fff; }

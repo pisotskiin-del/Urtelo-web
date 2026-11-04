@@ -28,10 +28,35 @@
 </div>
 {% include "abonents/_card.html" %}
 {% if can_change %}<script>
+/* Подтверждение изменения показания: всплывает рядом с галочкой. */
 function pokPodtv(f) {
   var staroe = f.dataset.staroe || "пусто", novoe = f.znach.value.trim() || "пусто";
   if (novoe === staroe) return false;
-  return confirm("Сохранить изменение?\n\nБыло: " + staroe + "\nСтало: " + novoe);
+  var old = document.querySelector(".podtv"); if (old) old.remove();
+  var d = document.createElement("div");
+  d.className = "podtv"; d.setAttribute("role", "dialog");
+  d.innerHTML = '<div class="podtv-z">Сохранить изменение?</div>' +
+    '<div class="podtv-r"><span class="podtv-bylo"></span><span class="podtv-str">→</span><span class="podtv-stalo"></span></div>' +
+    '<div class="podtv-b"><button type="button" class="primary">Сохранить</button><button type="button" >Отмена</button></div>';
+  d.querySelector(".podtv-bylo").textContent = staroe;
+  d.querySelector(".podtv-stalo").textContent = novoe;
+  document.body.appendChild(d);
+  var r = (f.querySelector("button") || f).getBoundingClientRect(), w = d.offsetWidth, h = d.offsetHeight;
+  var left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
+  var top = r.bottom + 8;
+  if (top + h > window.innerHeight - 8) { top = r.top - h - 8; d.classList.add("verh"); }
+  d.style.left = (left + window.scrollX) + "px"; d.style.top = (top + window.scrollY) + "px";
+  d.style.setProperty("--ugol", Math.max(14, Math.min(w - 14, r.left + r.width / 2 - left)) + "px");
+  function zakryt() { d.remove(); document.removeEventListener("keydown", klav, true); document.removeEventListener("mousedown", vne, true); }
+  function klav(e) { if (e.key === "Escape") { zakryt(); f.znach.focus(); e.preventDefault(); } }
+  function vne(e) { if (!d.contains(e.target)) zakryt(); }
+  var bs = d.querySelectorAll("button");
+  bs[0].onclick = function () { bs[0].disabled = true; bs[0].textContent = "Сохраняю…"; f.submit(); };
+  bs[1].onclick = function () { zakryt(); f.znach.focus(); };
+  document.addEventListener("keydown", klav, true);
+  document.addEventListener("mousedown", vne, true);
+  bs[0].focus();
+  return false;
 }
 </script>{% endif %}
 {% endblock %}
