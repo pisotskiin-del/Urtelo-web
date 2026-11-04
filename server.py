@@ -40,7 +40,9 @@ def main():
             return
     except OSError:
         pass
-    call_command("collectstatic", interactive=False, verbosity=0)
+    # clear=True: файлы из архива обновления сохраняют старую дату, и без очистки
+    # collectstatic считал бы прежнюю копию новее и не обновлял её.
+    call_command("collectstatic", interactive=False, clear=True, verbosity=0)
     call_command("migrate", verbosity=0)
     from waitress import serve
     from teplo.wsgi import application
