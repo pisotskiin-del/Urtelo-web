@@ -583,3 +583,11 @@ html[data-theme="dark"] .dok, html[data-theme="dark"] .dok * { color:#000; }
 html[data-theme="dark"] .dok input, html[data-theme="dark"] .dok select { background:#fff; color:#000; }
 html[data-theme="dark"] .add-pop > form { background:var(--card); }
 }
+
+/* Карточка абонента: заголовок с кнопками и поиск остаются вверху при прокрутке. */
+.karta-top { position:sticky; top:var(--topbar); z-index:15; background:var(--bg, #f3f5f8); margin:-16px -22px 12px; padding:12px 22px 10px;
+  border-bottom:1px solid var(--line); }
+.karta-top .page-head { margin-bottom:8px; }
+.karta-poisk { flex:none; }
+html[data-theme="dark"] .karta-top { background:var(--bg); }
+@media print { .karta-top { position:static; margin:0; padding:0; border:0; } .karta-poisk { display:none; } }

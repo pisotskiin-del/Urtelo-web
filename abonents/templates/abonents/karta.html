@@ -1,6 +1,7 @@
 {% extends "base.html" %}{% load ui %}
 {% block title %}Л/№ {{ p.potreb_id }} — {{ p.name_potre }}{% endblock %}
 {% block content %}
+<div class="karta-top">
 <p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a><span class="sep">›</span>Карточка абонента</p>
 <div class="page-head">
   <h1>Карточка абонента</h1>
@@ -15,6 +16,15 @@
     {% if can_change %}<a class="button primary" href="{% url 'abonents:edit' p.potreb_id %}?tab={{ tab }}">{% icon "edit" %} Изменить</a>{% endif %}
     {% if can_delete %}<a class="button danger" href="{% url 'abonents:delete' p.potreb_id %}">{% icon "trash" %} Удалить</a>{% endif %}
   </div>
+</div>
+<div class="finder karta-poisk">
+  <form method="get" action="{% url 'abonents:index' %}"><input type="hidden" name="gorod" value="{{ p.cod_gor_id|default_if_none:'' }}">
+    <label>№ договора <input name="dog" inputmode="numeric" size="6"></label><button title="Найти договор">{% icon "search" %}</button></form>
+  <form method="get" action="{% url 'abonents:index' %}">
+    <label>Лицевой № <input name="ls" inputmode="numeric" size="6" title="Ищет во всех городах"></label><button title="Открыть карту">{% icon "open" %}</button></form>
+  <form method="get" action="{% url 'abonents:index' %}"><input type="hidden" name="gorod" value="{{ p.cod_gor_id|default_if_none:'' }}">
+    <label>Наименование <input class="wide-input" name="q" placeholder="Часть названия, нажмите /" data-hotkey-search></label><button title="Найти">{% icon "search" %}</button></form>
+</div>
 </div>
 {% include "abonents/_card.html" %}
 {% if can_change %}<script>
