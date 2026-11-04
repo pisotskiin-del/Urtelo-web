@@ -259,6 +259,11 @@ def _card_context(request, p, tab_key, form=None):
         "can_change": request.user.has_perm("catalogs.change_potreb"),
         "can_delete": request.user.has_perm("catalogs.delete_potreb"),
         "pokazaniya": POKAZANIYA,
+        # Кнопка «информация о приборе учёта» у показаний предыдущих, как в старой программе.
+        "pribor_info": form is None and tab_key == "otop" and request.user.has_perm("catalogs.view_spteplosch"),
+        "teplosch": SpTeplosch.objects.filter(ln=p.potreb_id).order_by("pk").first()
+        if form is None and tab_key == "otop" else None,
+        "segodnya": datetime.date.today(),
     }
 
 

@@ -27,34 +27,51 @@
 </div>
 </div>
 {% include "abonents/_card.html" %}
+{% if pribor_info %}{% include "abonents/_pribor_info.html" %}{% endif %}
+<script>
+/* Всплывающее окно рядом с кнопкой el; Esc и щелчок мимо закрывают. */
+function ryadom(d, el, posleZakr) {
+  var old = document.querySelector(".podtv"); if (old) old.zakryt ? old.zakryt() : old.remove();
+  document.body.appendChild(d);
+  var r = el.getBoundingClientRect(), w = d.offsetWidth, h = d.offsetHeight;
+  var left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
+  var top = r.bottom + 8;
+  if (top + h > window.innerHeight - 8 && r.top - h - 8 > 0) { top = r.top - h - 8; d.classList.add("verh"); }
+  d.style.left = (left + window.scrollX) + "px"; d.style.top = (top + window.scrollY) + "px";
+  d.style.setProperty("--ugol", Math.max(14, Math.min(w - 14, r.left + r.width / 2 - left)) + "px");
+  function zakryt() { d.remove(); document.removeEventListener("keydown", klav, true); document.removeEventListener("mousedown", vne, true); if (posleZakr) posleZakr(); }
+  function klav(e) { if (e.key === "Escape") { zakryt(); e.preventDefault(); } }
+  function vne(e) { if (!d.contains(e.target) && !el.contains(e.target)) zakryt(); }
+  document.addEventListener("keydown", klav, true);
+  document.addEventListener("mousedown", vne, true);
+  d.zakryt = zakryt;
+  return zakryt;
+}
+function priborInfo(el) {
+  var est = document.querySelector(".pribor-pop");
+  if (est) { est.zakryt(); return; }
+  var d = document.getElementById("pribor-info-tpl").content.firstElementChild.cloneNode(true);
+  var zakryt = ryadom(d, el);
+  d.querySelector("[data-zakryt]").onclick = zakryt;
+  d.querySelector(".button").focus();
+}
+</script>
 {% if can_change %}<script>
 /* Подтверждение изменения показания: всплывает рядом с галочкой. */
 function pokPodtv(f) {
   var staroe = f.dataset.staroe || "пусто", novoe = f.znach.value.trim() || "пусто";
   if (novoe === staroe) return false;
-  var old = document.querySelector(".podtv"); if (old) old.remove();
   var d = document.createElement("div");
   d.className = "podtv"; d.setAttribute("role", "dialog");
   d.innerHTML = '<div class="podtv-z">Сохранить изменение?</div>' +
     '<div class="podtv-r"><span class="podtv-bylo"></span><span class="podtv-str">→</span><span class="podtv-stalo"></span></div>' +
-    '<div class="podtv-b"><button type="button" class="primary">Сохранить</button><button type="button" >Отмена</button></div>';
+    '<div class="podtv-b"><button type="button" class="primary">Сохранить</button><button type="button">Отмена</button></div>';
   d.querySelector(".podtv-bylo").textContent = staroe;
   d.querySelector(".podtv-stalo").textContent = novoe;
-  document.body.appendChild(d);
-  var r = (f.querySelector("button") || f).getBoundingClientRect(), w = d.offsetWidth, h = d.offsetHeight;
-  var left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
-  var top = r.bottom + 8;
-  if (top + h > window.innerHeight - 8) { top = r.top - h - 8; d.classList.add("verh"); }
-  d.style.left = (left + window.scrollX) + "px"; d.style.top = (top + window.scrollY) + "px";
-  d.style.setProperty("--ugol", Math.max(14, Math.min(w - 14, r.left + r.width / 2 - left)) + "px");
-  function zakryt() { d.remove(); document.removeEventListener("keydown", klav, true); document.removeEventListener("mousedown", vne, true); }
-  function klav(e) { if (e.key === "Escape") { zakryt(); f.znach.focus(); e.preventDefault(); } }
-  function vne(e) { if (!d.contains(e.target)) zakryt(); }
+  var zakryt = ryadom(d, f.querySelector("button") || f);
   var bs = d.querySelectorAll("button");
   bs[0].onclick = function () { bs[0].disabled = true; bs[0].textContent = "Сохраняю…"; f.submit(); };
   bs[1].onclick = function () { zakryt(); f.znach.focus(); };
-  document.addEventListener("keydown", klav, true);
-  document.addEventListener("mousedown", vne, true);
   bs[0].focus();
   return false;
 }

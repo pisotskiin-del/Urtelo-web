@@ -2011,3 +2011,20 @@ class ShemaTests(KartaBase):
         self.assertContains(r, "по присоединённой нагрузке от прибора")
         self.assertContains(r, "Приостановлен")
         self.assertContains(r, 'class="uzel sp-pribor tek')
+
+
+class PriborInfoTests(KartaBase):
+    """Кнопка «информация о приборе учёта» у показаний предыдущих."""
+
+    def test_knopka_i_okno(self):
+        from catalogs.models import SpTeplosch
+        SpTeplosch.objects.create(ln=5, nomer_prib="1234567", tip_prib="СТ-10", kdata_pov=date(2020, 1, 1))
+        self.login("Наблюдатель")
+        r = self.client.get("/abonents/5/?tab=otop")
+        self.assertContains(r, 'class="pribor-info"')
+        self.assertContains(r, "1234567")
+        self.assertContains(r, "просрочена")
+        r = self.client.get("/abonents/7/?tab=otop")
+        self.assertContains(r, "Информация о приборе не заполнена")
+        r = self.client.get("/abonents/5/?tab=gvs")
+        self.assertNotContains(r, 'class="pribor-info"')

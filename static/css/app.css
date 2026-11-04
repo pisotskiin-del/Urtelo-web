@@ -656,3 +656,15 @@ html[data-theme="dark"] .uzel.abon, html[data-theme="dark"] .shema-leg .lg.abon:
 .podtv-b { display:flex; gap:8px; justify-content:flex-end; }
 @keyframes podtv-in { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
 .podtv-b .primary, html[data-theme="dark"] .podtv-b button.primary { background:var(--accent) !important; border-color:var(--accent); color:#fff; }
+/* Кнопка «информация о приборе учёта» у показаний предыдущих. */
+.pribor-info { margin-left:8px; width:26px; height:26px; padding:0; display:inline-flex; align-items:center; justify-content:center;
+  border-radius:50%; border:1px solid var(--line-strong); background:var(--card); color:var(--accent-text); vertical-align:middle; cursor:pointer; }
+.pribor-info:hover { background:var(--accent-weak); border-color:var(--accent); }
+.pribor-info .i { width:15px; height:15px; }
+.pribor-pop { min-width:300px; max-width:400px; }
+.pribor-pop .podtv-z { display:flex; align-items:center; gap:6px; }
+.pribor-pop .podtv-z .i { width:16px; height:16px; color:var(--accent-text); }
+.pribor-dl { display:grid; grid-template-columns:auto 1fr; gap:5px 12px; margin:0 0 12px; font-size:13px; }
+.pribor-dl dt { color:var(--muted); } .pribor-dl dd { margin:0; font-weight:500; }
+html[data-theme="dark"] .podtv-b a.button.primary { background:var(--accent) !important; color:#fff; }
+.chip.danger { background:var(--danger-weak); color:var(--danger); }
