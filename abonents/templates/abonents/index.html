@@ -15,11 +15,6 @@
     <form method="get"><input type="hidden" name="gorod" value="{{ city }}">
       <label>№ договора <input name="dog" value="{{ dog }}" inputmode="numeric" size="6"></label><button title="Найти">{% icon "search" %}</button>
     </form>
-    <form method="get" class="aktiv-form"><input type="hidden" name="gorod" value="{{ city }}">
-      {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}{% if dog %}<input type="hidden" name="dog" value="{{ dog }}">{% endif %}
-      <input type="hidden" name="aktiv" value="0">
-      <label class="check"><input type="checkbox" name="aktiv" value="1"{% if aktiv %} checked{% endif %} onchange="this.form.submit()"> Только активные лицевые счета</label>
-    </form>
     <form method="get">
       <label>Лицевой № <input name="ls" inputmode="numeric" size="6" title="Ищет во всех городах"></label><button title="Открыть карту">{% icon "open" %}</button>
     </form>
@@ -44,11 +39,16 @@
   </tbody>
 </table>
 </div>
-<p class="pager">
+<div class="pager">
   {% if page.has_previous %}<a href="?{{ query }}&page={{ page.previous_page_number }}">← Назад</a>{% endif %}
   Страница {{ page.number }} из {{ page.paginator.num_pages }}
   {% if page.has_next %}<a href="?{{ query }}&page={{ page.next_page_number }}">Вперёд →</a>{% endif %}
-</p>
+  <form method="get" class="aktiv-form"><input type="hidden" name="gorod" value="{{ city }}">
+      {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}{% if dog %}<input type="hidden" name="dog" value="{{ dog }}">{% endif %}
+      <input type="hidden" name="aktiv" value="0">
+      <label class="check"><input type="checkbox" name="aktiv" value="1"{% if aktiv %} checked{% endif %} onchange="this.form.submit()"> Только активные лицевые счета</label>
+    </form>
+</div>
 <p class="legend"><span><span class="chip warn">Приостановлен</span> <span class="chip off">Расторгнут</span> — строки выделены серым</span>
   <span><kbd>/</kbd> поиск по наименованию</span><span><kbd>PgUp</kbd> <kbd>PgDn</kbd> в карте — предыдущая и следующая запись</span></p>
 {% endblock %}
