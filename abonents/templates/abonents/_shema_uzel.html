@@ -1,4 +1,5 @@
-{% load ui %}<li><div class="uzel sp-{{ u.sposob }}{% if u.tekushchij %} tek{% endif %}{% if u.otkluchen %} otkl{% endif %}">
+{% load ui %}<li><div class="uzel sp-{{ u.sposob }}{% if u.tekushchij %} tek{% endif %}{% if u.otkluchen %} otkl{% endif %}{% if u.abonent %} abon{% endif %}">
+  {% if u.pribor %}<span class="u-schet" title="Установлен прибор учёта">{% icon "gauge" %}</span>{% endif %}
   {% if u.svyaz %}<div class="svyaz">{{ u.svyaz_text }}</div>{% endif %}
   <div class="u-top"><a href="{% url 'abonents:karta' u.p.potreb_id %}?tab=shema" class="u-ls">л/№ {{ u.p.potreb_id }}</a>
     <span class="u-pr">{{ u.prinadl }}</span>{% if u.p.nom_dog != dog %}<span class="chip info">дог. № {{ u.p.nom_dog|default:"—" }}</span>{% endif %}

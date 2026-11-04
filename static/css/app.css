@@ -622,6 +622,14 @@ html[data-theme="dark"] .karta-top { background:var(--bg); }
 .uzel.koren { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; font-size:14px; text-align:center; }
 .uzel.koren .u-name { color:#e6efff; font-weight:400; font-size:12px; }
 .uzel.sp-pribor { border-color:#2f7de1; } .uzel.sp-nagruzka { border-color:#e08a1e; } .uzel.sp-oba { border-color:#8b5cf6; }
+.uzel { position:relative; }
+.uzel.abon { background:#e3eeff; }
+.shema-leg .lg.abon::before { background:#e3eeff; }
+.shema-leg .lg-schet { display:inline-flex; align-items:center; gap:6px; }
+.shema-leg .lg-schet .i { width:16px; height:16px; stroke-width:2.4; } .uzel .u-schet .i { width:17px; height:17px; stroke-width:2.4; }
+.uzel .u-schet { position:absolute; top:-13px; right:-13px; width:28px; height:28px; border-radius:50%; display:flex;
+  align-items:center; justify-content:center; background:#2f7de1; color:#fff; box-shadow:0 0 0 2px var(--card); }
+.shema-leg .lg-schet { color:#2f7de1; }
 .uzel.tek { background:#fff7d6; box-shadow:0 0 0 3px rgba(226,180,0,.35); }
 .uzel.otkl { border-style:dashed; opacity:.65; }
 .uzel .svyaz { font-size:11px; color:var(--muted); border-bottom:1px dashed var(--line); margin:-2px 0 5px; padding-bottom:4px; }
@@ -631,3 +639,4 @@ html[data-theme="dark"] .karta-top { background:var(--bg); }
 .uzel .u-sp { color:var(--muted); }
 .uzel .u-nach { margin-top:3px; }
 html[data-theme="dark"] .uzel.tek { background:#3a3210; }
+html[data-theme="dark"] .uzel.abon, html[data-theme="dark"] .shema-leg .lg.abon::before { background:#1c2f52; }

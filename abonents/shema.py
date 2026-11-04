@@ -58,6 +58,16 @@ class Uzel:
         return {1: pribor, 2: f"{pribor} + {nagr}", 3: nagr}.get(p.tip_rasot, "способ расчёта не задан")
 
     @property
+    def pribor(self):
+        """На лицевом стоит свой прибор: расчёт по прибору, и он не сидит на
+        общем приборе главного по договору."""
+        return self.p.tip_rasot in (1, 2) and self.svyaz != OBSHCHIJ
+
+    @property
+    def abonent(self):
+        return self.p.id_katabon == 1
+
+    @property
     def prinadl(self):
         return dict(layout.ID_KATABON).get(self.p.id_katabon, "")
 
