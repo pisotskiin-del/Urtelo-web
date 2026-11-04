@@ -1966,3 +1966,48 @@ class RaschetOshibkiTests(KartaBase):
         (pid, pole, _), *_ = result.perepolnenie
         self.assertEqual((pid, pole), (7, "nach_otpr"))
         self.assertIsNone(next(r for r in recs if r.potreb_id == 7).nach_otpr)
+
+
+class ShemaTests(KartaBase):
+    """Вкладка «Схема»: кто к кому подключён в договоре."""
+
+    def setUp(self):
+        super().setUp()
+        common = dict(cod_gor=self.ryb, cod_minist_id=1, id_kategor=1, id_koteln=16, accept=3)
+        Potreb.objects.create(potreb_id=13, nom_dog=6, nom_dogab=6, nom_pribor=2, tip_rasot=1, id_katabon=3,
+                              name_potre="Котельная", **common)
+        Potreb.objects.create(potreb_id=15, nom_dog=16, nom_dogab=6, nom_pribor=2, tip_rasot=2, id_katabon=2,
+                              name_potre="Сигма", d_stat=61, **common)
+        Potreb.objects.create(potreb_id=17, nom_dog=18, tip_rasot=3, id_katabon=2, name_potre="Петров", **common)
+        Potreb.objects.filter(potreb_id=5).update(pris_nag1=17)
+
+    def test_derevo(self):
+        from abonents import shema
+        korni, dog, glav_ab = shema.postroit(Potreb.objects.get(potreb_id=5))
+        self.assertEqual(dog, 6)
+        self.assertIsNone(glav_ab)
+        po_ls = {}
+
+        def obojti(uzly, roditel=None):
+            for u in uzly:
+                po_ls[u.p.potreb_id] = (roditel, u.svyaz)
+                obojti(u.deti, u.p.potreb_id)
+        obojti(korni)
+        self.assertEqual(po_ls[5], (None, ""))
+        self.assertEqual(po_ls[7], (5, shema.POSLE_PRIB))
+        self.assertEqual(po_ls[17], (5, shema.NAGRUZKA))   # лицевой другого договора
+        self.assertEqual(po_ls[13], (None, ""))
+        self.assertEqual(po_ls[15], (13, shema.OBSHCHIJ))
+        self.assertNotIn(9, po_ls)
+
+    def test_vkladka(self):
+        self.login("Наблюдатель")
+        r = self.client.get("/abonents/15/?tab=shema")
+        self.assertContains(r, "Договор № 16")
+        self.assertContains(r, "субабонент абонента договора № 6")
+        r = self.client.get("/abonents/5/?tab=shema")
+        self.assertContains(r, "на общем приборе № 2")
+        self.assertContains(r, "присоединённый прибор: показания вычитаются")
+        self.assertContains(r, "по присоединённой нагрузке от прибора")
+        self.assertContains(r, "Приостановлен")
+        self.assertContains(r, 'class="uzel sp-pribor tek')

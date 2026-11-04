@@ -591,3 +591,43 @@ html[data-theme="dark"] .add-pop > form { background:var(--card); }
 .karta-poisk { flex:none; }
 html[data-theme="dark"] .karta-top { background:var(--bg); }
 @media print { .karta-top { position:static; margin:0; padding:0; border:0; } .karta-poisk { display:none; } }
+
+/* Схема договора (вкладка «Схема» карточки): дерево сверху вниз. */
+.shema-card { padding:16px; }
+.shema-leg { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; font-size:12px; margin:0 0 12px; }
+.shema-leg .lg { display:inline-flex; align-items:center; gap:6px; }
+.shema-leg .lg::before { content:""; width:14px; height:14px; border-radius:4px; border:2px solid var(--line-strong); background:var(--card); }
+.shema-leg .lg.sp-pribor::before { border-color:#2f7de1; } .shema-leg .lg.sp-nagruzka::before { border-color:#e08a1e; }
+.shema-leg .lg.sp-oba::before { border-color:#8b5cf6; } .shema-leg .lg.tek::before { background:#fff7d6; border-color:#e2b400; }
+.shema-leg .lg.otkl::before { border-style:dashed; opacity:.6; }
+.shema-scroll { overflow:auto; padding-bottom:8px; }
+.shema-scroll > .shema { width:max-content; min-width:100%; }
+.shema, .shema ul { list-style:none; margin:0; padding:0; display:flex; justify-content:center; }
+.shema ul { padding-top:22px; position:relative; }
+.shema li { position:relative; padding:22px 6px 0; display:flex; flex-direction:column; align-items:center; }
+.shema > li { padding-top:0; }
+/* соединительные линии */
+.shema li::before, .shema li::after { content:""; position:absolute; top:0; width:50%; height:22px; border-top:2px solid var(--line-strong); }
+.shema li::before { right:50%; } .shema li::after { left:50%; border-left:2px solid var(--line-strong); }
+.shema li:only-child::before, .shema li:only-child::after { border-top:0; }
+.shema li:only-child { padding-top:22px; }
+.shema li:first-child::before, .shema li:last-child::after { border-top:0; }
+.shema li:last-child::before { border-right:2px solid var(--line-strong); border-radius:0 6px 0 0; }
+.shema li:first-child::after { border-radius:6px 0 0 0; }
+.shema > li::before, .shema > li::after { display:none; }
+.shema ul::before { content:""; position:absolute; top:0; left:50%; height:22px; border-left:2px solid var(--line-strong); }
+.shema li:only-child::after { border-left:2px solid var(--line-strong); left:50%; width:0; }
+.uzel { min-width:170px; max-width:230px; background:var(--card); border:2px solid var(--line-strong); border-radius:10px; padding:8px 10px;
+  font-size:12px; line-height:1.35; box-shadow:0 1px 2px rgba(16,24,40,.06); text-align:left; }
+.uzel.koren { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; font-size:14px; text-align:center; }
+.uzel.koren .u-name { color:#e6efff; font-weight:400; font-size:12px; }
+.uzel.sp-pribor { border-color:#2f7de1; } .uzel.sp-nagruzka { border-color:#e08a1e; } .uzel.sp-oba { border-color:#8b5cf6; }
+.uzel.tek { background:#fff7d6; box-shadow:0 0 0 3px rgba(226,180,0,.35); }
+.uzel.otkl { border-style:dashed; opacity:.65; }
+.uzel .svyaz { font-size:11px; color:var(--muted); border-bottom:1px dashed var(--line); margin:-2px 0 5px; padding-bottom:4px; }
+.uzel .u-top { display:flex; flex-wrap:wrap; gap:4px 6px; align-items:center; }
+.uzel .u-ls { font-weight:700; } .uzel .u-pr { color:var(--muted); }
+.uzel .u-name { font-weight:500; margin:2px 0; }
+.uzel .u-sp { color:var(--muted); }
+.uzel .u-nach { margin-top:3px; }
+html[data-theme="dark"] .uzel.tek { background:#3a3210; }

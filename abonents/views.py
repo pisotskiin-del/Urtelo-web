@@ -235,12 +235,20 @@ def _card_context(request, p, tab_key, form=None):
     related = related_values(p)
     lookups = _lookups()
     _, title, groups = layout.tab(tab_key)
+    shema = None
+    if tab_key == SHEMA:
+        from . import shema as sh
+        title, groups = "Схема договора", []
+        korni, dog, glav_ab = sh.postroit(p)
+        shema = {"korni": korni, "dog": dog, "glav_ab": glav_ab}
     return {
         "p": p,
+        "shema": shema,
         "otkluchen": p.d_stat in layout.OTKLUCHEN,
         "header": _items(p, layout.HEADER, related, form, lookups),
         "groups": [(g, _items(p, fields, related, form, lookups)) for g, fields in groups],
-        "tabs": [(k, t) for k, t, _ in layout.TABS], "tab": tab_key, "tab_title": title,
+        "tabs": [(k, t) for k, t, _ in layout.TABS] + ([(SHEMA, "Схема")] if form is None else []),
+        "tab": tab_key, "tab_title": title,
         "tab_url": reverse("abonents:edit" if form is not None else "abonents:karta", args=[p.potreb_id]),
         "nav": _neighbours(p),
         "prisoed": _prisoed(p) if tab_key == "otop" else [],
@@ -254,8 +262,13 @@ def _card_context(request, p, tab_key, form=None):
     }
 
 
-def _tab_key(request):
+SHEMA = "shema"   # вкладка «Схема» карточки: только просмотр
+
+
+def _tab_key(request, shema=False):
     key = request.GET.get("tab") or request.POST.get("tab")
+    if shema and key == SHEMA:
+        return key
     return key if key in layout.TAB_KEYS else layout.TAB_KEYS[0]
 
 
@@ -265,7 +278,7 @@ def karta(request, potreb_id):
     p = get_object_or_404(Potreb.objects.select_related("cod_gor", "cod_minist"), potreb_id=potreb_id)
     if p.cod_gor_id:
         request.session["kod_gorod"] = p.cod_gor_id
-    return render(request, "abonents/karta.html", _card_context(request, p, _tab_key(request)))
+    return render(request, "abonents/karta.html", _card_context(request, p, _tab_key(request, shema=True)))
 
 
 @login_required

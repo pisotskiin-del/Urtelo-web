@@ -14,7 +14,7 @@ GROUP_ICONS = {
     "Руководство": "user", "Адрес юридический": "pin", "Адрес объекта": "pin", "Связь": "phone", "Банк": "bank",
     "Свидетельство о гос. регистрации": "badge", "Данные для акта отпущенной тепловой энергии": "file",
 }
-TAB_ICONS = {"otop": "flame", "gvs": "drop", "ishod": "file"}
+TAB_ICONS = {"otop": "flame", "gvs": "drop", "ishod": "file", "shema": "link"}
 
 
 @register.simple_tag

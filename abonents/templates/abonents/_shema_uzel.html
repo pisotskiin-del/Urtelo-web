@@ -1,0 +1,9 @@
+{% load ui %}<li><div class="uzel sp-{{ u.sposob }}{% if u.tekushchij %} tek{% endif %}{% if u.otkluchen %} otkl{% endif %}">
+  {% if u.svyaz %}<div class="svyaz">{{ u.svyaz_text }}</div>{% endif %}
+  <div class="u-top"><a href="{% url 'abonents:karta' u.p.potreb_id %}?tab=shema" class="u-ls">л/№ {{ u.p.potreb_id }}</a>
+    <span class="u-pr">{{ u.prinadl }}</span>{% if u.p.nom_dog != dog %}<span class="chip info">дог. № {{ u.p.nom_dog|default:"—" }}</span>{% endif %}
+    {% if u.otkluchen %}<span class="chip off">{{ u.status }}</span>{% endif %}</div>
+  <div class="u-name">{{ u.p.glav_potre|default:u.p.name_potre|default:"—" }}</div>
+  <div class="u-sp">{{ u.sposob_text }}</div>
+  <div class="u-nach">{% if u.p.nach_otopl %}отопл. {{ u.p.nach_otopl|floatformat:3 }} Гкал{% else %}<span class="muted">начислений нет</span>{% endif %}{% if u.p.nac_vsego %} · к оплате {{ u.p.nac_vsego|floatformat:3 }}{% endif %}</div>
+</div>{% if u.deti %}<ul>{% for u in u.deti %}{% include "abonents/_shema_uzel.html" %}{% endfor %}</ul>{% endif %}</li>
