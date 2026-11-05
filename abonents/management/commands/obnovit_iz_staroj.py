@@ -6,7 +6,9 @@
 - potreb.dbf — показания счётчиков (pok_new, pok_old, date_pok — отопление,
   pok_newg, pok_oldg — ГВС) и дни подачи отопления и ГВС из карточек
   (dnotop, dngvs), перерасчёт т/э (dn_pereras — дни, tkf_perer — коэффициент,
-  gkl_perer — Гкал) у лицевых, которые есть в обеих программах;
+  gkl_perer — Гкал), ГВС: тепловые потери (poter_gvs) и фактическое
+  потребление (nach_gvs; при расчёте ГВС по прибору его пересчитывает расчёт)
+  у лицевых, которые есть в обеих программах;
 - danrasch.dbf — исходные данные для расчёта по городам (t воздуха, расчётная t,
   t коэффициент, дни отопления и ГВС, Q факт, полезный отпуск населению).
 
@@ -27,7 +29,7 @@ from dbfsync.importer import _find_file, column_map, convert
 from dbfsync.reader import open_dbf
 
 POLYA_KARTY = ["pok_new", "pok_old", "date_pok", "pok_newg", "pok_oldg", "dnotop", "dngvs",
-               "dn_pereras", "tkf_perer", "gkl_perer"]
+               "dn_pereras", "tkf_perer", "gkl_perer", "poter_gvs", "nach_gvs"]
 POLYA_GORODA = ["t_vozd", "t_proekt", "tkoef", "dnotop", "dngvs", "qpfakt", "gkl_pod", "gkl_bezpod"]
 
 
@@ -55,7 +57,8 @@ def raznica(obj, novoe):
 
 
 class Command(BaseCommand):
-    help = ("Обновить из старой программы показания счётчиков, дни отопления, перерасчёт в карточках и исходные "
+    help = ("Обновить из старой программы показания счётчиков, дни отопления, перерасчёт, потери и потребление ГВС "
+            "в карточках и исходные "
             "данные для расчёта (с --proverka — только показать).")
 
     def add_arguments(self, parser):

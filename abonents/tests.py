@@ -1856,12 +1856,12 @@ class ObnovitIzStarojTests(KartaBase):
         t.append((2, 11, 2026, 1.0, -17, 0.5, 30.0, ""))     # другой месяц — не переносится
         t.close()
         t = dbf.Table(str(self.folder / "potreb.dbf"), "potreb_id N(6,0); cod_gor N(2,0); pok_new N(9,3); "
-                      "date_pok D; dnotop N(4,1); org_in C(40); gkl_perer N(13,3)", codepage="cp1251",
+                      "date_pok D; dnotop N(4,1); org_in C(40); gkl_perer N(13,3); poter_gvs N(10,3); nach_gvs N(10,3)", codepage="cp1251",
                       dbf_type="vfp")
         t.open(dbf.READ_WRITE)
-        t.append((5, 1, 12.5, dbf.Date(2026, 10, 25), 31.0, "СТАРОЕ", -1.25))
-        t.append((11, 2, 99, None, 5.0, "", 0))
-        t.append((99999, 1, 1, None, 1, "", 0))
+        t.append((5, 1, 12.5, dbf.Date(2026, 10, 25), 31.0, "СТАРОЕ", -1.25, 0.5, 7.125))
+        t.append((11, 2, 99, None, 5.0, "", 0, 0, 0))
+        t.append((99999, 1, 1, None, 1, "", 0, 0, 0))
         t.close()
 
     def test_proverka_i_zapis(self):
@@ -1872,8 +1872,9 @@ class ObnovitIzStarojTests(KartaBase):
         self.assertEqual(Potreb.objects.get(potreb_id=5).pok_new, Decimal("1.000"))
         call_command("obnovit_iz_staroj", dir=str(self.folder), stdout=out)
         p = Potreb.objects.get(potreb_id=5)
-        self.assertEqual((p.pok_new, p.date_pok, p.dnotop, p.org_in, p.gkl_perer),
-                         (Decimal("12.500"), date(2026, 10, 25), Decimal("31.0"), "ORG", Decimal("-1.250")))
+        self.assertEqual((p.pok_new, p.date_pok, p.dnotop, p.org_in, p.gkl_perer, p.poter_gvs, p.nach_gvs),
+                         (Decimal("12.500"), date(2026, 10, 25), Decimal("31.0"), "ORG", Decimal("-1.250"),
+                          Decimal("0.500"), Decimal("7.125")))
         d = Danrasch.objects.get(cod_gorod=1)
         self.assertEqual((d.t_vozd, d.tkoef, d.dnotop, d.name_gorod), (Decimal("4.0"), Decimal("0.400"), Decimal("31.0"), "Рыбница"))
         self.assertIsNone(Potreb.objects.get(potreb_id=11).pok_new)          # другой месяц
