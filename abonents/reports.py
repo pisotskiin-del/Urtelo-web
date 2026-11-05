@@ -80,7 +80,8 @@ class Report:
     landscape: bool = False
     approve: list = field(default_factory=list)   # гриф «УТВЕРЖДАЮ» справа вверху
     css: str = ""           # класс отчета: своё оформление, как в старой программе
-    sek_label: str = ""     # «Категория потребителя» перед названием группы (отчет по группам)
+    gruppy: bool = False    # группы отдельными таблицами, как в старых отчетах OT_KATEG и OT_MINIST
+    sek_label: str = ""     # «Категория потребителя» перед названием группы (иначе название по центру)
 
 
 @dataclass
@@ -190,7 +191,8 @@ def ot_kateg(city, opts):
         s.foot[3] = f"всего: {po_zagl.get(s.title) or s.title}"
     return Report("ОТПУСК ТЕПЛОВОЙ ЭНЕРГИИ ДЛЯ АБОНЕНТОВ", _city_lines(city),
                   [Table(cols, sections, total=_sum_row(cols, rows, "ИТОГО :", label_col=4))],
-                  signatures=_signatures(city), css="budzhet", sek_label="Категория потребителя")
+                  signatures=_signatures(city), css="budzhet", gruppy=True,
+                  sek_label="Категория потребителя")
 
 
 def ot_minist(city, opts):
@@ -203,14 +205,19 @@ def ot_minist(city, opts):
             Col("К оплате (Гкал)", "num", total=True)]
     sections = _grouped(
         qs.order_by("cod_minist", "potreb_id"), lambda p: p.cod_minist_id,
-        lambda k: (names.get(k) or "Министерство не указано").strip().upper(),
+        lambda k: (names.get(k) or "").strip().upper(),   # без министерства — без названия, как в старом отчете
         lambda p: [0, p.cod_ac, p.cod_buhg, p.name_potre, akc.get(p.accept), n(p.predopl),
                    n(p.nac_vsego), n(p.nac_vsego) - n(p.predopl)],
         cols)
     rows = [r for s in sections for r in s.rows]
-    return Report("РЕСПУБЛИКАНСКИЙ БЮДЖЕТ", ["Расшифровка по министерствам"] + _city_lines(city),
+    # Как в старом OT_MINIST: «всего: Министерство здравоохранения ПМР» — название как в справочнике.
+    po_zagl = {(v or "").strip().upper(): (v or "").strip() for v in names.values()}
+    for s in sections:
+        s.foot[3] = f"всего: {po_zagl.get(s.title, s.title)}".rstrip()
+    return Report("РЕСПУБЛИКАНСКИЙ БЮДЖЕТ", [_city_lines(city)[0], "Расшифровка по министерствам"]
+                  + _city_lines(city)[1:],
                   [Table(cols, sections, total=_sum_row(cols, rows, "ИТОГО:", label_col=4))],
-                  signatures=_signatures(city))
+                  signatures=_signatures(city), css="minist", gruppy=True)
 
 
 def ved_potreb(city, opts):

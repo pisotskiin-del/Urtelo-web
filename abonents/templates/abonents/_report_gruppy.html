@@ -7,14 +7,16 @@
   {% for t in report.tables %}
   {% for s in t.sections %}
   <section class="rep-gr">
-    <p class="rep-gr-z">{{ report.sek_label }}<b>{{ s.title }}</b></p>
+    {% if report.sek_label %}<p class="rep-gr-z">{{ report.sek_label }}<b>{{ s.title }}</b></p>
+    {% else %}<p class="rep-gr-z rep-gr-centr">{{ s.title|default:" " }}</p>{% endif %}
     <table class="rep-gr-t">
       <colgroup>{% for c in t.cols %}<col>{% endfor %}</colgroup>
       <thead><tr>{% for c in t.cols %}<th class="{% if c.kind != "text" %}num{% endif %} {{ c.css }}">{{ c.title|nerazryv }}</th>{% endfor %}</tr></thead>
       <tbody>
       {% for row in s.rows %}<tr>{% for v, c in row|withcols:t.cols %}<td class="{% if c.kind != "text" %}num{% endif %} {{ c.css }}">{% rcell v c %}</td>{% endfor %}</tr>{% endfor %}
       </tbody>
-      {% if s.foot %}<tbody class="rep-gr-vsego"><tr>{% for v, c in s.foot|withcols:t.cols %}<td class="{% if c.kind != "text" %}num{% endif %} {{ c.css }}">{% if v|stringformat:"s"|slice:":7" == "всего: " %}<b>всего:</b> {{ v|slice:"7:" }}{% else %}{% rcell v c %}{% endif %}</td>{% endfor %}</tr></tbody>{% endif %}
+      {% if s.foot and not report.sek_label %}<tbody class="rep-gr-vsego rep-gr-vsego-l"><tr><td colspan="5">{{ s.foot.3 }}</td>{% for v, c in s.foot|withcols:t.cols|slice:"5:" %}<td class="num">{% rcell v c %}</td>{% endfor %}</tr></tbody>
+      {% elif s.foot %}<tbody class="rep-gr-vsego"><tr>{% for v, c in s.foot|withcols:t.cols %}<td class="{% if c.kind != "text" %}num{% endif %} {{ c.css }}">{% if v|stringformat:"s"|slice:":7" == "всего: " %}<b>всего:</b> {{ v|slice:"7:" }}{% else %}{% rcell v c %}{% endif %}</td>{% endfor %}</tr></tbody>{% endif %}
     </table>
   </section>
   {% endfor %}

@@ -769,3 +769,11 @@ html[data-theme="dark"] .rep-gr-t th { background:var(--card); color:var(--text)
 html[data-theme="dark"] .rep-gr-t tbody:first-of-type tr:nth-child(even) td { background:#222c3c; }
 html[data-theme="dark"] .rep-gr-t tbody:first-of-type tr:last-child td { border-bottom-color:var(--line-strong); }
 .rep-gr-itogo tbody tr:last-child td { border-bottom:0; background:none; }
+/* «Расшифровка по министерствам» (OT_MINIST): название министерства по центру,
+   «всего: …» слева под таблицей. */
+.rep-gr-z.rep-gr-centr { margin:0 0 2px; text-align:center; font-weight:700; font-size:15px; }
+.rep-gr-vsego-l td:first-child { text-align:left !important; font-weight:400 !important; font-size:14px; padding-left:8px; }
+.rep-minist .rep-gr { margin-bottom:22px; }
+@media print { .rep-gr-z.rep-gr-centr { font-size:11pt; } .rep-gr-vsego-l td:first-child { font-size:10.5pt; } }
+.rep-gr-vsego-l td.num { font-weight:700; font-size:inherit; text-align:right; }
+.rep-gr-t.rep-gr-itogo td { border-bottom:0 !important; }

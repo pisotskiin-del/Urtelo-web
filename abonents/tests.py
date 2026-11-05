@@ -677,6 +677,11 @@ class ReportsTests(KartaBase):
         r = self.client.get("/abonents/otchety/ot_kateg/?gorod=1")
         self.assertContains(r, "Категория потребителя<b>ХОЗРАСЧЕТ</b>")
         self.assertContains(r, "<b>всего:</b> Хозрасчет")
+        Potreb.objects.filter(potreb_id=5).update(id_kategor=3)
+        r = self.client.get("/abonents/otchety/ot_minist/?gorod=1")
+        self.assertContains(r, "РЕСПУБЛИКАНСКИЙ БЮДЖЕТ")
+        self.assertContains(r, '<td colspan="5">всего: Без министерства</td>')
+        self.assertContains(r, "БЕЗ МИНИСТЕРСТВА")
         self.assertEqual(self.client.get("/abonents/otchety/net/").status_code, 404)
 
 
