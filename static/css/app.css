@@ -809,3 +809,49 @@ html[data-theme="dark"] .rep-kot table.rep th { background:#2a3446; color:var(--
 html[data-theme="dark"] .rep-kot table.rep td { background:var(--card); color:var(--text); border-color:var(--line-strong); }
 .rep-kot .scroll { overflow-x:auto; } .rep-kot table.rep { min-width:900px; }
 .rep-kot .scroll, .rep-kot table.rep, .rep-kot table.rep th { border-radius:0 !important; }
+
+/* Отчеты по приборам учета — как старый otch_potr_pribor.frx: Times, сетка,
+   белая шапка, «Приложение №2» справа, подпись с подстрочными пояснениями. */
+.rep-pribor { font-family:"Times New Roman", Times, serif; color:#000; }
+.rep-pribor .rep-approve { width:auto; text-align:right; font-size:13px; }
+.rep-pribor .rep-head h2 { font-size:16px; font-weight:400; text-transform:none; color:#000; margin:6px 0 4px; }
+.rep-pribor .rep-head p { font-size:16px; color:#000; }
+.rep-pribor table.rep { border-collapse:collapse; width:100%; table-layout:fixed; min-width:900px; border-radius:0; }
+.rep-pribor .scroll { border-radius:0; }
+.rep-pribor table.rep th { background:#fff; color:#000; border:1px solid #000; font-weight:400; font-size:12px; text-transform:none;
+  letter-spacing:0; text-align:center; vertical-align:middle; padding:2px 3px; line-height:1.2; border-radius:0 !important; position:static; }
+.rep-pribor table.rep td { border:1px solid #000; background:#fff; color:#000; font-size:12.5px; padding:2px 4px; vertical-align:top;
+  min-width:0; white-space:normal; }
+.rep-pribor table.rep td.num { white-space:nowrap; }
+.rep-pribor table.rep td:first-child { text-align:center; }
+.rep-pribor table.rep td:nth-child(5) { text-align:center; }
+.rep-pribor table.rep tbody tr:nth-child(even) td { background:#fff; }
+.rep-pribor table.rep thead tr:first-child th:nth-child(1) { width:3%; }
+.rep-pribor table.rep thead tr:first-child th:nth-child(2) { width:21%; }
+.rep-pribor table.rep thead tr:first-child th:nth-child(3) { width:14%; }
+.rep-pribor table.rep thead tr:first-child th:nth-child(4) { width:12%; }
+.rep-pribor table.rep thead tr:first-child th:nth-child(5) { width:4%; }
+.rep-pribor table.rep thead tr:first-child th:nth-child(6) { width:14%; }
+.rep-pribor table.rep thead tr:first-child th:nth-child(7) { width:7%; }
+.rep-priborg table.rep thead tr:first-child th:nth-child(4) { width:5%; }
+.rep-priborg table.rep thead tr:first-child th:nth-child(5) { width:16%; }
+.rep-priborg table.rep thead tr:first-child th:nth-child(6) { width:8%; }
+.rep-priborg table.rep td:nth-child(5) { text-align:right; } .rep-priborg table.rep td:nth-child(4) { text-align:center; }
+.rep-podpis { display:flex; align-items:flex-end; gap:40px; margin:30px 0 0 10px; font-size:13px; page-break-inside:avoid; }
+.rep-podpis small { display:block; font-size:7px; text-align:center; border-top:1px solid #000; margin-top:1px; padding-top:1px; }
+.rep-podpis .rp-dolj { width:330px; } .rep-podpis .rp-dolj span { display:block; }
+.rep-podpis .rp-mid { margin-left:auto; } .rep-podpis .rp-l { display:inline-block; width:95px; border-bottom:1px solid #000; }
+.rep-podpis .rp-l.rp-k { width:75px; }
+.rep-podpis .rp-fio { width:115px; margin-right:12%; text-align:center; } .rep-podpis .rp-fio span { font-size:15px; }
+@media print {
+  .rep-pribor table.rep { min-width:0; border:0; border-collapse:collapse; }
+  .rep-pribor table.rep th, .rep-pribor table.rep td { border:1px solid #000 !important; }
+  .rep-pribor table.rep th { font-size:8.5pt; } .rep-pribor table.rep td { font-size:9pt; padding:1px 3px; }
+  .rep-pribor .rep-head h2, .rep-pribor .rep-head p { font-size:11.5pt; }
+  .rep-pribor .rep-approve { font-size:9.5pt; }
+  .rep-podpis { font-size:9.5pt; }
+}
+html[data-theme="dark"] .rep-pribor, html[data-theme="dark"] .rep-pribor .rep-head h2, html[data-theme="dark"] .rep-pribor .rep-head p { color:var(--text); }
+html[data-theme="dark"] .rep-pribor table.rep th, html[data-theme="dark"] .rep-pribor table.rep td,
+html[data-theme="dark"] .rep-pribor table.rep tbody tr:nth-child(even) td { background:var(--card); color:var(--text); border-color:var(--line-strong); }
+html[data-theme="dark"] .rep-podpis small, html[data-theme="dark"] .rep-podpis .rp-l { border-color:var(--text); }

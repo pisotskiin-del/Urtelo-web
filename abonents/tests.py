@@ -642,7 +642,9 @@ class ReportsTests(KartaBase):
                                    d_next_pov=date(2026, 1, 1))
         rep, _ = reports.build(reports.BY_KEY["otch_pribor"], self.ryb, {})
         row = rep.tables[0].sections[0].rows[0]
-        self.assertEqual((row[0], row[3], row[7]), (5, "ВКТ-7  №123", Decimal("5.0")))
+        self.assertEqual((row[0], row[1], row[3], row[7]), (1, "Магазин", "ВКТ-7  №123", Decimal("5.0")))
+        self.assertEqual(rep.approve, ["Приложение №2", "к приказу от 08.04.2024г.№290"])
+        self.assertEqual(rep.podpis[0], "Инспектор по контролю за потреблением тепловой энергии юридическим лицам")
         self.assertEqual(rep.signatures[0],
                          "Инспектор по контролю за потреблением тепловой энергии юридическим лицам")
         self.assertTrue(rep.signatures[1].endswith("Химач Н.И."))

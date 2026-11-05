@@ -24,5 +24,9 @@
   </table></div>
   {% endfor %}
   {% for note in report.notes %}<p class="rep-note">{{ note }}</p>{% endfor %}
-  {% if report.signatures %}<div class="rep-sign">{% for s in report.signatures %}<p>{{ s }}</p>{% endfor %}</div>{% endif %}
+  {% if report.podpis %}<div class="rep-podpis">
+    <div class="rp-dolj"><span>{{ report.podpis.0 }}</span><small>Должность ответственного специалиста (инженера, инспектора, контролера)</small></div>
+    <div class="rp-mid">Подпись<span class="rp-l"></span>дата<span class="rp-l rp-k"></span></div>
+    <div class="rp-fio"><span>{{ report.podpis.1 }}</span><small>ФИО исполнителя</small></div>
+  </div>{% elif report.signatures %}<div class="rep-sign">{% for s in report.signatures %}<p>{{ s }}</p>{% endfor %}</div>{% endif %}
 </article>{% endif %}

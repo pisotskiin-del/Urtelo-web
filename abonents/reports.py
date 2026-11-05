@@ -80,6 +80,7 @@ class Report:
     landscape: bool = False
     approve: list = field(default_factory=list)   # гриф «УТВЕРЖДАЮ» справа вверху
     css: str = ""           # класс отчета: своё оформление, как в старой программе
+    podpis: tuple = None    # (должность, ФИО) — подпись с подстрочными пояснениями, как в отчетах по приборам
     gruppy: bool = False    # группы отдельными таблицами, как в старых отчетах OT_KATEG и OT_MINIST
     sek_label: str = ""     # «Категория потребителя» перед названием группы (иначе название по центру)
 
@@ -689,9 +690,26 @@ def _ispol_sign(city):
 
 
 def _pribor_head(city, title):
-    return ([title, f"по участку г.{(city.name_gorod or '').strip()}",
-             f"за {(city.name_mes or '').strip()} {city.god} г."],
-            _approve() + ["Приложение №2", "к приказу от 08.04.2024г.№290"])
+    """Заголовок отчетов по приборам учета, как в старой форме otch_potr_pribor:
+    «… за Октябрь 2026г.», «по участку г.Рыбница», справа «Приложение №2»."""
+    return ([f"{title} за {(city.name_mes or '').strip()} {city.god}г.",
+             f"по участку г.{(city.name_gorod or '').strip()}"],
+            ["Приложение №2", "к приказу от 08.04.2024г.№290"])
+
+
+def _pribor_report(city, title, cols, head, rows, css):
+    from .models import Podpisant
+    for i, r in enumerate(rows, 1):
+        r[0] = i
+    lines, approve = _pribor_head(city, title)
+    return Report(lines[0], lines[1:], [Table(cols, [Section(rows=rows)], head=head)],
+                  signatures=_ispol_sign(city), landscape=True, approve=approve, css=css,
+                  podpis=_signer(Podpisant.PRIBORY, city))
+
+
+_PRIBOR_SHAPKA = [("№ п/п", 1, 2), ("Наименование абонента (потребителя)", 1, 2),
+                  ("Фактический адрес объекта теплопотребления", 1, 2)]
+_PRIBOR_HVOST = [("Показания", 2, 1), ("Расчет потребления (в Гкал)", 1, 2), ("Примечание", 1, 2)]
 
 
 def otch_pribor(city, opts):
@@ -706,7 +724,7 @@ def otch_pribor(city, opts):
             devices.setdefault(round(float(d.p_kod)), []).append(d)
         except ValueError:
             continue
-    cols = [Col("Л/№", "int"), Col("Наименование абонента (потребителя)"), Col("Фактический адрес объекта"),
+    cols = [Col("№ п/п", "int"), Col("Наименование абонента (потребителя)"), Col("Фактический адрес объекта"),
             Col("Тип и номер прибора"), Col("ед. изм."), Col("Показания предыдущие", "num"),
             Col("Показания настоящие", "num"), Col("Расчет потребления (Гкал)", "num", 3, total=True),
             Col("Примечание")]
@@ -721,16 +739,17 @@ def otch_pribor(city, opts):
             tip = f"{(info.name or '').strip() if info else ''}  №{(d.d_num or '').strip() if d else ''}"
             rows.append([p.potreb_id, p.glav_potre, p.adres_sd, tip, (info.edn or "").strip() if info else "",
                          n(p.pok_old), n(p.pok_new), rasch, p.prim_chot])
-    lines, approve = _pribor_head(city, "Отчет о потреблении тепловой энергии по приборам учета тепловой энергии")
-    return Report(lines[0], lines[1:], [Table(cols, [Section(rows=rows)], total=_sum_row(cols, rows, "Итого"))],
-                  signatures=_ispol_sign(city), landscape=True, approve=approve)
+    head = [_PRIBOR_SHAPKA + [("Тип и номер прибора", 1, 2), ("ед. изм.", 1, 2)] + _PRIBOR_HVOST,
+            [("предыдущие", 1, 1), ("настоящие", 1, 1)]]
+    return _pribor_report(city, "Отчет о потреблении тепловой энергии по приборам учета тепловой энергии",
+                          cols, head, rows, "pribor")
 
 
 def otch_priborg(city, opts):
     """Кнопка «Отчет по приборам учета (ГВС)» (otch_potr_priborg): потребление
     по разнице показаний счетчика ГВС, 1 куб.м = 0,0533 Гкал."""
     from .raschet import GVS_GKAL
-    cols = [Col("Л/№", "int"), Col("Наименование абонента (потребителя)"), Col("Фактический адрес объекта"),
+    cols = [Col("№ п/п", "int"), Col("Наименование абонента (потребителя)"), Col("Фактический адрес объекта"),
             Col("ед. изм."), Col("Показания предыдущие", "num"), Col("Показания настоящие", "num"),
             Col("Расчет потребления (Гкал)", "num", 3, total=True), Col("Примечание")]
     rows = []
@@ -739,9 +758,8 @@ def otch_priborg(city, opts):
         if rasch > 0:
             rows.append([p.potreb_id, p.glav_potre, p.adres_sd, "куб.м.", n(p.pok_oldg), n(p.pok_newg), rasch,
                          p.prim_chgvs])
-    lines, approve = _pribor_head(city, "Отчет о потреблении ГВС по приборам учета")
-    return Report(lines[0], lines[1:], [Table(cols, [Section(rows=rows)], total=_sum_row(cols, rows, "Итого"))],
-                  signatures=_ispol_sign(city), landscape=True, approve=approve)
+    head = [_PRIBOR_SHAPKA + [("ед. изм.", 1, 2)] + _PRIBOR_HVOST, [("предыдущие", 1, 1), ("настоящие", 1, 1)]]
+    return _pribor_report(city, "Отчет о потреблении ГВС по приборам учета", cols, head, rows, "pribor rep-priborg")
 
 
 DATE = "date"
