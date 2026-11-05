@@ -1,0 +1,9 @@
+{% load ui %}<section class="card shema-card">
+  <p class="shema-leg"><span class="lg sp-pribor">по прибору</span><span class="lg sp-nagruzka">по нагрузке</span><span class="lg sp-oba">прибор + нагрузка</span><span class="lg abon">абонент</span><span class="lg tek">эта карточка</span><span class="lg-schet">{% icon "gauge" %} установлен прибор</span><span class="lg otkl">договор не действует</span>
+    <span class="muted">Линии ведут вниз к подключённым: общий прибор, присоединённый прибор или присоединённая нагрузка. Щелчок по л/№ открывает схему из той карточки.</span></p>
+  {% if shema.glav_ab %}<p class="msg info">Этот лицевой — субабонент абонента договора № {{ p.nom_dogab }}: <a href="{% url 'abonents:karta' shema.glav_ab.potreb_id %}?tab=shema">схема договора № {{ p.nom_dogab }}</a>.</p>{% endif %}
+  <div class="shema-scroll"><ul class="shema">
+    <li><div class="uzel koren">{% if shema.dog %}Договор № {{ shema.dog }}{% else %}Без договора{% endif %}<div class="u-name">{{ p.name_potre|default:"" }}</div></div>
+      <ul>{% for u in shema.korni %}{% include "abonents/_shema_uzel.html" with dog=shema.dog %}{% endfor %}</ul></li>
+  </ul></div>
+</section>

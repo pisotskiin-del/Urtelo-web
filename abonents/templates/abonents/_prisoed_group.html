@@ -1,0 +1,10 @@
+{% load ui %}{% if prisoed and not form %}
+  <section class="card kgroup"><h2>{% icon "link" %} Присоединённые объекты</h2>
+    <ul class="plist">{% for label, name, ls, obj in prisoed %}<li>
+      <span class="chip {% if name|slice:':5' == 'posle' %}info{% else %}ok{% endif %}">{% if name|slice:':5' == 'posle' %}прибор{% else %}нагрузка{% endif %}</span>
+      <a href="{% url 'abonents:karta' ls %}">Л/№ {{ ls }}</a>
+      <span class="pname">{% if obj %}{{ obj.name_potre|default:"" }}{% if obj.glav_potre %} <span class="muted">— {{ obj.glav_potre }}</span>{% endif %}{% else %}<span class="error">нет такого абонента</span>{% endif %}</span>
+      {% if can_change %}<form method="post" action="{% url 'abonents:prisoed' p.potreb_id %}" class="inline">{% csrf_token %}<button class="link-btn" name="remove" value="{{ name }}" title="Убрать из присоединённых" onclick="return confirm('Убрать л/№ {{ ls }} из присоединённых?')">✕</button></form>{% endif %}
+    </li>{% endfor %}</ul>
+  </section>
+{% endif %}

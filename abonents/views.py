@@ -235,12 +235,28 @@ def _card_context(request, p, tab_key, form=None):
     related = related_values(p)
     lookups = _lookups()
     _, title, groups = layout.tab(tab_key)
+    shema = None
+    if tab_key == SHEMA:
+        from . import shema as sh
+        title, groups = "Схема договора", []
+        korni, dog, glav_ab = sh.postroit(p)
+        shema = {"korni": korni, "dog": dog, "glav_ab": glav_ab}
+    gruppy = [(g, _items(p, fields, related, form, lookups)) for g, fields in groups]
+    kolonki = None
+    if tab_key in layout.KOLONKI:
+        po_imeni = dict(gruppy)
+        kolonki = [[(t, po_imeni[t]) for t in kol if t in po_imeni] for kol in layout.KOLONKI[tab_key]]
+        razlozheny = {t for kol in layout.KOLONKI[tab_key] for t in kol}
+        kolonki[-1] += [g for g in gruppy if g[0] not in razlozheny]
     return {
         "p": p,
+        "shema": shema,
+        "kolonki": kolonki,
         "otkluchen": p.d_stat in layout.OTKLUCHEN,
         "header": _items(p, layout.HEADER, related, form, lookups),
-        "groups": [(g, _items(p, fields, related, form, lookups)) for g, fields in groups],
-        "tabs": [(k, t) for k, t, _ in layout.TABS], "tab": tab_key, "tab_title": title,
+        "groups": gruppy,
+        "tabs": [(k, t) for k, t, _ in layout.TABS] + ([(SHEMA, "Схема")] if form is None else []),
+        "tab": tab_key, "tab_title": title,
         "tab_url": reverse("abonents:edit" if form is not None else "abonents:karta", args=[p.potreb_id]),
         "nav": _neighbours(p),
         "prisoed": _prisoed(p) if tab_key == "otop" else [],
@@ -251,11 +267,22 @@ def _card_context(request, p, tab_key, form=None):
         "can_change": request.user.has_perm("catalogs.change_potreb"),
         "can_delete": request.user.has_perm("catalogs.delete_potreb"),
         "pokazaniya": POKAZANIYA,
+        "pokaz_vydel": ("pok_new", "pok_old", "pok_newg", "pok_oldg"),
+        # Кнопка «информация о приборе учёта» у показаний предыдущих, как в старой программе.
+        "pribor_info": form is None and tab_key == "otop" and request.user.has_perm("catalogs.view_spteplosch"),
+        "teplosch": SpTeplosch.objects.filter(ln=p.potreb_id).order_by("pk").first()
+        if form is None and tab_key == "otop" else None,
+        "segodnya": datetime.date.today(),
     }
 
 
-def _tab_key(request):
+SHEMA = "shema"   # вкладка «Схема» карточки: только просмотр
+
+
+def _tab_key(request, shema=False):
     key = request.GET.get("tab") or request.POST.get("tab")
+    if shema and key == SHEMA:
+        return key
     return key if key in layout.TAB_KEYS else layout.TAB_KEYS[0]
 
 
@@ -265,7 +292,7 @@ def karta(request, potreb_id):
     p = get_object_or_404(Potreb.objects.select_related("cod_gor", "cod_minist"), potreb_id=potreb_id)
     if p.cod_gor_id:
         request.session["kod_gorod"] = p.cod_gor_id
-    return render(request, "abonents/karta.html", _card_context(request, p, _tab_key(request)))
+    return render(request, "abonents/karta.html", _card_context(request, p, _tab_key(request, shema=True)))
 
 
 @login_required
@@ -283,24 +310,28 @@ def karta_edit(request, potreb_id):
     return render(request, "abonents/karta_edit.html", context)
 
 
-# Показания прибора и дни потребления т/э, которые вводятся прямо в карточке, без «Изменить»:
-# поле → (название, наибольшее значение, знаков после запятой).
+# Показания прибора, дни потребления т/э и перерасчёт, которые вводятся прямо в карточке,
+# без «Изменить»: поле → (название, наибольшее значение, знаков после запятой, можно ли меньше 0).
 POKAZANIYA = {
-    "pok_new": ("Показания настоящие (отопление)", Decimal("999999.999"), 3),
-    "pok_newg": ("Показания настоящие (ГВС)", Decimal("999999999999"), 0),
-    "dnotop": ("Потребление т/э, дней", Decimal("999.9"), 1),
+    "pok_new": ("Показания настоящие (отопление)", Decimal("999999.999"), 3, False),
+    "pok_newg": ("Показания настоящие (ГВС)", Decimal("999999999999"), 0, False),
+    "dnotop": ("Потребление т/э, дней", Decimal("999.9"), 1, False),
+    # Перерасчёт бывает и в минус (снятие).
+    "dn_pereras": ("Перерасчет т/э за, дней", Decimal("999"), 0, True),
+    "tkf_perer": ("Температурный коэфф. перерасчета", Decimal("99.999"), 3, True),
+    "gkl_perer": ("Перерасчет т/э, Гкал", Decimal("9999999999.999"), 3, True),
 }
 
 
 @login_required
 @permission_required("catalogs.change_potreb", raise_exception=True)
 def pokazanie(request, potreb_id, pole):
-    """Ввод показаний прибора в карточке. Сохранение подтверждается в окне
-    браузера, старое и новое значение пишутся в сообщение."""
+    """Ввод показаний прибора, дней и перерасчёта в карточке. Сохранение
+    подтверждается рядом с полем, старое и новое значение пишутся в сообщение."""
     if pole not in POKAZANIYA or request.method != "POST":
         raise Http404
     p = get_object_or_404(Potreb, potreb_id=potreb_id)
-    nazv, maks, znakov = POKAZANIYA[pole]
+    nazv, maks, znakov, minus = POKAZANIYA[pole]
     tab = request.POST.get("tab") if request.POST.get("tab") in layout.TAB_KEYS else layout.TAB_KEYS[0]
     nazad = reverse("abonents:karta", args=[potreb_id]) + f"?tab={tab}"
     raw = (request.POST.get("znach") or "").strip().replace(" ", "").replace("\xa0", "").replace(",", ".")
@@ -309,10 +340,10 @@ def pokazanie(request, potreb_id, pole):
     except ArithmeticError:
         znach = None
         raw = "ошибка"
-    if raw and (znach is None or not znach.is_finite() or znach < 0 or znach > maks
+    if raw and (znach is None or not znach.is_finite() or znach < (-maks if minus else 0) or znach > maks
                 or znach != round(znach, znakov)):
         messages.error(request, f"{nazv}: «{request.POST.get('znach')}» — неверное значение "
-                                f"(число от 0 до {formats.localize(maks)}"
+                                f"(число от {formats.localize(-maks) if minus else 0} до {formats.localize(maks)}"
                                 + (f", не больше {znakov} знаков после запятой" if znakov else ", целое") + ")")
         return redirect(nazad)
     if znach is not None and not znakov:
@@ -321,9 +352,20 @@ def pokazanie(request, potreb_id, pole):
     if staroe == znach:
         return redirect(nazad)
     setattr(p, pole, znach)
-    p.save(update_fields=[pole])
+    polya = [pole]
     pokaz = lambda v: "пусто" if v is None else formats.localize(v)
-    messages.success(request, f"{nazv}: было {pokaz(staroe)}, стало {pokaz(znach)}")
+    soobshch = f"{nazv}: было {pokaz(staroe)}, стало {pokaz(znach)}"
+    if pole == "dn_pereras":
+        # Как в старой форме (и в «Изменить»): новое число дней перерасчета
+        # обнуляет коэффициент и Гкал перерасчета — их вводят заново.
+        sbros = [f for f in ("tkf_perer", "gkl_perer") if getattr(p, f)]
+        for f in sbros:
+            setattr(p, f, 0)
+        polya += sbros
+        if sbros:
+            soobshch += ". Коэффициент и Гкал перерасчета обнулены — введите коэффициент заново"
+    p.save(update_fields=polya)
+    messages.success(request, soobshch)
     return redirect(nazad)
 
 
@@ -490,6 +532,7 @@ def raschet_view(request):
             "potreb": result.potreb,
             "created_poteri": result.created_poteri,
             "zero_division": result.zero_division,
+            "perepolnenie": result.perepolnenie,
             "otkluchen": result.otkluchen,
         }
         messages.success(request, f"Расчет закончен: рассчитано абонентов {result.potreb}")
@@ -1197,3 +1240,125 @@ def kredo_kod(request, potreb_id):
         "p": p, "can_change": can_change, "kandidaty": kandidaty, "poisk": poisk, "q": q,
         "org": org, "predst": predst, "oshibka": oshibka, "orgs_n": KredoOrg.objects.count(),
     })
+
+
+OPISANIE_PEREDACHI = {
+    "dogovory": "Информация об абонентах (Set_URAbon), договорах с абонентами (Set_URDogv) и объектах (точках) "
+                "потребления (Set_URPotr). Договоры передаются только у абонентов (категория 1) с датой договора.",
+    "pribory": "Справочники приборов учёта, их типов и мест установки (Set_URDeviceList, Set_URDevTypeList, "
+               "Set_URDevPlaceList) и приборы учёта абонентов участка (Set_URDevice) — как они записаны в "
+               "«Справочники → Приборы учёта».",
+    "pokazaniya": "Последние показания приборов учёта абонентов участка (Set_URDeviceMeters): по каждому прибору — "
+                  "показание из карты лицевого, дата — сегодня. Лицевые без показания в карте не передаются.",
+}
+
+
+def _kredo_peredacha(request, cod_gor, vid, sobrat, nom_dog, zagolovok, nazad, crumbs, cities=None, city=None):
+    """Общая страница передачи пакетов в КРЭДО: предпросмотр, проверка без
+    отправки и передача. sobrat() — ({процедура: [строка]}, [замечание])."""
+    from . import kredo, kredo_dogovory as kd
+    from .models import KredoPeredacha
+    can_change = request.user.has_perm("catalogs.change_potreb")
+    if request.method == "POST":
+        if not can_change:
+            raise PermissionDenied
+        proverka = request.POST.get("action") != "peredat"
+        paket, zamech = sobrat()
+        z = kd.otpravit_pakety(cod_gor, vid, paket, zamech, user=request.user.get_username(), nom_dog=nom_dog,
+                               proverka=proverka)
+        if z.status == KredoPeredacha.OSHIBKA:
+            messages.error(request, f"КРЭДО: {z.oshibka}")
+        elif proverka:
+            messages.success(request, f"Пакеты собраны, в КРЭДО не передавались. {z.itogo}")
+        else:
+            messages.success(request, f"Данные переданы в КРЭДО. {z.itogo}")
+        return redirect("abonents:kredo_peredacha", pk=z.pk)
+    paket, zamech = sobrat()
+    try:
+        nast = kredo.nastrojki(cod_gor)
+    except kredo.KredoError as e:
+        nast = None
+        messages.warning(request, str(e))
+    zhurnal = KredoPeredacha.objects.filter(cod_gor=cod_gor, nom_dog=nom_dog, vid=vid)[:20]
+    return render(request, "abonents/kredo_dogovory.html", {
+        "zagolovok": zagolovok, "nazad": nazad, "crumbs": crumbs, "nom_dog": nom_dog, "vid": vid,
+        "opisanie": OPISANIE_PEREDACHI[vid], "itogo": kd.itogo(paket),
+        "pakety": [(proc, kd.NAZVANIYA[proc], [f for f, _ in kd.POLYA[proc]],
+                    [kd.kolonki(proc, r) for r in rows]) for proc, rows in paket.items()],
+        "zamech": zamech, "nast": nast, "can_change": can_change, "zhurnal": zhurnal,
+        "zdes": getattr(settings, "TEPLO_KREDO_ZDES", True), "ne_zdes": kredo.NE_ZDES,
+        "cities": cities, "city": city,
+    })
+
+
+@login_required
+@view_required
+def kredo_dogovor(request, potreb_id):
+    """Передать данные договора в КРЭДО (кнопка карты karta.Page3.Command12)."""
+    from . import kredo_dogovory as kd
+    p = get_object_or_404(Potreb.objects.select_related("cod_gor"), potreb_id=potreb_id)
+    if not p.cod_gor_id:
+        raise Http404
+    nazad = reverse("abonents:karta", args=[potreb_id])
+    zag = f"Договор № {p.nom_dog}: {p.name_potre}" if p.nom_dog else f"Л/с {p.potreb_id}: {p.name_potre}"
+    return _kredo_peredacha(request, p.cod_gor_id, "dogovory", lambda: kd.stroki(kd.zapisi_dogovora(p)),
+                            p.nom_dog or None, zag, nazad, [(nazad, "Карточка абонента")])
+
+
+def _kredo_uchastok(request, vid, url_name, zagolovok, sobrat):
+    cities = _cities()
+    code = _current_city(request, cities)
+    city = next((c for c in cities if c.cod_gorod == code), None)
+    if city is None:
+        raise Http404
+    nazad = f"{reverse(url_name)}?gorod={code}"
+    return _kredo_peredacha(request, code, vid, lambda: sobrat(code), None,
+                            f"{zagolovok} участка {city.name_gorod}", nazad, [], cities=cities, city=city)
+
+
+@login_required
+@view_required
+def kredo_dogovory(request):
+    """Регистрация в КРЭДО абонентов участка (apk_kredo.prg, кнопка формы rric)."""
+    from . import kredo_dogovory as kd
+    return _kredo_uchastok(request, "dogovory", "abonents:kredo_dogovory", "Абоненты",
+                           lambda code: kd.stroki(kd.zapisi_uchastka(code)))
+
+
+@login_required
+@view_required
+def kredo_pribory(request):
+    """Информация о приборах учёта абонентов (кнопка Command35 формы rric)."""
+    from . import kredo_pribory as kp
+    return _kredo_uchastok(request, "pribory", "abonents:kredo_pribory", "Приборы учёта", kp.pakety_priborov)
+
+
+@login_required
+@view_required
+def kredo_pokazaniya_otpr(request):
+    """Последние показания приборов учёта абонентов (кнопка Command31 формы rric)."""
+    from . import kredo_pribory as kp
+    return _kredo_uchastok(request, "pokazaniya", "abonents:kredo_pokazaniya_otpr", "Показания приборов",
+                           kp.pakety_pokazanij)
+
+
+@login_required
+@view_required
+def kredo_peredacha(request, pk):
+    """Одна передача: пакеты XML, ответ сервиса, замечания."""
+    from .models import KredoPeredacha
+    z = get_object_or_404(KredoPeredacha, pk=pk)
+    p = None
+    if z.nom_dog:
+        p = Potreb.objects.filter(cod_gor=z.cod_gor, nom_dog=z.nom_dog).order_by("-id_katabon", "potreb_id").first()
+    if p is not None:
+        nazad = reverse("abonents:kredo_dogovor", args=[p.potreb_id])
+    else:
+        url = {"pribory": "abonents:kredo_pribory", "pokazaniya": "abonents:kredo_pokazaniya_otpr"}.get(
+            z.vid, "abonents:kredo_dogovory")
+        nazad = f"{reverse(url)}?gorod={z.cod_gor}"
+    if request.GET.get("xml"):
+        response = HttpResponse(z.xml, content_type="text/xml; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="kredo_peredacha_{z.pk}.xml"'
+        return response
+    return render(request, "abonents/kredo_peredacha.html", {"z": z, "nazad": nazad})

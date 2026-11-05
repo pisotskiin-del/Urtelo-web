@@ -33,5 +33,10 @@ urlpatterns = [
     path("kredo/", views.kredo_view, name="kredo"),
     path("kredo/<int:pk>/", views.kredo_priem, name="kredo_priem"),
     path("kredo/kody/", views.kredo_kody, name="kredo_kody"),
+    path("kredo/dogovory/", views.kredo_dogovory, name="kredo_dogovory"),
+    path("kredo/pribory/", views.kredo_pribory, name="kredo_pribory"),
+    path("kredo/pokazaniya/", views.kredo_pokazaniya_otpr, name="kredo_pokazaniya_otpr"),
+    path("kredo/dogovor/<int:potreb_id>/", views.kredo_dogovor, name="kredo_dogovor"),
+    path("kredo/peredacha/<int:pk>/", views.kredo_peredacha, name="kredo_peredacha"),
     path("kredo/kod/<int:potreb_id>/", views.kredo_kod, name="kredo_kod"),
 ]

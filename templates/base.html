@@ -13,6 +13,12 @@
 <body>
 {% include "_icons.html" %}
 <script>try { if (localStorage.getItem("side-mini") === "1") document.documentElement.classList.add("side-mini"); if (localStorage.getItem("tema") === "dark") document.documentElement.setAttribute("data-theme", "dark"); } catch (e) {}</script>
+<script>/* Печать всегда в светлой теме: тёмная остаётся только на экране. */
+(function () {
+  var h = document.documentElement, byla = null;
+  window.addEventListener("beforeprint", function () { byla = h.getAttribute("data-theme"); if (byla) h.removeAttribute("data-theme"); });
+  window.addEventListener("afterprint", function () { if (byla) h.setAttribute("data-theme", byla); byla = null; });
+})();</script>
 <header class="topbar">
   {% if user.is_authenticated %}<button class="burger" type="button" onclick="toggleSide()" title="Свернуть / развернуть меню">{% icon "menu" %}</button>{% endif %}
   <a class="brand" href="{% url 'abonents:index' %}"><img class="brand-logo" src="{% static 'img/emblema.png' %}" alt="Теплоснабжение">
@@ -31,16 +37,19 @@
 {% if user.is_authenticated %}
 {% with app=request.resolver_match.app_name url=request.resolver_match.url_name %}
 <nav class="sidebar">
-  {% if perms.catalogs.view_potreb %}<a href="{% url 'abonents:index' %}" title="Абоненты" {% if app == "abonents" and url != "raschet" and url != "raschet_itog" and url != "kredo" and url != "kredo_priem" and url != "kredo_kody" and url != "kredo_kod" and url != "dan_rasch" and url != "nov_mes" and url != "otchety" and url != "otchet" and url != "new" %}class="active"{% endif %}>{% icon "users" %}<span class="t">Абоненты</span></a>
+  {% if perms.catalogs.view_potreb %}<a href="{% url 'abonents:index' %}" title="Абоненты" {% if app == "abonents" and url != "raschet" and url != "raschet_itog" and url != "kredo" and url != "kredo_priem" and url != "kredo_kody" and url != "kredo_kod" and url != "kredo_dogovory" and url != "kredo_dogovor" and url != "kredo_peredacha" and url != "kredo_pribory" and url != "kredo_pokazaniya_otpr" and url != "dan_rasch" and url != "nov_mes" and url != "otchety" and url != "otchet" and url != "new" %}class="active"{% endif %}>{% icon "users" %}<span class="t">Абоненты</span></a>
   {% if perms.catalogs.add_potreb %}<a href="{% url 'abonents:new' %}" title="Новый абонент" {% if url == "new" %}class="active"{% endif %}>{% icon "plus" %}<span class="t">Новый абонент</span></a>{% endif %}
   <a href="{% url 'abonents:raschet' %}" title="Расчет" {% if url == "raschet" or url == "raschet_itog" %}class="active"{% endif %}>{% icon "calc" %}<span class="t">Расчет</span></a>
   <a href="{% url 'abonents:dan_rasch' %}" title="Исходные данные для расчета" {% if url == "dan_rasch" %}class="active"{% endif %}>{% icon "sliders" %}<span class="t">Исходные данные</span></a>
   <a href="{% url 'abonents:nov_mes' %}" title="Переход на новый месяц" {% if url == "nov_mes" %}class="active"{% endif %}>{% icon "calendar" %}<span class="t">Новый месяц</span></a>
   <a href="{% url 'abonents:otchety' %}" title="Отчеты и печать" {% if url == "otchety" or url == "otchet" %}class="active"{% endif %}>{% icon "file" %}<span class="t">Отчеты</span></a>
-  <details class="side-grp" {% if url == "kredo" or url == "kredo_priem" or url == "kredo_kody" or url == "kredo_kod" %}open{% endif %}>
-    <summary title="Обмен с АПК «КРЭДО»" {% if url == "kredo" or url == "kredo_priem" or url == "kredo_kody" or url == "kredo_kod" %}class="active"{% endif %}>{% icon "link" %}<span class="t">КРЭДО</span></summary>
+  <details class="side-grp" {% if url == "kredo" or url == "kredo_priem" or url == "kredo_kody" or url == "kredo_kod" or url == "kredo_dogovory" or url == "kredo_dogovor" or url == "kredo_peredacha" or url == "kredo_pribory" or url == "kredo_pokazaniya_otpr" %}open{% endif %}>
+    <summary title="Обмен с АПК «КРЭДО»" {% if url == "kredo" or url == "kredo_priem" or url == "kredo_kody" or url == "kredo_kod" or url == "kredo_dogovory" or url == "kredo_dogovor" or url == "kredo_peredacha" or url == "kredo_pribory" or url == "kredo_pokazaniya_otpr" %}class="active"{% endif %}>{% icon "link" %}<span class="t">КРЭДО</span></summary>
     <a href="{% url 'abonents:kredo' %}" title="Показания приборов из КРЭДО" class="sub{% if url == "kredo" or url == "kredo_priem" %} active{% endif %}">{% icon "gauge" %}<span class="t">Показания приборов</span></a>
     <a href="{% url 'abonents:kredo_kody' %}" title="Коды абонентов в КРЭДО" class="sub{% if url == "kredo_kody" or url == "kredo_kod" %} active{% endif %}">{% icon "badge" %}<span class="t">Коды абонентов</span></a>
+    <a href="{% url 'abonents:kredo_dogovory' %}" title="Передать в КРЭДО абонентов, договоры и точки потребления" class="sub{% if url == "kredo_dogovory" or url == "kredo_dogovor" or url == "kredo_peredacha" %} active{% endif %}">{% icon "file" %}<span class="t">Договоры абонентов</span></a>
+    <a href="{% url 'abonents:kredo_pribory' %}" title="Передать в КРЭДО приборы учёта абонентов и справочники приборов" class="sub{% if url == "kredo_pribory" %} active{% endif %}">{% icon "gauge" %}<span class="t">Приборы учёта</span></a>
+    <a href="{% url 'abonents:kredo_pokazaniya_otpr' %}" title="Передать в КРЭДО последние показания приборов учёта" class="sub{% if url == "kredo_pokazaniya_otpr" %} active{% endif %}">{% icon "gauge" %}<span class="t">Отправка показаний</span></a>
   </details>{% endif %}
   <a href="{% url 'catalogs:index' %}" title="Справочники" {% if app == "catalogs" %}class="active"{% endif %}>{% icon "book" %}<span class="t">Справочники</span></a>
   {% if user.is_staff %}<a href="{% url 'admin:index' %}" title="Администрирование">{% icon "settings" %}<span class="t">Администрирование</span></a>{% endif %}

@@ -642,7 +642,9 @@ class ReportsTests(KartaBase):
                                    d_next_pov=date(2026, 1, 1))
         rep, _ = reports.build(reports.BY_KEY["otch_pribor"], self.ryb, {})
         row = rep.tables[0].sections[0].rows[0]
-        self.assertEqual((row[0], row[3], row[7]), (5, "ВКТ-7  №123", Decimal("5.0")))
+        self.assertEqual((row[0], row[1], row[3], row[7]), (1, "Магазин", "ВКТ-7  №123", Decimal("5.0")))
+        self.assertEqual(rep.approve, ["Приложение №2", "к приказу от 08.04.2024г.№290"])
+        self.assertEqual(rep.podpis[0], "Инспектор по контролю за потреблением тепловой энергии юридическим лицам")
         self.assertEqual(rep.signatures[0],
                          "Инспектор по контролю за потреблением тепловой энергии юридическим лицам")
         self.assertTrue(rep.signatures[1].endswith("Химач Н.И."))
@@ -671,8 +673,20 @@ class ReportsTests(KartaBase):
         self.assertEqual(x["Content-Disposition"], 'attachment; filename="ot_kateg_1.xlsx"')
         ws = load_workbook(BytesIO(x.content)).active
         values = [c for row in ws.iter_rows(values_only=True) for c in row if c is not None]
-        self.assertIn("ИТОГО:", values)
+        self.assertIn("ИТОГО :", values)
         self.assertIn(10.5, values)
+        self.assertIn("всего: Хозрасчет", values)
+        r = self.client.get("/abonents/otchety/ot_kateg/?gorod=1")
+        self.assertContains(r, "Категория потребителя<b>ХОЗРАСЧЕТ</b>")
+        self.assertContains(r, "<b>всего:</b> Хозрасчет")
+        Potreb.objects.filter(potreb_id=5).update(id_kategor=3)
+        r = self.client.get("/abonents/otchety/ot_minist/?gorod=1")
+        self.assertContains(r, "РЕСПУБЛИКАНСКИЙ БЮДЖЕТ")
+        self.assertContains(r, '<td colspan="5">всего: Без министерства</td>')
+        self.assertContains(r, "БЕЗ МИНИСТЕРСТВА")
+        r = self.client.get("/abonents/otchety/p_kot1/?gorod=1")
+        self.assertContains(r, 'rowspan="3" class="grp">Наименование котельной')
+        self.assertContains(r, "Потребление ГКал")
         self.assertEqual(self.client.get("/abonents/otchety/net/").status_code, 404)
 
 
@@ -1632,3 +1646,420 @@ class VedomostiTests(KartaBase):
             r = self.client.get(reverse("abonents:otchet", args=[key]) + "?gorod=1")
             self.assertEqual(r.status_code, 200, key)
         self.assertContains(self.client.get(reverse("abonents:otchety")), "Ведомости, реестры")
+
+
+class PaketInv:
+    """Поддельный RRIC_COM_OBJECT.Invoker для пакетов Set_UR*."""
+
+    def __init__(self, otvet="<root><row><ret_val>OK</ret_val></row></root>"):
+        self.otvet, self.calls = otvet, []
+
+    def exec_proc(self, name, params, xml=None):
+        self.calls.append((name, params, xml))
+        return self.otvet
+
+
+class KredoDogovoryTests(KartaBase):
+    """Передача в КРЭДО абонентов, договоров и точек потребления (Set_URAbon,
+    Set_URDogv, Set_URPotr)."""
+
+    def setUp(self):
+        super().setUp()
+        Potreb.objects.filter(potreb_id=5).update(
+            nameobakt="Магазин", d_stat=60, data_dog=date(2020, 1, 15), dn_dog=date(2020, 1, 1),
+            fisk_cod="0200012345", telefon="0555 123456789", ras_chet=2211290000000026, name_banka="Агропромбанк",
+            ao_code="AO1", ura_dom="5", oba_dom="7", direktor="Иванов", a_type=1)
+        Potreb.objects.filter(potreb_id=7).update(nameobakt="Склад & гараж", d_stat=60, ao_code="AO1")
+        Potreb.objects.filter(potreb_id=9).update(nameobakt="-----")
+
+    def test_stroki(self):
+        from abonents import kredo_dogovory as kd
+        paket, zamech = kd.stroki(kd.zapisi_dogovora(Potreb.objects.get(potreb_id=7)))
+        self.assertEqual([r["liz"] for r in paket["Set_URAbon"]], ["000005", "000007"])
+        (d,) = paket["Set_URDogv"]
+        self.assertEqual((d["liz"], d["n_dog"], d["d_dog"], d["d_stat"]), ("000005", "000006", date(2020, 1, 15), 60))
+        self.assertEqual([(r["liz"], r["p_kod"], r["stat"]) for r in paket["Set_URPotr"]],
+                         [("000005", "000005", 1), ("000005", "000007", 1)])
+        self.assertEqual(paket["Set_URAbon"][0]["rs"], "2211290000000026")
+        self.assertEqual(paket["Set_URAbon"][0]["account"], "5")
+        self.assertEqual(zamech, [])
+
+    def test_xml(self):
+        from abonents import kredo_dogovory as kd
+        paket, _ = kd.stroki([Potreb.objects.get(potreb_id=5), Potreb.objects.get(potreb_id=7)])
+        x = kd.xml_paketa("Set_URDogv", paket["Set_URDogv"])
+        self.assertTrue(x.startswith('<?xml version = "1.0" encoding="Windows-1251" standalone="yes"?>\n<root>'))
+        self.assertIn("<tip>Юрлица Теп</tip>", x)          # ширина поля TIP — 10
+        self.assertIn("<d_dog>2020-01-15</d_dog>", x)
+        self.assertIn("<dk_dog/>", x)
+        a = kd.xml_paketa("Set_URAbon", paket["Set_URAbon"])
+        self.assertIn("<ru_phone>0555 12345</ru_phone>", a)
+        self.assertIn('<a_name_full>ООО "Крипс"</a_name_full>', a)
+        self.assertIn("<p_name>Склад &amp; гараж</p_name>", kd.xml_paketa("Set_URPotr", paket["Set_URPotr"]))
+        import xml.etree.ElementTree as ET
+        ET.fromstring(x.split("?>", 1)[1])
+
+    def test_porcii(self):
+        from abonents import kredo_dogovory as kd
+        rows = [{"liz": kod, "p_kod": kod} for kod in map(kd.kod6, range(2500))] + [{"liz": "000001", "p_kod": "000001"}]
+        self.assertEqual([x.count("<row>") for x in kd.porcii("Set_URPotr", rows)], [1000, 1000, 500])
+
+    def test_uchastok_bez_ne_objektov(self):
+        from abonents import kredo_dogovory as kd
+        self.assertEqual([p.potreb_id for p in kd.zapisi_uchastka(1)], [5, 7])
+        # Кнопка карты передаёт и сам лицевой без названия объекта.
+        self.assertEqual([p.potreb_id for p in kd.zapisi_dogovora(Potreb.objects.get(potreb_id=9))], [9])
+
+    def test_peredat(self):
+        from abonents import kredo_dogovory as kd
+        from abonents.models import KredoPeredacha
+        inv = PaketInv()
+        z = kd.peredat(1, kd.zapisi_uchastka(1), user="op", nom_dog=None, invoker=inv)
+        self.assertEqual(z.status, KredoPeredacha.OK)
+        self.assertEqual([(c[0], c[1]) for c in inv.calls],
+                         [("Set_URAbon", "@comorg_id=210"), ("Set_URDogv", "@comorg_id=210"), ("Set_URPotr", "@comorg_id=210")])
+        self.assertIn("<n_dog>000006</n_dog>", inv.calls[1][2])
+        self.assertIn("Set_URAbon: OK", z.otvet)
+        self.assertEqual((z.abon, z.dogv, z.potr), (2, 1, 2))
+
+    def test_oshibka_ostanavlivaet(self):
+        from abonents import kredo_dogovory as kd
+        from abonents.models import KredoPeredacha
+        inv = PaketInv("<root><error>Нет прав</error></root>")
+        z = kd.peredat(1, kd.zapisi_uchastka(1), invoker=inv)
+        self.assertEqual((z.status, z.oshibka, len(inv.calls)), (KredoPeredacha.OSHIBKA, "Нет прав", 1))
+
+    def test_proverka_bez_vyzova(self):
+        from abonents import kredo_dogovory as kd
+        from abonents.models import KredoPeredacha
+        inv = PaketInv()
+        z = kd.peredat(1, kd.zapisi_uchastka(1), proverka=True, invoker=inv)
+        self.assertEqual((z.status, inv.calls), (KredoPeredacha.PROVERKA, []))
+        self.assertIn("<!-- Set_URPotr -->", z.xml)
+
+    def test_stranicy(self):
+        from unittest import mock
+        from abonents import kredo, kredo_dogovory as kd
+        from abonents.models import KredoPeredacha
+        self.login("Оператор")
+        self.assertContains(self.client.get(reverse("abonents:karta", args=[5])), "Договор в КРЭДО")
+        url = reverse("abonents:kredo_dogovor", args=[7])
+        r = self.client.get(url)
+        self.assertContains(r, "Договор № 6")
+        self.assertContains(r, "Юрлица Теп<")
+        r = self.client.post(url, {"action": "proverka"})
+        z = KredoPeredacha.objects.get()
+        self.assertRedirects(r, reverse("abonents:kredo_peredacha", args=[z.pk]))
+        self.assertEqual((z.nom_dog, z.status), (6, KredoPeredacha.PROVERKA))
+        self.assertContains(self.client.get(reverse("abonents:kredo_peredacha", args=[z.pk])), "Проверка")
+        self.assertEqual(self.client.get(reverse("abonents:kredo_peredacha", args=[z.pk]) + "?xml=1")["Content-Type"],
+                         "text/xml; charset=utf-8")
+        inv = PaketInv()
+        with mock.patch.object(kredo, "ComInvoker", lambda cod_gor: inv):
+            self.client.post(reverse("abonents:kredo_dogovory") + "?gorod=1", {"action": "peredat"})
+        self.assertEqual(len(inv.calls), 3)
+        self.assertContains(self.client.get(reverse("abonents:kredo_dogovory") + "?gorod=1"), "Передано")
+        with self.settings(TEPLO_KREDO_ZDES=False):
+            z = kd.peredat(1, kd.zapisi_uchastka(1))
+            self.assertEqual(z.status, KredoPeredacha.OSHIBKA)
+            self.assertIn("общем сервере", z.oshibka)
+            self.assertNotContains(self.client.get(url), 'value="peredat"')
+
+    def test_nablyudatel_ne_peredaet(self):
+        self.login("Наблюдатель")
+        url = reverse("abonents:kredo_dogovor", args=[5])
+        self.assertNotContains(self.client.get(url), 'value="proverka"')
+        self.assertEqual(self.client.post(url, {"action": "peredat"}).status_code, 403)
+
+
+class KredoPriboryTests(KartaBase):
+    """Передача в КРЭДО приборов учёта (Set_URDevice и справочники) и
+    последних показаний (Set_URDeviceMeters)."""
+
+    def setUp(self):
+        super().setUp()
+        from catalogs.models import SetUrdevice, SetUrdevicelist, SetUrdevplacelist, SetUrdevtypelist
+        SetUrdevicelist.objects.create(kod="3", name="ВКТ-7", tip_kod=1, koef=Decimal("2"), edn="Гкал")
+        SetUrdevtypelist.objects.create(kod=1, name="Теплосчётчик", stat=1)
+        SetUrdevplacelist.objects.create(kod=1, name="Подвал", stat=1)
+        SetUrdevice.objects.create(liz="000005", p_kod="000005", d_kod="3", d_tip=1, d_num="123",
+                                   d_date=date(2020, 5, 1), d_pok=Decimal("1.5"), koef=Decimal("1"))
+        SetUrdevice.objects.create(liz="000005", p_kod="000007", d_kod="9", d_tip=1, d_num="456")
+        SetUrdevice.objects.create(liz="000011", p_kod="000011", d_kod="3", d_num="789")   # Дубоссары
+        SetUrdevice.objects.create(liz="000099", p_kod="000099", d_kod="3", d_num="000")   # нет лицевого
+        Potreb.objects.filter(potreb_id=5).update(pok_new=Decimal("12.345"), rric_acn="R5")
+        Potreb.objects.filter(potreb_id=7).update(pok_new=None)
+
+    def test_pribory(self):
+        from abonents import kredo_dogovory as kd, kredo_pribory as kp
+        paket, zamech = kp.pakety_priborov(1)
+        self.assertEqual(list(paket), ["Set_URDeviceList", "Set_URDevTypeList", "Set_URDevPlaceList", "Set_URDevice"])
+        self.assertEqual([r["d_num"] for r in paket["Set_URDevice"]], ["123", "456"])
+        self.assertEqual(len(zamech), 1)
+        self.assertIn("p_kod 000099", zamech[0])
+        x = kd.xml_paketa("Set_URDevice", paket["Set_URDevice"])
+        self.assertIn("<d_pok>1.500</d_pok>", x)
+        self.assertIn("<d_date>2020-05-01</d_date>", x)
+        self.assertIn("<d_mesto>0</d_mesto>", x)     # пусто — 0, как в старой программе
+        self.assertIn("<del>0</del>", x)
+        self.assertIn("<koef>2.00</koef>", kd.xml_paketa("Set_URDeviceList", paket["Set_URDeviceList"]))
+
+    def test_pokazaniya(self):
+        from abonents import kredo_dogovory as kd, kredo_pribory as kp
+        paket, zamech = kp.pakety_pokazanij(1, date(2026, 11, 3))
+        (r,) = paket["Set_URDeviceMeters"]
+        self.assertEqual((r["p_kod"], r["last_pok"], r["tip_pok"], r["rric_acn"], r["edn"]),
+                         ("000005", Decimal("12.35"), 2, "R5", "Гкал"))
+        self.assertTrue(any("Л/с 7" in z for z in zamech))
+        x = kd.xml_paketa("Set_URDeviceMeters", paket["Set_URDeviceMeters"])
+        self.assertIn("<last_pok>12.35</last_pok>\n\t\t<pok_date>2026-11-03</pok_date>", x)
+        Potreb.objects.filter(potreb_id=7).update(pok_new=Decimal("4"))
+        paket, _ = kp.pakety_pokazanij(1)
+        self.assertEqual([r["edn"] for r in paket["Set_URDeviceMeters"]], ["Гкал", "-"])
+
+    def test_peredat(self):
+        from abonents import kredo_dogovory as kd, kredo_pribory as kp
+        from abonents.models import KredoPeredacha
+        inv = PaketInv()
+        paket, zamech = kp.pakety_priborov(1)
+        z = kd.otpravit_pakety(1, "pribory", paket, zamech, invoker=inv)
+        self.assertEqual(z.status, KredoPeredacha.OK)
+        self.assertEqual([c[0] for c in inv.calls],
+                         ["Set_URDeviceList", "Set_URDevTypeList", "Set_URDevPlaceList", "Set_URDevice"])
+        self.assertIn("Приборы учёта абонентов: 2", z.itogo)
+
+    def test_stranicy(self):
+        from unittest import mock
+        from abonents import kredo
+        from abonents.models import KredoPeredacha
+        self.login("Оператор")
+        for name in ("abonents:kredo_pribory", "abonents:kredo_pokazaniya_otpr"):
+            url = reverse(name) + "?gorod=1"
+            self.assertContains(self.client.get(url), "Проверить без отправки")
+            r = self.client.post(url, {"action": "proverka"})
+            z = KredoPeredacha.objects.first()
+            self.assertRedirects(r, reverse("abonents:kredo_peredacha", args=[z.pk]))
+            self.assertEqual(z.status, KredoPeredacha.PROVERKA)
+            self.assertContains(self.client.get(reverse("abonents:kredo_peredacha", args=[z.pk])), url)
+        inv = PaketInv()
+        with mock.patch.object(kredo, "ComInvoker", lambda cod_gor: inv):
+            self.client.post(reverse("abonents:kredo_pokazaniya_otpr") + "?gorod=1", {"action": "peredat"})
+        self.assertEqual([c[0] for c in inv.calls], ["Set_URDeviceMeters"])
+        self.assertEqual(KredoPeredacha.objects.first().vid, "pokazaniya")
+
+
+class ObnovitIzStarojTests(KartaBase):
+    """obnovit-iz-staroj.bat: показания, дни отопления карточек и исходные данные
+    для расчёта из DBF старой программы."""
+
+    def setUp(self):
+        super().setUp()
+        import tempfile
+        from pathlib import Path
+        import dbf
+        self.folder = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__("shutil").rmtree, self.folder)
+        Danrasch.objects.filter(cod_gorod=1).update(nom_mes=10, t_proekt=-17)
+        Danrasch.objects.filter(cod_gorod=2).update(nom_mes=10)
+        Potreb.objects.filter(potreb_id=5).update(pok_new=Decimal("1.000"), dnotop=Decimal("10.0"), org_in="ORG")
+        t = dbf.Table(str(self.folder / "danrasch.dbf"), "cod_gorod N(2,0); nom_mes N(2,0); god N(4,0); "
+                      "t_vozd N(5,1); t_proekt N(3,0); tkoef N(5,3); dnotop N(4,1); name_gorod C(20)",
+                      codepage="cp1251", dbf_type="vfp")
+        t.open(dbf.READ_WRITE)
+        t.append((1, 10, 2026, 4.0, -17, 0.4, 31.0, "Старое имя"))
+        t.append((2, 11, 2026, 1.0, -17, 0.5, 30.0, ""))     # другой месяц — не переносится
+        t.close()
+        t = dbf.Table(str(self.folder / "potreb.dbf"), "potreb_id N(6,0); cod_gor N(2,0); pok_new N(9,3); "
+                      "date_pok D; dnotop N(4,1); org_in C(40); gkl_perer N(13,3); poter_gvs N(10,3); nach_gvs N(10,3)", codepage="cp1251",
+                      dbf_type="vfp")
+        t.open(dbf.READ_WRITE)
+        t.append((5, 1, 12.5, dbf.Date(2026, 10, 25), 31.0, "СТАРОЕ", -1.25, 0.5, 7.125))
+        t.append((11, 2, 99, None, 5.0, "", 0, 0, 0))
+        t.append((99999, 1, 1, None, 1, "", 0, 0, 0))
+        t.close()
+
+    def test_proverka_i_zapis(self):
+        out = io.StringIO()
+        call_command("obnovit_iz_staroj", dir=str(self.folder), proverka=True, stdout=out)
+        self.assertIn("ничего не записано", out.getvalue())
+        self.assertIn("Дубоссары: расчётный месяц в старой программе 11.2026", out.getvalue())
+        self.assertEqual(Potreb.objects.get(potreb_id=5).pok_new, Decimal("1.000"))
+        call_command("obnovit_iz_staroj", dir=str(self.folder), stdout=out)
+        p = Potreb.objects.get(potreb_id=5)
+        self.assertEqual((p.pok_new, p.date_pok, p.dnotop, p.org_in, p.gkl_perer, p.poter_gvs, p.nach_gvs),
+                         (Decimal("12.500"), date(2026, 10, 25), Decimal("31.0"), "ORG", Decimal("-1.250"),
+                          Decimal("0.500"), Decimal("7.125")))
+        d = Danrasch.objects.get(cod_gorod=1)
+        self.assertEqual((d.t_vozd, d.tkoef, d.dnotop, d.name_gorod), (Decimal("4.0"), Decimal("0.400"), Decimal("31.0"), "Рыбница"))
+        self.assertIsNone(Potreb.objects.get(potreb_id=11).pok_new)          # другой месяц
+        self.assertIsNone(Danrasch.objects.get(cod_gorod=2).t_vozd)
+        self.assertIn("есть только в старой (не переносятся): 1", out.getvalue())
+
+    def test_net_papki(self):
+        from django.core.management.base import CommandError
+        with self.assertRaisesMessage(CommandError, "Нет папки"):
+            call_command("obnovit_iz_staroj", dir=str(self.folder / "net"))
+
+
+class SverkaRaschetaTests(KartaBase):
+    def test_sverka(self):
+        import tempfile
+        from pathlib import Path
+        import dbf
+        from openpyxl import load_workbook
+        folder = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__("shutil").rmtree, folder)
+        Danrasch.objects.filter(cod_gorod__in=[1, 2]).update(nom_mes=10)
+        Potreb.objects.filter(potreb_id=5).update(d_stat=60, nac_vsego=Decimal("10.5"), nach_otpr=Decimal("3"),
+                                                     gkl_perer=0)
+        Potreb.objects.filter(potreb_id=7).update(d_stat=60, nac_vsego=Decimal("2"))
+        t = dbf.Table(str(folder / "danrasch.dbf"), "cod_gorod N(2,0); nom_mes N(2,0); god N(4,0)",
+                      codepage="cp1251", dbf_type="vfp")
+        t.open(dbf.READ_WRITE)
+        t.append((1, 10, 2026))
+        t.append((2, 10, 2026))
+        t.close()
+        t = dbf.Table(str(folder / "potreb.dbf"), "potreb_id N(6,0); cod_gor N(2,0); d_stat N(2,0); "
+                      "nac_vsego N(12,3); nach_otpr N(12,3); pok_new N(9,3)", codepage="cp1251", dbf_type="vfp")
+        t.open(dbf.READ_WRITE)
+        t.append((5, 1, 60, 10.5, 3, 0))
+        t.append((7, 1, 60, 5, 0, 1))
+        t.close()
+        out = io.StringIO()
+        f = folder / "s.xlsx"
+        call_command("sverka_rascheta", dir=str(folder), out=str(f), stdout=out)
+        self.assertIn("Лицевых с расхождениями: 1", out.getvalue())
+        wb = load_workbook(f)
+        rows = list(wb["Расхождения"].iter_rows(values_only=True))
+        self.assertEqual(rows[1][0], 7)
+        itog = {r[0]: r[1:4] for r in wb["Итоги"].iter_rows(min_row=2, values_only=True)}
+        self.assertEqual(itog["Предъявлено к оплате"], (15.5, 12.5, -3.0))
+
+
+class ProverkaFormulTests(KartaBase):
+    def test_raschet_po_dannym_staroj(self):
+        import tempfile
+        from pathlib import Path
+        import dbf
+        folder = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__("shutil").rmtree, folder)
+        t = dbf.Table(str(folder / "danrasch.dbf"), "cod_gorod N(2,0); nom_mes N(2,0); god N(4,0); tkoef N(5,3); "
+                      "qpfakt N(10,2); name_gorod C(20)", codepage="cp1251", dbf_type="vfp")
+        t.open(dbf.READ_WRITE)
+        t.append((1, 10, 2026, 0.5, 0, "Рыбница"))
+        t.close()
+        t = dbf.Table(str(folder / "sp_teplpoteri.dbf"), "ln N(6,0)", codepage="cp1251", dbf_type="vfp")
+        t.close()
+        t = dbf.Table(str(folder / "potreb.dbf"), "potreb_id N(6,0); cod_gor N(2,0); d_stat N(2,0); tip_rasot N(1,0); "
+                      "pok_new N(9,3); pok_old N(9,3); koef_pok N(6,2); nach_otpr N(12,3); nac_vsego N(12,3); "
+                      "nach_otopl N(12,3)", codepage="cp1251", dbf_type="vfp")
+        t.open(dbf.READ_WRITE)
+        t.append((5, 1, 60, 1, 20, 10, 1, 5, 0, 0))      # в старой nach_otpr 5, по формуле 10
+        t.close()
+        out = io.StringIO()
+        call_command("proverka_formul", dir=str(folder), stdout=out)
+        self.assertIn("nach_otpr: расходится у 1 лицевых", out.getvalue())
+        self.assertIn("Л/№ 5 (участок 1): старая 5.000, новая 10.000", out.getvalue())
+        self.assertNotIn("nac_vsego:", out.getvalue())
+
+
+class RaschetOshibkiTests(KartaBase):
+    """Ошибки, на которых старая программа пишет «переполнение данных»."""
+
+    def test_nol_na_nol_i_perepolnenie(self):
+        from abonents import raschet
+        # Главный по договору с общим прибором, нагрузка группы 0: в старой
+        # программе 0 / 0 — «переполнение данных».
+        Potreb.objects.filter(potreb_id=5).update(d_stat=60, nom_dogab=6, nom_pribor=4, q_otop=0, tip_rasot=1,
+                                                  pok_new=1, pok_old=1)
+        Potreb.objects.filter(potreb_id=7).update(d_stat=60, nom_pribor=0, pok_new=Decimal("999999"), pok_old=0,
+                                                  koef_pok=Decimal("50"), tip_rasot=1)
+        recs = list(Potreb.objects.order_by("pk"))
+        cities = {d.cod_gorod: d for d in Danrasch.objects.all()}
+        result, _, _ = raschet.compute(recs, cities, {})
+        self.assertIn((5, "нагрузка субабонентов договора"), result.zero_division)
+        self.assertEqual(len([z for z in result.zero_division if z[0] == 5]), 1)
+        (pid, pole, _), *_ = result.perepolnenie
+        self.assertEqual((pid, pole), (7, "nach_otpr"))
+        self.assertIsNone(next(r for r in recs if r.potreb_id == 7).nach_otpr)
+
+
+class ShemaTests(KartaBase):
+    """Вкладка «Схема»: кто к кому подключён в договоре."""
+
+    def setUp(self):
+        super().setUp()
+        common = dict(cod_gor=self.ryb, cod_minist_id=1, id_kategor=1, id_koteln=16, accept=3)
+        Potreb.objects.create(potreb_id=13, nom_dog=6, nom_dogab=6, nom_pribor=2, tip_rasot=1, id_katabon=3,
+                              name_potre="Котельная", **common)
+        Potreb.objects.create(potreb_id=15, nom_dog=16, nom_dogab=6, nom_pribor=2, tip_rasot=2, id_katabon=2,
+                              name_potre="Сигма", d_stat=61, **common)
+        Potreb.objects.create(potreb_id=17, nom_dog=18, tip_rasot=3, id_katabon=2, name_potre="Петров", **common)
+        Potreb.objects.filter(potreb_id=5).update(pris_nag1=17)
+
+    def test_derevo(self):
+        from abonents import shema
+        korni, dog, glav_ab = shema.postroit(Potreb.objects.get(potreb_id=5))
+        self.assertEqual(dog, 6)
+        self.assertIsNone(glav_ab)
+        po_ls = {}
+
+        def obojti(uzly, roditel=None):
+            for u in uzly:
+                po_ls[u.p.potreb_id] = (roditel, u.svyaz)
+                obojti(u.deti, u.p.potreb_id)
+        obojti(korni)
+        self.assertEqual(po_ls[5], (None, ""))
+        self.assertEqual(po_ls[7], (5, shema.POSLE_PRIB))
+        self.assertEqual(po_ls[17], (5, shema.NAGRUZKA))   # лицевой другого договора
+        self.assertEqual(po_ls[13], (None, ""))
+        self.assertEqual(po_ls[15], (13, shema.OBSHCHIJ))
+        self.assertNotIn(9, po_ls)
+
+    def test_vkladka(self):
+        self.login("Наблюдатель")
+        r = self.client.get("/abonents/15/?tab=shema")
+        self.assertContains(r, "Договор № 16")
+        self.assertContains(r, "субабонент абонента договора № 6")
+        r = self.client.get("/abonents/5/?tab=shema")
+        self.assertContains(r, "на общем приборе № 2")
+        self.assertContains(r, "присоединённый прибор: показания вычитаются")
+        self.assertContains(r, "по присоединённой нагрузке от прибора")
+        self.assertContains(r, "Приостановлен")
+        self.assertContains(r, 'class="uzel sp-pribor tek')
+
+
+class PriborInfoTests(KartaBase):
+    """Кнопка «информация о приборе учёта» у показаний предыдущих."""
+
+    def test_knopka_i_okno(self):
+        from catalogs.models import SpTeplosch
+        SpTeplosch.objects.create(ln=5, nomer_prib="1234567", tip_prib="СТ-10", kdata_pov=date(2020, 1, 1))
+        self.login("Наблюдатель")
+        r = self.client.get("/abonents/5/?tab=otop")
+        self.assertContains(r, 'class="pribor-info"')
+        self.assertContains(r, "1234567")
+        self.assertContains(r, "просрочена")
+        r = self.client.get("/abonents/7/?tab=otop")
+        self.assertContains(r, "Информация о приборе не заполнена")
+        r = self.client.get("/abonents/5/?tab=gvs")
+        self.assertNotContains(r, 'class="pribor-info"')
+
+
+class PererasschetVKartochkeTests(KartaBase):
+    """Окно «Перерасчеты»: поля вводятся прямо в карточке."""
+
+    def test_vvod(self):
+        self.login("Оператор")
+        url = "/abonents/5/pokazanie/{}/"
+        r = self.client.get("/abonents/5/?tab=otop")
+        self.assertContains(r, 'action="/abonents/5/pokazanie/gkl_perer/"')
+        self.client.post(url.format("gkl_perer"), {"znach": "-2,5", "tab": "otop"})
+        self.assertEqual(Potreb.objects.get(potreb_id=5).gkl_perer, Decimal("-2.5"))
+        Potreb.objects.filter(potreb_id=5).update(tkf_perer=Decimal("0.5"))
+        r = self.client.post(url.format("dn_pereras"), {"znach": "3", "tab": "otop"}, follow=True)
+        p = Potreb.objects.get(potreb_id=5)
+        self.assertEqual((p.dn_pereras, p.tkf_perer, p.gkl_perer), (3, 0, 0))
+        self.assertContains(r, "обнулены")
+        self.client.post(url.format("tkf_perer"), {"znach": "1,2345", "tab": "otop"})
+        self.assertEqual(Potreb.objects.get(potreb_id=5).tkf_perer, 0)   # больше 3 знаков — не записано
