@@ -678,3 +678,32 @@ html[data-theme="dark"] .podtv-b a.button.primary { background:var(--accent) !im
 html[data-theme="dark"] .kgroup .kf.kf-pok_new, html[data-theme="dark"] .kgroup .kf.kf-pok_newg { background:#16302a; box-shadow:inset 3px 0 0 #4cc38a; }
 html[data-theme="dark"] .kgroup .kf.kf-pok_old, html[data-theme="dark"] .kgroup .kf.kf-pok_oldg { background:#1a2c47; box-shadow:inset 3px 0 0 #4d94ee; }
 .kv .pok-inline { width:auto; flex:1 1 0; min-width:90px; }  /* единица измерения — в той же строке */
+
+/* «Полезный отпуск» — оформление как в старом отчете polez_otpusk.frx: серая
+   шапка, тёмно-серые колонки «Всего…», жирные итоги по городам, серый блок
+   «Итого по филиалу» крупнее. */
+.rep-polez .rep-head h2 { font-size:20px; letter-spacing:.02em; }
+.rep-polez table.rep { --pz-sv:#d9d9d9; --pz-tm:#bfbfbf; --pz-itog:#e8e8e8; color:#000; }
+.rep-polez table.rep th { background:var(--pz-sv); color:#000; font-weight:700; text-align:center; vertical-align:middle; }
+.rep-polez table.rep thead tr:first-child th:nth-child(3), .rep-polez table.rep thead tr:first-child th:nth-child(4),
+.rep-polez table.rep thead tr:first-child th:nth-child(7), .rep-polez table.rep thead tr:first-child th:nth-child(8) { background:var(--pz-tm); }
+.rep-polez table.rep td { background:#fff; }
+.rep-polez table.rep tr.mark:not(.itog) td { background:#fff; font-weight:700; }
+.rep-polez table.rep tr.mark:not(.itog) td:first-child { background:var(--pz-sv); }
+.rep-polez table.rep tr.mark:not(.itog) td.vsego:nth-last-child(-n+2) { background:var(--pz-tm); }
+.rep-polez table.rep tr.foot td { font-weight:700; border-bottom:2px solid #000; }
+.rep-polez table.rep tr.itog td { background:var(--pz-itog); font-size:1.08em; }
+.rep-polez table.rep tr.itog td.vsego { background:var(--pz-tm); }
+.rep-polez table.rep tr.itog.foot td { font-size:1.15em; font-weight:700; }
+.rep-polez table.rep tbody tr:not(.foot):not(.mark) td:first-child { font-size:.9em; }
+@media print {
+  .rep-polez table.rep th, .rep-polez table.rep td { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .rep-polez table.rep tr.foot td { border-bottom:2px solid #000; }
+  .rep-polez table.rep tr.mark td { height:auto; }
+}
+html[data-theme="dark"] .rep-polez table.rep { --pz-sv:#2a3446; --pz-tm:#364257; --pz-itog:#222c3c; color:var(--text); }
+html[data-theme="dark"] .rep-polez table.rep th { color:var(--text); }
+html[data-theme="dark"] .rep-polez table.rep td { background:var(--card); }
+html[data-theme="dark"] .rep-polez table.rep tr.foot td { border-bottom-color:var(--line-strong); }
+.rep-polez .rep-head h2 { color:#000; } .rep-polez .rep-sign { margin-top:40px; }
+html[data-theme="dark"] .rep-polez .rep-head h2 { color:var(--text); }

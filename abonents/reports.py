@@ -45,6 +45,7 @@ class Col:
     kind: str = "text"      # text, int, num, date
     places: int = 3
     total: bool = False     # суммировать в итогах
+    css: str = ""           # класс ячеек колонки (оформление отдельных отчетов)
 
 
 @dataclass
@@ -56,6 +57,7 @@ class Section:
     foot_links: list = None
     mark_rows: bool = False  # строки выделены цветом и выше обычных (строка тарифов)
     mark_foot: bool = False  # так же выделенный итог (итог по филиалу)
+    css: str = ""            # класс строк раздела (оформление отдельных отчетов)
 
 
 @dataclass
@@ -77,6 +79,7 @@ class Report:
     signatures: list = field(default_factory=list)
     landscape: bool = False
     approve: list = field(default_factory=list)   # гриф «УТВЕРЖДАЮ» справа вверху
+    css: str = ""           # класс отчета: своё оформление, как в старой программе
 
 
 @dataclass
@@ -437,13 +440,13 @@ POLEZ_COLS = [Col("Категории потребителей"),
               Col("Население абонентское (с господд.)", "num", 2, total=True),
               Col("Население абонентское (без господд.)", "num", 2, total=True),
               Col("Население хозрасчет", "num", 2, total=True),
-              Col("Всего население (Гкал)", "num", 2, total=True),
-              Col("Всего хозрасчёт (Гкал)", "num", 2, total=True),
+              Col("Всего население (Гкал)", "num", 2, total=True, css="vsego"),
+              Col("Всего хозрасчёт (Гкал)", "num", 2, total=True, css="vsego"),
               Col("Местный", "num", 2, total=True),
               Col("Республ.", "num", 2, total=True),
               Col("Организация СКиИОД", "num", 2, total=True),
-              Col("Всего бюджет (Гкал)", "num", 2, total=True),
-              Col("ВСЕГО (Гкал)", "num", 2, total=True)]
+              Col("Всего бюджет (Гкал)", "num", 2, total=True, css="vsego"),
+              Col("ВСЕГО (Гкал)", "num", 2, total=True, css="vsego")]
 # Колонки «Всего…», которые в строках «П/У» и «Нагр.» старый отчет оставляет пустыми.
 POLEZ_VSEGO = (5, 10, 11)
 
@@ -502,7 +505,7 @@ def polez_otpusk(city, opts):
         pu_rows.append(rows[0])
         nagr_rows.append(rows[1])
     pu, nagr = _sum_row(POLEZ_COLS, pu_rows, "П/У"), _sum_row(POLEZ_COLS, nagr_rows, "Нагр.")
-    itog = Section(rows=[shown(pu), shown(nagr)])
+    itog = Section(rows=[shown(pu), shown(nagr)], css="itog")
     itog.links = [links(0, key, r) for key, r in zip(("pu", "nagr"), itog.rows)]
     itog.foot = _sum_row(POLEZ_COLS, [pu, nagr], "Итого по филиалу")
     itog.mark_foot = True
@@ -523,7 +526,7 @@ def polez_otpusk(city, opts):
     return Report("ПОЛЕЗНЫЙ ОТПУСК", lines,
                   [Table(POLEZ_COLS, [Section(rows=[tarif_row], mark_rows=True)] + sections + [itog], head=head)],
                   signatures=[_ved_spec(city, "\u2003" * 12)],
-                  landscape=True)   # без грифа «УТВЕРЖДАЮ»: отчет не утверждается (03.11.2026)
+                  landscape=True, css="polez")   # без грифа «УТВЕРЖДАЮ»: отчет не утверждается (03.11.2026)
 
 
 def _ved_spec(city, sep):
