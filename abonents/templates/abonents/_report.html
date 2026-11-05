@@ -1,4 +1,4 @@
-{% load ui %}<article class="card report{% if report.landscape %} landscape{% endif %}{% if report.css %} rep-{{ report.css }}{% endif %}">
+{% load ui %}{% if report.sek_label %}{% include "abonents/_report_gruppy.html" %}{% else %}<article class="card report{% if report.landscape %} landscape{% endif %}{% if report.css %} rep-{{ report.css }}{% endif %}">
   {% if report.approve %}<div class="rep-approve">{% for line in report.approve %}<p>{{ line }}</p>{% endfor %}</div>{% endif %}
   <header class="rep-head">
     <h2>{{ report.title }}</h2>
@@ -25,4 +25,4 @@
   {% endfor %}
   {% for note in report.notes %}<p class="rep-note">{{ note }}</p>{% endfor %}
   {% if report.signatures %}<div class="rep-sign">{% for s in report.signatures %}<p>{{ s }}</p>{% endfor %}</div>{% endif %}
-</article>
+</article>{% endif %}

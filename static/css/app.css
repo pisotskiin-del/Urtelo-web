@@ -719,3 +719,53 @@ html[data-theme="dark"] .rep-polez .rep-head h2 { color:var(--text); }
 table.rep td.uzk, table.rep th.uzk { min-width:0; width:1%; white-space:nowrap; text-align:center; }
 /* Числа отчета не переносятся («2 433,260» в одну строку). */
 table.rep td.num { white-space:nowrap; }
+
+/* Отчет по группам (как OT_KATEG старой программы): у группы своя шапка с
+   рамкой, строки «зеброй» без вертикальных линий, «всего:» и «ИТОГО :» жирным. */
+.rep-gruppy { font-family:"Times New Roman", Times, serif; color:#000; }
+.rep-gruppy .rep-head { text-align:center; margin-bottom:14px; }
+.rep-gruppy .rep-head h2 { font-size:17px; font-weight:700; margin:0 0 4px; color:#000; }
+.rep-gruppy .rep-gorod { margin-left:8px; }
+.rep-gruppy .rep-head p { margin:0; font-weight:700; color:#000; }
+.rep-gr { margin:0 0 16px; page-break-inside:auto; }
+.rep-gr-z { margin:0 0 3px 36px; font-size:15px; }
+.rep-gr-z b { margin-left:18px; }
+.rep-gr-t { width:100%; border-collapse:collapse; table-layout:fixed; font-size:13px; }
+.rep-gr-t col:nth-child(1) { width:5%; } .rep-gr-t col:nth-child(2) { width:6.5%; } .rep-gr-t col:nth-child(3) { width:7%; }
+.rep-gr-t col:nth-child(5) { width:6.5%; } .rep-gr-t col:nth-child(6) { width:9%; } .rep-gr-t col:nth-child(7) { width:9.5%; }
+.rep-gr-t col:nth-child(8) { width:10.5%; }
+.rep-gr-t th { border:1px solid #000; font-weight:700; font-size:12.5px; line-height:1.15; padding:2px 3px; text-align:center;
+  vertical-align:middle; background:#fff; color:#000; }
+.rep-gr-t th:nth-child(4) { font-size:14px; }
+.rep-gr-t th.num { text-align:center; }
+.rep-gr-t td { padding:3px 4px; vertical-align:top; line-height:1.25; }
+.rep-gr-t td.num { text-align:right; white-space:nowrap; }
+.rep-gr-t td:nth-child(1) { text-align:center; }
+.rep-gr-t td.uzk { text-align:center; }
+.rep-gr-t tbody:first-of-type tr:nth-child(even) td { background:#c8c8c8; }
+.rep-gr-t tbody:first-of-type tr:last-child td { border-bottom:1px solid #000; }
+.rep-gr-t tr { page-break-inside:avoid; }
+.rep-gr-vsego td { padding-top:5px; font-weight:700; }
+.rep-gr-vsego td:nth-child(4) { text-align:center; font-weight:400; font-size:14px; }
+.rep-gr-vsego td:nth-child(4) b { font-weight:700; }
+.rep-gr-itogo { margin-top:14px; }
+.rep-gr-itogo td { font-weight:700; }
+/* «ИТОГО :» шире узкой колонки «Акцепт» — выступает влево, не переносясь. */
+.rep-gr-itogo td.uzk { position:relative; }
+.rep-gr-itogo td.uzk span { position:absolute; right:4px; top:3px; white-space:nowrap; }
+.rep-gruppy .rep-sign { margin-top:40px; font-size:13px; }
+.rep-gruppy .rep-sign p { margin:14px 0; font-weight:700; }
+@media print {
+  .rep-gruppy { padding:0; }
+  .rep-gr-t { font-size:9.5pt; }
+  .rep-gr-t th { font-size:9pt; } .rep-gr-t th:nth-child(4) { font-size:10pt; }
+  .rep-gr-t td { padding:2px 3px; }
+  .rep-gr-t th, .rep-gr-t td { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .rep-gr-z { font-size:11pt; }
+  .rep-gruppy .rep-head h2 { font-size:13pt; }
+}
+html[data-theme="dark"] .rep-gruppy, html[data-theme="dark"] .rep-gruppy .rep-head h2, html[data-theme="dark"] .rep-gruppy .rep-head p { color:var(--text); }
+html[data-theme="dark"] .rep-gr-t th { background:var(--card); color:var(--text); border-color:var(--line-strong); }
+html[data-theme="dark"] .rep-gr-t tbody:first-of-type tr:nth-child(even) td { background:#222c3c; }
+html[data-theme="dark"] .rep-gr-t tbody:first-of-type tr:last-child td { border-bottom-color:var(--line-strong); }
+.rep-gr-itogo tbody tr:last-child td { border-bottom:0; background:none; }

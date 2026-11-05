@@ -671,8 +671,12 @@ class ReportsTests(KartaBase):
         self.assertEqual(x["Content-Disposition"], 'attachment; filename="ot_kateg_1.xlsx"')
         ws = load_workbook(BytesIO(x.content)).active
         values = [c for row in ws.iter_rows(values_only=True) for c in row if c is not None]
-        self.assertIn("ИТОГО:", values)
+        self.assertIn("ИТОГО :", values)
         self.assertIn(10.5, values)
+        self.assertIn("всего: Хозрасчет", values)
+        r = self.client.get("/abonents/otchety/ot_kateg/?gorod=1")
+        self.assertContains(r, "Категория потребителя<b>ХОЗРАСЧЕТ</b>")
+        self.assertContains(r, "<b>всего:</b> Хозрасчет")
         self.assertEqual(self.client.get("/abonents/otchety/net/").status_code, 404)
 
 

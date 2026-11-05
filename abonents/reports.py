@@ -80,6 +80,7 @@ class Report:
     landscape: bool = False
     approve: list = field(default_factory=list)   # гриф «УТВЕРЖДАЮ» справа вверху
     css: str = ""           # класс отчета: своё оформление, как в старой программе
+    sek_label: str = ""     # «Категория потребителя» перед названием группы (отчет по группам)
 
 
 @dataclass
@@ -183,9 +184,13 @@ def ot_kateg(city, opts):
                    n(p.nac_vsego) + n(p.predopl), n(p.nac_vsego)],
         cols)
     rows = [r for s in sections for r in s.rows]
+    # Как в старом отчете OT_KATEG: «всего: Местный бюджет» — название категории как в справочнике.
+    po_zagl = {(v or "").upper(): (v or "").strip() for v in names.values()}
+    for s in sections:
+        s.foot[3] = f"всего: {po_zagl.get(s.title) or s.title}"
     return Report("ОТПУСК ТЕПЛОВОЙ ЭНЕРГИИ ДЛЯ АБОНЕНТОВ", _city_lines(city),
-                  [Table(cols, sections, total=_sum_row(cols, rows, "ИТОГО:", label_col=4))],
-                  signatures=_signatures(city))
+                  [Table(cols, sections, total=_sum_row(cols, rows, "ИТОГО :", label_col=4))],
+                  signatures=_signatures(city), css="budzhet", sek_label="Категория потребителя")
 
 
 def ot_minist(city, opts):
