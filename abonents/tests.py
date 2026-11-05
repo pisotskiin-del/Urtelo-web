@@ -1856,11 +1856,12 @@ class ObnovitIzStarojTests(KartaBase):
         t.append((2, 11, 2026, 1.0, -17, 0.5, 30.0, ""))     # другой месяц — не переносится
         t.close()
         t = dbf.Table(str(self.folder / "potreb.dbf"), "potreb_id N(6,0); cod_gor N(2,0); pok_new N(9,3); "
-                      "date_pok D; dnotop N(4,1); org_in C(40)", codepage="cp1251", dbf_type="vfp")
+                      "date_pok D; dnotop N(4,1); org_in C(40); gkl_perer N(13,3)", codepage="cp1251",
+                      dbf_type="vfp")
         t.open(dbf.READ_WRITE)
-        t.append((5, 1, 12.5, dbf.Date(2026, 10, 25), 31.0, "СТАРОЕ"))
-        t.append((11, 2, 99, None, 5.0, ""))
-        t.append((99999, 1, 1, None, 1, ""))
+        t.append((5, 1, 12.5, dbf.Date(2026, 10, 25), 31.0, "СТАРОЕ", -1.25))
+        t.append((11, 2, 99, None, 5.0, "", 0))
+        t.append((99999, 1, 1, None, 1, "", 0))
         t.close()
 
     def test_proverka_i_zapis(self):
@@ -1871,8 +1872,8 @@ class ObnovitIzStarojTests(KartaBase):
         self.assertEqual(Potreb.objects.get(potreb_id=5).pok_new, Decimal("1.000"))
         call_command("obnovit_iz_staroj", dir=str(self.folder), stdout=out)
         p = Potreb.objects.get(potreb_id=5)
-        self.assertEqual((p.pok_new, p.date_pok, p.dnotop, p.org_in),
-                         (Decimal("12.500"), date(2026, 10, 25), Decimal("31.0"), "ORG"))
+        self.assertEqual((p.pok_new, p.date_pok, p.dnotop, p.org_in, p.gkl_perer),
+                         (Decimal("12.500"), date(2026, 10, 25), Decimal("31.0"), "ORG", Decimal("-1.250")))
         d = Danrasch.objects.get(cod_gorod=1)
         self.assertEqual((d.t_vozd, d.tkoef, d.dnotop, d.name_gorod), (Decimal("4.0"), Decimal("0.400"), Decimal("31.0"), "Рыбница"))
         self.assertIsNone(Potreb.objects.get(potreb_id=11).pok_new)          # другой месяц
@@ -2028,3 +2029,22 @@ class PriborInfoTests(KartaBase):
         self.assertContains(r, "Информация о приборе не заполнена")
         r = self.client.get("/abonents/5/?tab=gvs")
         self.assertNotContains(r, 'class="pribor-info"')
+
+
+class PererasschetVKartochkeTests(KartaBase):
+    """Окно «Перерасчеты»: поля вводятся прямо в карточке."""
+
+    def test_vvod(self):
+        self.login("Оператор")
+        url = "/abonents/5/pokazanie/{}/"
+        r = self.client.get("/abonents/5/?tab=otop")
+        self.assertContains(r, 'action="/abonents/5/pokazanie/gkl_perer/"')
+        self.client.post(url.format("gkl_perer"), {"znach": "-2,5", "tab": "otop"})
+        self.assertEqual(Potreb.objects.get(potreb_id=5).gkl_perer, Decimal("-2.5"))
+        Potreb.objects.filter(potreb_id=5).update(tkf_perer=Decimal("0.5"))
+        r = self.client.post(url.format("dn_pereras"), {"znach": "3", "tab": "otop"}, follow=True)
+        p = Potreb.objects.get(potreb_id=5)
+        self.assertEqual((p.dn_pereras, p.tkf_perer, p.gkl_perer), (3, 0, 0))
+        self.assertContains(r, "обнулены")
+        self.client.post(url.format("tkf_perer"), {"znach": "1,2345", "tab": "otop"})
+        self.assertEqual(Potreb.objects.get(potreb_id=5).tkf_perer, 0)   # больше 3 знаков — не записано

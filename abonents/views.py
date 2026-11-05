@@ -310,24 +310,28 @@ def karta_edit(request, potreb_id):
     return render(request, "abonents/karta_edit.html", context)
 
 
-# Показания прибора и дни потребления т/э, которые вводятся прямо в карточке, без «Изменить»:
-# поле → (название, наибольшее значение, знаков после запятой).
+# Показания прибора, дни потребления т/э и перерасчёт, которые вводятся прямо в карточке,
+# без «Изменить»: поле → (название, наибольшее значение, знаков после запятой, можно ли меньше 0).
 POKAZANIYA = {
-    "pok_new": ("Показания настоящие (отопление)", Decimal("999999.999"), 3),
-    "pok_newg": ("Показания настоящие (ГВС)", Decimal("999999999999"), 0),
-    "dnotop": ("Потребление т/э, дней", Decimal("999.9"), 1),
+    "pok_new": ("Показания настоящие (отопление)", Decimal("999999.999"), 3, False),
+    "pok_newg": ("Показания настоящие (ГВС)", Decimal("999999999999"), 0, False),
+    "dnotop": ("Потребление т/э, дней", Decimal("999.9"), 1, False),
+    # Перерасчёт бывает и в минус (снятие).
+    "dn_pereras": ("Перерасчет т/э за, дней", Decimal("999"), 0, True),
+    "tkf_perer": ("Температурный коэфф. перерасчета", Decimal("99.999"), 3, True),
+    "gkl_perer": ("Перерасчет т/э, Гкал", Decimal("9999999999.999"), 3, True),
 }
 
 
 @login_required
 @permission_required("catalogs.change_potreb", raise_exception=True)
 def pokazanie(request, potreb_id, pole):
-    """Ввод показаний прибора в карточке. Сохранение подтверждается в окне
-    браузера, старое и новое значение пишутся в сообщение."""
+    """Ввод показаний прибора, дней и перерасчёта в карточке. Сохранение
+    подтверждается рядом с полем, старое и новое значение пишутся в сообщение."""
     if pole not in POKAZANIYA or request.method != "POST":
         raise Http404
     p = get_object_or_404(Potreb, potreb_id=potreb_id)
-    nazv, maks, znakov = POKAZANIYA[pole]
+    nazv, maks, znakov, minus = POKAZANIYA[pole]
     tab = request.POST.get("tab") if request.POST.get("tab") in layout.TAB_KEYS else layout.TAB_KEYS[0]
     nazad = reverse("abonents:karta", args=[potreb_id]) + f"?tab={tab}"
     raw = (request.POST.get("znach") or "").strip().replace(" ", "").replace("\xa0", "").replace(",", ".")
@@ -336,10 +340,10 @@ def pokazanie(request, potreb_id, pole):
     except ArithmeticError:
         znach = None
         raw = "ошибка"
-    if raw and (znach is None or not znach.is_finite() or znach < 0 or znach > maks
+    if raw and (znach is None or not znach.is_finite() or znach < (-maks if minus else 0) or znach > maks
                 or znach != round(znach, znakov)):
         messages.error(request, f"{nazv}: «{request.POST.get('znach')}» — неверное значение "
-                                f"(число от 0 до {formats.localize(maks)}"
+                                f"(число от {formats.localize(-maks) if minus else 0} до {formats.localize(maks)}"
                                 + (f", не больше {znakov} знаков после запятой" if znakov else ", целое") + ")")
         return redirect(nazad)
     if znach is not None and not znakov:
@@ -348,9 +352,20 @@ def pokazanie(request, potreb_id, pole):
     if staroe == znach:
         return redirect(nazad)
     setattr(p, pole, znach)
-    p.save(update_fields=[pole])
+    polya = [pole]
     pokaz = lambda v: "пусто" if v is None else formats.localize(v)
-    messages.success(request, f"{nazv}: было {pokaz(staroe)}, стало {pokaz(znach)}")
+    soobshch = f"{nazv}: было {pokaz(staroe)}, стало {pokaz(znach)}"
+    if pole == "dn_pereras":
+        # Как в старой форме (и в «Изменить»): новое число дней перерасчета
+        # обнуляет коэффициент и Гкал перерасчета — их вводят заново.
+        sbros = [f for f in ("tkf_perer", "gkl_perer") if getattr(p, f)]
+        for f in sbros:
+            setattr(p, f, 0)
+        polya += sbros
+        if sbros:
+            soobshch += ". Коэффициент и Гкал перерасчета обнулены — введите коэффициент заново"
+    p.save(update_fields=polya)
+    messages.success(request, soobshch)
     return redirect(nazad)
 
 

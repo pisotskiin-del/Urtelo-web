@@ -677,3 +677,4 @@ html[data-theme="dark"] .podtv-b a.button.primary { background:var(--accent) !im
 .kgroup .kf.kf-pok_new .kl, .kgroup .kf.kf-pok_newg .kl, .kgroup .kf.kf-pok_old .kl, .kgroup .kf.kf-pok_oldg .kl { font-weight:600; }
 html[data-theme="dark"] .kgroup .kf.kf-pok_new, html[data-theme="dark"] .kgroup .kf.kf-pok_newg { background:#16302a; box-shadow:inset 3px 0 0 #4cc38a; }
 html[data-theme="dark"] .kgroup .kf.kf-pok_old, html[data-theme="dark"] .kgroup .kf.kf-pok_oldg { background:#1a2c47; box-shadow:inset 3px 0 0 #4d94ee; }
+.kv .pok-inline { width:auto; flex:1 1 0; min-width:90px; }  /* единица измерения — в той же строке */

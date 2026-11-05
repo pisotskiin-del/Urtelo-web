@@ -1,5 +1,5 @@
 @echo off
-rem teplo-web: update meter readings, heating days of the cards and the calculation input data
+rem teplo-web: update meter readings, heating days, recalculation of the cards and the calculation input data
 rem from the old program (DBF in D:\Teplo_dog\dbf). For parallel work while the new program is tested.
 rem   obnovit-iz-staroj.bat            - update
 rem   obnovit-iz-staroj.bat /proverka  - only show what would change
