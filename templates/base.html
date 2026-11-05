@@ -13,6 +13,12 @@
 <body>
 {% include "_icons.html" %}
 <script>try { if (localStorage.getItem("side-mini") === "1") document.documentElement.classList.add("side-mini"); if (localStorage.getItem("tema") === "dark") document.documentElement.setAttribute("data-theme", "dark"); } catch (e) {}</script>
+<script>/* Печать всегда в светлой теме: тёмная остаётся только на экране. */
+(function () {
+  var h = document.documentElement, byla = null;
+  window.addEventListener("beforeprint", function () { byla = h.getAttribute("data-theme"); if (byla) h.removeAttribute("data-theme"); });
+  window.addEventListener("afterprint", function () { if (byla) h.setAttribute("data-theme", byla); byla = null; });
+})();</script>
 <header class="topbar">
   {% if user.is_authenticated %}<button class="burger" type="button" onclick="toggleSide()" title="Свернуть / развернуть меню">{% icon "menu" %}</button>{% endif %}
   <a class="brand" href="{% url 'abonents:index' %}"><img class="brand-logo" src="{% static 'img/emblema.png' %}" alt="Теплоснабжение">
