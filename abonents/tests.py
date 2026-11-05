@@ -682,6 +682,9 @@ class ReportsTests(KartaBase):
         self.assertContains(r, "РЕСПУБЛИКАНСКИЙ БЮДЖЕТ")
         self.assertContains(r, '<td colspan="5">всего: Без министерства</td>')
         self.assertContains(r, "БЕЗ МИНИСТЕРСТВА")
+        r = self.client.get("/abonents/otchety/p_kot1/?gorod=1")
+        self.assertContains(r, 'rowspan="3" class="grp">Наименование котельной')
+        self.assertContains(r, "Потребление ГКал")
         self.assertEqual(self.client.get("/abonents/otchety/net/").status_code, 404)
 
 

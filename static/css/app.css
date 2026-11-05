@@ -777,3 +777,35 @@ html[data-theme="dark"] .rep-gr-t tbody:first-of-type tr:last-child td { border-
 @media print { .rep-gr-z.rep-gr-centr { font-size:11pt; } .rep-gr-vsego-l td:first-child { font-size:10.5pt; } }
 .rep-gr-vsego-l td.num { font-weight:700; font-size:inherit; text-align:right; }
 .rep-gr-t.rep-gr-itogo td { border-bottom:0 !important; }
+
+/* «Потребление по котельным» — как старый p_kot1n.frx: серая шапка в три
+   яруса, сетка у всех клеток, мелкие числа, итог без рамки. */
+.rep-kot { font-family:"Times New Roman", Times, serif; color:#000; }
+.rep-kot .rep-head h2, .rep-kot .rep-head p { color:#000; }
+.rep-kot table.rep { border-collapse:collapse; width:100%; table-layout:fixed; }
+.rep-kot table.rep th { background:#c0c0c0; color:#000; border:1px solid #000; font-weight:400; font-size:12px;
+  text-transform:none; letter-spacing:0; text-align:center; vertical-align:middle; padding:2px 3px; line-height:1.15; }
+.rep-kot table.rep thead tr:first-child th:first-child { font-style:italic; font-size:15px; width:19%; }
+.rep-kot table.rep thead tr:first-child th:nth-child(2) { font-size:17px; }
+.rep-kot table.rep td { border:1px solid #000; font-size:11px; padding:2px 4px; background:#fff; color:#000; }
+.rep-kot table.rep td:first-child { font-size:14px; white-space:nowrap; min-width:0; }
+.rep-kot table.rep tr.total td { border:0; font-weight:400; background:none; font-size:11px; }
+.rep-kot table.rep tr.total td:first-child { color:transparent; }
+.rep-kot .rep-note { font-weight:700; margin:24px 0 0 50px; font-size:13px; }
+.rep-kot .rep-sign { margin:20px 0 0 70px; } .rep-kot .rep-sign p { font-weight:700; margin:14px 0; }
+@media print {
+  .rep-kot table.rep { border-collapse:collapse; border:0; table-layout:fixed; }
+  .rep-kot table.rep th, .rep-kot table.rep td { border:1px solid #000; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .rep-kot table.rep th { font-size:8pt; padding:1px 2px; }
+  .rep-kot table.rep thead tr:first-child th:first-child { font-size:10.5pt; }
+  .rep-kot table.rep thead tr:first-child th:nth-child(2) { font-size:12pt; }
+  .rep-kot table.rep td { font-size:7.5pt; padding:1px 3px; }
+  .rep-kot table.rep td:first-child { font-size:10pt; }
+  .rep-kot table.rep tr.total td { border:0; font-size:7.5pt; }
+  .rep-kot .rep-note { font-size:9pt; }
+}
+html[data-theme="dark"] .rep-kot, html[data-theme="dark"] .rep-kot .rep-head h2, html[data-theme="dark"] .rep-kot .rep-head p { color:var(--text); }
+html[data-theme="dark"] .rep-kot table.rep th { background:#2a3446; color:var(--text); border-color:var(--line-strong); }
+html[data-theme="dark"] .rep-kot table.rep td { background:var(--card); color:var(--text); border-color:var(--line-strong); }
+.rep-kot .scroll { overflow-x:auto; } .rep-kot table.rep { min-width:900px; }
+.rep-kot .scroll, .rep-kot table.rep, .rep-kot table.rep th { border-radius:0 !important; }

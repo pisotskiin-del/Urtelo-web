@@ -298,13 +298,19 @@ def p_kot1(city, opts):
         rows.append(r)
     total = _sum_row(cols, rows, "Итого")
     vsego = (total[-2] or 0) + (total[-1] or 0)
-    notes = [f"ВСЕГО ПОТРЕБЛЕНИЕ ПО КОТЕЛЬНЫМ: {vsego:.2f} ГКал"]
+    from django.utils import formats
+    notes = [f"ВСЕГО ПОТРЕБЛЕНИЕ ПО КОТЕЛЬНЫМ: {formats.number_format(vsego, 2, use_l10n=True, force_grouping=True)} ГКал"]
     if bez_kot:
         notes.append("Не указан № котельной у потребителей: " + ", ".join(map(str, bez_kot)))
     lines = [" ".join(_city_lines(city))] + ([dict(VID_USLUGA)[vid]] if vid else [])
+    # Шапка в три яруса, как в старом p_kot1n.frx: «Наименование котельной»,
+    # над категориями — «Потребление ГКал», внизу ГВС / Отопл.
+    head = [[("Наименование котельной", 1, 3), ("Потребление ГКал", len(cols) - 1, 1)],
+            [(title, 2, 1) for _, title in KOT_KATEG + [(None, "Всего")]],
+            [(c.title, 1, 1) for c in cols[1:]]]
     return Report("ФАКТИЧЕСКОЕ ПОТРЕБЛЕНИЕ ПО КОТЕЛЬНЫМ", lines,
-                  [Table(cols, [Section(rows=rows)], groups=groups, total=total)],
-                  notes=notes, signatures=_signatures(city), landscape=True)
+                  [Table(cols, [Section(rows=rows)], groups=groups, total=total, head=head)],
+                  notes=notes, signatures=_signatures(city), landscape=True, css="kot")
 
 
 def p_kot2(city, opts):
