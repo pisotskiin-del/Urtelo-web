@@ -683,12 +683,19 @@ html[data-theme="dark"] .kgroup .kf.kf-pok_old, html[data-theme="dark"] .kgroup 
    шапка, тёмно-серые колонки «Всего…», жирные итоги по городам, серый блок
    «Итого по филиалу» крупнее. */
 .rep-polez .rep-head h2 { font-size:20px; letter-spacing:.02em; }
-.rep-polez table.rep { --pz-sv:#d9d9d9; --pz-tm:#bfbfbf; --pz-itog:#e8e8e8; color:#000; }
+.rep-polez table.rep { --pz-sv:#d9d9d9; --pz-tm:#bfbfbf; --pz-itog:#e8e8e8; --pz-tarif:#e2e2e2; --pz-line:#9aa3ad; color:#000; }
+/* Вертикальные линии между колонками и на экране, как в печатной форме. */
+@media screen {
+  .rep-polez table.rep th, .rep-polez table.rep td { border-right:1px solid var(--pz-line); }
+  .rep-polez table.rep th { border-bottom:1px solid var(--pz-line); }
+  .rep-polez table.rep th:first-child, .rep-polez table.rep td:first-child { border-left:1px solid var(--pz-line); }
+  .rep-polez table.rep thead tr:last-child th { border-left:0; }
+}
 .rep-polez table.rep th { background:var(--pz-sv); color:#000; font-weight:700; text-align:center; vertical-align:middle; }
 .rep-polez table.rep thead tr:first-child th:nth-child(3), .rep-polez table.rep thead tr:first-child th:nth-child(4),
 .rep-polez table.rep thead tr:first-child th:nth-child(7), .rep-polez table.rep thead tr:first-child th:nth-child(8) { background:var(--pz-tm); }
 .rep-polez table.rep td { background:#fff; }
-.rep-polez table.rep tr.mark:not(.itog) td { background:#fff; font-weight:700; }
+.rep-polez table.rep tr.mark:not(.itog) td { background:var(--pz-tarif); font-weight:700; }
 .rep-polez table.rep tr.mark:not(.itog) td:first-child { background:var(--pz-sv); }
 .rep-polez table.rep tr.mark:not(.itog) td.vsego:nth-last-child(-n+2) { background:var(--pz-tm); }
 .rep-polez table.rep tr.foot td { font-weight:700; border-bottom:2px solid #000; }
@@ -701,7 +708,7 @@ html[data-theme="dark"] .kgroup .kf.kf-pok_old, html[data-theme="dark"] .kgroup 
   .rep-polez table.rep tr.foot td { border-bottom:2px solid #000; }
   .rep-polez table.rep tr.mark td { height:auto; }
 }
-html[data-theme="dark"] .rep-polez table.rep { --pz-sv:#2a3446; --pz-tm:#364257; --pz-itog:#222c3c; color:var(--text); }
+html[data-theme="dark"] .rep-polez table.rep { --pz-sv:#2a3446; --pz-tm:#364257; --pz-itog:#222c3c; --pz-tarif:#253041; --pz-line:#3e4b62; color:var(--text); }
 html[data-theme="dark"] .rep-polez table.rep th { color:var(--text); }
 html[data-theme="dark"] .rep-polez table.rep td { background:var(--card); }
 html[data-theme="dark"] .rep-polez table.rep tr.foot td { border-bottom-color:var(--line-strong); }
