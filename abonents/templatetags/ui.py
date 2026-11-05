@@ -69,6 +69,12 @@ def rcells(row, cols, links=None, index=None):
 
 
 @register.filter
+def nerazryv(title):
+    """Заголовок колонки без переноса внутри «п/п» («№ п/ п»)."""
+    return str(title).replace("п/п", "п/\u2060п")
+
+
+@register.filter
 def withcols(row, cols):
     """Пары (значение, колонка) строки отчета."""
     return list(zip(row, cols))

@@ -173,7 +173,7 @@ def ot_kateg(city, opts):
     else:
         qs = qs.filter(nom_dog__gt=0)
     names, akc = _kategor(), _akcept()
-    cols = [Col("№ п/п", "int"), Col("Лиц. №", "int"), Col("Код бух.", "int"), Col("Абонент"), Col("Акцепт"),
+    cols = [Col("№ п/п", "int"), Col("Лиц. №", "int"), Col("Код бух.", "int"), Col("Абонент"), Col("Акцепт", css="uzk"),
             Col("Выстав. аванс", "num", total=True), Col("Отпуск (Гкал)", "num", total=True),
             Col("К оплате (Гкал)", "num", total=True)]
     sections = _grouped(
@@ -193,7 +193,7 @@ def ot_minist(city, opts):
     министерствам."""
     qs = Potreb.objects.filter(cod_gor=city.cod_gorod, nom_dog__gt=0, id_kategor=3).exclude(id_katabon=3)
     names, akc = dict(Minist.objects.values_list("cod_minist", "name_minis")), _akcept()
-    cols = [Col("№ п/п", "int"), Col("Код АС", "int"), Col("Код бух.", "int"), Col("Абонент"), Col("Акцепт"),
+    cols = [Col("№ п/п", "int"), Col("Код АС", "int"), Col("Код бух.", "int"), Col("Абонент"), Col("Акцепт", css="uzk"),
             Col("Выстав. аванс", "num", total=True), Col("Отпуск (Гкал)", "num", total=True),
             Col("К оплате (Гкал)", "num", total=True)]
     sections = _grouped(

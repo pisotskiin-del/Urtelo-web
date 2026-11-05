@@ -714,3 +714,8 @@ html[data-theme="dark"] .rep-polez table.rep td { background:var(--card); }
 html[data-theme="dark"] .rep-polez table.rep tr.foot td { border-bottom-color:var(--line-strong); }
 .rep-polez .rep-head h2 { color:#000; } .rep-polez .rep-sign { margin-top:40px; }
 html[data-theme="dark"] .rep-polez .rep-head h2 { color:var(--text); }
+/* Узкая текстовая колонка отчета (Акцепт: А, БА, С) — по содержимому, без переноса;
+   ширина остаётся наименованию абонента. */
+table.rep td.uzk, table.rep th.uzk { min-width:0; width:1%; white-space:nowrap; text-align:center; }
+/* Числа отчета не переносятся («2 433,260» в одну строку). */
+table.rep td.num { white-space:nowrap; }
