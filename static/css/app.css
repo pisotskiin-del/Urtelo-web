@@ -668,3 +668,12 @@ html[data-theme="dark"] .uzel.abon, html[data-theme="dark"] .shema-leg .lg.abon:
 .pribor-dl dt { color:var(--muted); } .pribor-dl dd { margin:0; font-weight:500; }
 html[data-theme="dark"] .podtv-b a.button.primary { background:var(--accent) !important; color:#fff; }
 .chip.danger { background:var(--danger-weak); color:var(--danger); }
+/* Окна вкладки по колонкам (layout.KOLONKI). */
+.kgroups.kcols { columns:auto; display:grid; grid-template-columns:repeat(auto-fill, minmax(380px, 1fr)); gap:0 12px; align-items:start; }
+.kcols .kcol { min-width:0; }
+/* Строки показаний выделены цветом: настоящие — зелёным, предыдущие — синим. */
+.kgroup .kf.kf-pok_new, .kgroup .kf.kf-pok_newg { background:#e7f6ec; box-shadow:inset 3px 0 0 #2e9d5b; border-radius:6px; }
+.kgroup .kf.kf-pok_old, .kgroup .kf.kf-pok_oldg { background:#e8f1fd; box-shadow:inset 3px 0 0 #2f7de1; border-radius:6px; }
+.kgroup .kf.kf-pok_new .kl, .kgroup .kf.kf-pok_newg .kl, .kgroup .kf.kf-pok_old .kl, .kgroup .kf.kf-pok_oldg .kl { font-weight:600; }
+html[data-theme="dark"] .kgroup .kf.kf-pok_new, html[data-theme="dark"] .kgroup .kf.kf-pok_newg { background:#16302a; box-shadow:inset 3px 0 0 #4cc38a; }
+html[data-theme="dark"] .kgroup .kf.kf-pok_old, html[data-theme="dark"] .kgroup .kf.kf-pok_oldg { background:#1a2c47; box-shadow:inset 3px 0 0 #4d94ee; }

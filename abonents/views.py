@@ -241,12 +241,20 @@ def _card_context(request, p, tab_key, form=None):
         title, groups = "Схема договора", []
         korni, dog, glav_ab = sh.postroit(p)
         shema = {"korni": korni, "dog": dog, "glav_ab": glav_ab}
+    gruppy = [(g, _items(p, fields, related, form, lookups)) for g, fields in groups]
+    kolonki = None
+    if tab_key in layout.KOLONKI:
+        po_imeni = dict(gruppy)
+        kolonki = [[(t, po_imeni[t]) for t in kol if t in po_imeni] for kol in layout.KOLONKI[tab_key]]
+        razlozheny = {t for kol in layout.KOLONKI[tab_key] for t in kol}
+        kolonki[-1] += [g for g in gruppy if g[0] not in razlozheny]
     return {
         "p": p,
         "shema": shema,
+        "kolonki": kolonki,
         "otkluchen": p.d_stat in layout.OTKLUCHEN,
         "header": _items(p, layout.HEADER, related, form, lookups),
-        "groups": [(g, _items(p, fields, related, form, lookups)) for g, fields in groups],
+        "groups": gruppy,
         "tabs": [(k, t) for k, t, _ in layout.TABS] + ([(SHEMA, "Схема")] if form is None else []),
         "tab": tab_key, "tab_title": title,
         "tab_url": reverse("abonents:edit" if form is not None else "abonents:karta", args=[p.potreb_id]),
@@ -259,6 +267,7 @@ def _card_context(request, p, tab_key, form=None):
         "can_change": request.user.has_perm("catalogs.change_potreb"),
         "can_delete": request.user.has_perm("catalogs.delete_potreb"),
         "pokazaniya": POKAZANIYA,
+        "pokaz_vydel": ("pok_new", "pok_old", "pok_newg", "pok_oldg"),
         # Кнопка «информация о приборе учёта» у показаний предыдущих, как в старой программе.
         "pribor_info": form is None and tab_key == "otop" and request.user.has_perm("catalogs.view_spteplosch"),
         "teplosch": SpTeplosch.objects.filter(ln=p.potreb_id).order_by("pk").first()
