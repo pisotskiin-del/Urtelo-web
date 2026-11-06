@@ -1554,3 +1554,100 @@ class VedomostiTests(KartaBase):
             r = self.client.get(reverse("abonents:otchet", args=[key]) + "?gorod=1")
             self.assertEqual(r.status_code, 200, key)
         self.assertContains(self.client.get(reverse("abonents:otchety")), "Ведомости, реестры")
+
+
+class ProsmotrTests(KartaBase):
+    """Просмотр закрытого месяца: данные архива, правка запрещена."""
+
+    def setUp(self):
+        super().setUp()
+        from abonents import nov_mes
+        Danrasch.objects.update(nom_mes=10, name_mes="Октябрь", god=2026)
+        Potreb.objects.filter(potreb_id__in=[5, 7, 9]).update(d_stat=60)
+        Potreb.objects.filter(potreb_id=5).update(nac_vsego=Decimal("10.5"), pok_new=Decimal("12.5"),
+                                                  glav_potre="Магазин в октябре")
+        nov_mes.run("тест")                       # закрыт октябрь, теперь ноябрь
+        Potreb.objects.filter(potreb_id=5).update(glav_potre="Магазин в ноябре", nac_vsego=Decimal("1"))
+        Potreb.objects.create(potreb_id=13, nom_dog=6, name_potre="Новый в ноябре", cod_gor=self.ryb, d_stat=60)
+        self.login("Администратор")
+
+    def open(self, mes="2026-10"):
+        return self.client.get("/abonents/mesyac/", {"mes": mes, "next": "/abonents/5/"}, follow=True)
+
+    def test_selector_lists_closed_months(self):
+        response = self.client.get("/abonents/")
+        self.assertContains(response, 'value="2026-10"')
+        self.assertContains(response, "Октябрь 2026 — архив")
+        self.assertNotContains(response, "только просмотр")
+
+    def test_card_from_archive_without_edit_buttons(self):
+        response = self.open()
+        self.assertEqual(response.redirect_chain[-1][0], "/abonents/5/")
+        self.assertContains(response, "Магазин в октябре")
+        self.assertNotContains(response, "Магазин в ноябре")
+        self.assertContains(response, "только просмотр")
+        self.assertNotContains(response, "/abonents/5/edit/")
+        self.assertNotContains(response, "/abonents/5/delete/")
+        self.assertNotContains(response, 'name="znach"')
+        self.assertContains(response, "mes=2026-10")   # счёт и акт — за просматриваемый месяц
+        # Абонента, добавленного после закрытия месяца, в архиве нет.
+        response = self.client.get("/abonents/13/", follow=True)
+        self.assertContains(response, "в архиве за октябрь 2026 нет")
+
+    def test_list_and_contract_from_archive(self):
+        self.open()
+        response = self.client.get("/abonents/", {"gorod": 1})
+        self.assertContains(response, "Магазин в октябре")
+        self.assertNotContains(response, "Новый в ноябре")
+        response = self.client.get("/abonents/dogovor/1/6/")
+        self.assertContains(response, "10,5")
+        self.assertNotContains(response, "Новый в ноябре")
+        response = self.client.get("/abonents/raschet/itog/")
+        self.assertContains(response, "12,500")   # 10,5 + 2 — начислено в октябре
+
+    def test_nothing_can_be_changed(self):
+        self.open()
+        response = self.client.post("/abonents/5/pokazanie/pok_new/", {"znach": "99", "tab": "otop"}, follow=True)
+        self.assertContains(response, "только просмотр")
+        self.assertEqual(Potreb.objects.get(potreb_id=5).pok_new, Decimal("12.5"))
+        self.client.post("/abonents/5/edit/?tab=ishod", {"name_potre": "Другое"})
+        self.client.post("/abonents/5/delete/")
+        self.assertTrue(Potreb.objects.filter(potreb_id=5, name_potre='ООО "Крипс"').exists())
+        self.client.post("/abonents/nov-mes/", {"ready": "1"})
+        self.assertEqual(Danrasch.objects.first().nom_mes, 11)
+        self.client.post("/abonents/raschet/")
+        self.assertEqual(Potreb.objects.get(potreb_id=5).nac_vsego, Decimal("1"))
+        response = self.client.get("/abonents/5/edit/", follow=True)
+        self.assertEqual(response.redirect_chain[-1][0], "/abonents/5/")
+        response = self.client.get("/abonents/new/", follow=True)
+        self.assertEqual(response.redirect_chain[-1][0], "/abonents/")
+
+    def test_back_to_current_month(self):
+        self.open()
+        response = self.client.get("/abonents/mesyac/", {"mes": "", "next": "/abonents/5/"}, follow=True)
+        self.assertContains(response, "Магазин в ноябре")
+        self.assertNotContains(response, "только просмотр")
+        response = self.client.post("/abonents/5/pokazanie/pok_new/", {"znach": "20", "tab": "otop"})
+        self.assertEqual(Potreb.objects.get(potreb_id=5).pok_new, Decimal("20"))
+
+    def test_unknown_month_and_undone_month(self):
+        from abonents import nov_mes
+        response = self.open("2020-01")
+        self.assertContains(response, "нет в архиве")
+        self.open()
+        nov_mes.undo()                           # месяц убрали из архива — снова текущий
+        response = self.client.get("/abonents/5/")
+        self.assertNotContains(response, "только просмотр")
+
+    def test_other_pages_open_in_archive(self):
+        self.open()
+        for url in ["/abonents/raschet/", "/abonents/raschet/dannye/", "/abonents/nov-mes/",
+                    "/abonents/raschet/itog/rasshifr/?gorod=1&pole=nac_vsego", "/abonents/dogovor/1/6/schet/",
+                    "/abonents/dokumenty/", "/abonents/otchety/", "/abonents/otchety/ot_kateg/",
+                    "/abonents/otchety/arh_ras_ab/?ls=5", "/abonents/5/?tab=otop", "/catalogs/"]:
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200, url)
+            self.assertContains(response, "только просмотр")
+        self.assertContains(self.client.get("/abonents/raschet/itog/rasshifr/?gorod=1&pole=nac_vsego"), "за Октябрь 2026")
+        self.assertContains(self.client.get("/abonents/otchety/ot_kateg/"), "строится по текущим данным")
+        self.assertNotContains(self.client.get("/abonents/raschet/dannye/"), "Сохранить")

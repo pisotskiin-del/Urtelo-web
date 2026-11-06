@@ -510,3 +510,15 @@ table.dok-signs td { width:50%; vertical-align:top; padding:0 12px 0 0; }
 /* Реестр писем: кнопка «Отозвать» под статусом КРЭДО */
 form.otozvat { margin-top:4px; }
 form.otozvat .button { height:26px; padding:0 10px; font-size:12px; }
+
+/* Просмотр закрытого месяца (только просмотр) */
+.mes-vybor { display:flex; flex-direction:column; gap:2px; }
+.mes-vybor select { background:rgba(255,255,255,.12); color:#fff; border:1px solid rgba(255,255,255,.3); border-radius:6px;
+  font-size:15px; font-weight:600; padding:3px 6px; max-width:280px; min-height:0; height:auto; }
+.mes-vybor select option { color:var(--text); background:#fff; }
+.topmes.arh select { background:#f5b83d; color:#3b2600; border-color:#f5b83d; }
+.topmes.arh small { color:#ffd88a; }
+.prosmotr-bar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:10px 14px; margin-bottom:12px;
+  border-radius:var(--radius-sm); background:#fff4d6; border:1px solid #f0d08a; color:#5a3d00; }
+.prosmotr-bar svg { width:18px; height:18px; flex:none; }
+.prosmotr-bar span { flex:1; min-width:200px; }

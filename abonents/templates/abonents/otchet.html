@@ -21,6 +21,7 @@
     </select>{% endif %}</label>
   {% endfor %}
 </form>
+{% if tekushchie %}<p class="msg warning">Этот отчет строится по текущим данным ({{ raschet_mes }}), а не за {{ prosmotr.nazvanie }}. За закрытые месяцы — отчеты раздела «Архив (за период)».</p>{% endif %}
 </div>
 
 {% include "abonents/_report.html" %}

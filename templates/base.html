@@ -18,7 +18,16 @@
   <a class="brand" href="{% url 'abonents:index' %}"><img class="brand-logo" src="{% static 'img/logo.png' %}" alt="ГУП «Тирастеплоэнерго»">
     <span class="bt"><b>Система расчётов</b><small>с юридическими потребителями</small></span></a>
   {% if user.is_authenticated %}
-  <div class="topmes">{% if raschet_mes %}<small>Расчетный месяц</small><b>{{ raschet_mes }}</b>{% endif %}</div>
+  <div class="topmes{% if prosmotr %} arh{% endif %}">
+    {% if mesyacy_arhiv %}<form method="get" action="{% url 'abonents:prosmotr' %}" class="mes-vybor">
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <small>{% if prosmotr %}Закрытый месяц · только просмотр{% else %}Расчетный месяц{% endif %}</small>
+      <select name="mes" onchange="this.form.submit()" title="Выбрать месяц: текущий или закрытый, для просмотра">
+        <option value="">{{ raschet_mes|default:"текущий" }} — текущий</option>
+        {% for k, t in mesyacy_arhiv %}<option value="{{ k }}"{% if k == prosmotr_mes %} selected{% endif %}>{{ t|capfirst }} — архив</option>{% endfor %}
+      </select>
+    </form>{% elif raschet_mes %}<small>Расчетный месяц</small><b>{{ raschet_mes }}</b>{% endif %}
+  </div>
   <div class="user">
     <span class="ava">{% icon "user" %}</span>
     <span class="who">{{ user.get_full_name|default:user.username }}{% if user_roles %}<small>{{ user_roles|join:", " }}</small>{% endif %}</span>
@@ -31,7 +40,7 @@
 {% with app=request.resolver_match.app_name url=request.resolver_match.url_name %}
 <nav class="sidebar">
   {% if perms.catalogs.view_potreb %}<a href="{% url 'abonents:index' %}" title="Абоненты" {% if app == "abonents" and url != "raschet" and url != "raschet_itog" and url != "kredo" and url != "kredo_priem" and url != "kredo_kody" and url != "kredo_kod" and url != "dan_rasch" and url != "nov_mes" and url != "otchety" and url != "otchet" and url != "new" %}class="active"{% endif %}>{% icon "users" %}<span class="t">Абоненты</span></a>
-  {% if perms.catalogs.add_potreb %}<a href="{% url 'abonents:new' %}" title="Новый абонент" {% if url == "new" %}class="active"{% endif %}>{% icon "plus" %}<span class="t">Новый абонент</span></a>{% endif %}
+  {% if perms.catalogs.add_potreb and not prosmotr %}<a href="{% url 'abonents:new' %}" title="Новый абонент" {% if url == "new" %}class="active"{% endif %}>{% icon "plus" %}<span class="t">Новый абонент</span></a>{% endif %}
   <a href="{% url 'abonents:raschet' %}" title="Расчет" {% if url == "raschet" or url == "raschet_itog" %}class="active"{% endif %}>{% icon "calc" %}<span class="t">Расчет</span></a>
   <a href="{% url 'abonents:dan_rasch' %}" title="Исходные данные для расчета" {% if url == "dan_rasch" %}class="active"{% endif %}>{% icon "sliders" %}<span class="t">Исходные данные</span></a>
   <a href="{% url 'abonents:nov_mes' %}" title="Переход на новый месяц" {% if url == "nov_mes" %}class="active"{% endif %}>{% icon "calendar" %}<span class="t">Новый месяц</span></a>
@@ -49,6 +58,8 @@
 {% endwith %}
 {% endif %}
 <main>
+  {% if prosmotr %}<div class="prosmotr-bar">{% icon "calendar" %} <span>Вы смотрите закрытый месяц <b>{{ prosmotr.nazvanie }}</b> — только просмотр, изменить ничего нельзя.</span>
+    <a class="button" href="{% url 'abonents:prosmotr' %}?mes=&amp;next={{ request.get_full_path|urlencode }}">Вернуться в текущий месяц</a></div>{% endif %}
   {% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
   {% block content %}{% endblock %}
 </main>

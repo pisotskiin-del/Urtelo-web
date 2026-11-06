@@ -28,7 +28,7 @@
 <nav class="tabs karta-tabs">
   {% for key, title in tabs %}<a href="{{ tab_url }}?tab={{ key }}" {% if key == tab %}class="active"{% endif %}>{% tab_icon key %} {{ title }}</a>{% endfor %}
 </nav>
-{% if not form %}{% if tab == "otop" %}<div class="tabtools"><a class="button" href="{% url 'abonents:poteri' p.potreb_id %}">{% icon "gauge" %} Диаметр/длина для расч. потерь</a>
+{% if not form and not prosmotr %}{% if tab == "otop" %}<div class="tabtools"><a class="button" href="{% url 'abonents:poteri' p.potreb_id %}">{% icon "gauge" %} Диаметр/длина для расч. потерь</a>
   {% if can_change %}<details class="add-pop"><summary class="button">{% icon "plus" %} Присоединённый объект</summary>
     <form method="post" action="{% url 'abonents:prisoed' p.potreb_id %}" class="card">{% csrf_token %}
       <label>Что присоединяется <select name="kind">{% for k, label in prisoed_kinds %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select></label>

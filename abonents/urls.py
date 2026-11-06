@@ -7,6 +7,7 @@ app_name = "abonents"
 urlpatterns = [
     path("", views.index, name="index"),
     path("new/", views.nov_abonent, name="new"),
+    path("mesyac/", views.prosmotr_view, name="prosmotr"),
     path("raschet/", views.raschet_view, name="raschet"),
     path("raschet/itog/", views.raschet_itog, name="raschet_itog"),
     path("raschet/itog/rasshifr/", views.raschet_rasshifr, name="raschet_rasshifr"),
