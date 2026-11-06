@@ -511,6 +511,351 @@ table.dok-signs td { width:50%; vertical-align:top; padding:0 12px 0 0; }
 form.otozvat { margin-top:4px; }
 form.otozvat .button { height:26px; padding:0 10px; font-size:12px; }
 
+/* Таблица справочника: длинные заголовки столбцов переносятся. */
+.grid.katalog th { white-space:normal; vertical-align:bottom; min-width:6em; }
+
+/* Кнопка темы в шапке */
+.user button.tema { background:none; border:0; min-height:0; padding:7px; border-radius:8px; color:#dbe7f7; }
+.user button.tema:hover { background:rgba(255,255,255,.1); color:#fff; }
+.user button.tema .i { width:20px; height:20px; }
+.user button.tema .t-light, html[data-theme="dark"] .user button.tema .t-dark { display:none; }
+html[data-theme="dark"] .user button.tema .t-light { display:inline; }
+
+/* Тёмная тема (кнопка-луна в шапке; запоминается в браузере). Только на экране:
+   печать и PDF остаются светлыми. Бланки документов (.dok) — белые, как бумага. */
+@media screen {
+html[data-theme="dark"] {
+  color-scheme:dark;
+  --bg:#0f1622; --card:#172131; --text:#e3e9f2; --muted:#93a0b4; --line:#263246; --line-strong:#34425a;
+  --accent:#4d94ee; --accent-weak:#1a2c47; --accent-text:#8bbaf5;
+  --danger:#f0716c; --danger-weak:#3a1d1f; --ok:#4cc38a; --ok-weak:#16302a;
+  --warn:#e9a84a; --warn-weak:#352a17; --off:#7c8698; --off-weak:#1f2836;
+  --navy:#0c1a30; --navy-2:#11264a; --navy-3:#173160;
+}
+html[data-theme="dark"] input, html[data-theme="dark"] select, html[data-theme="dark"] textarea,
+html[data-theme="dark"] button:not(.link):not(.burger):not(.collapse):not(.tema), html[data-theme="dark"] .button, html[data-theme="dark"] kbd, html[data-theme="dark"] .pager a,
+html[data-theme="dark"] .navbtns, html[data-theme="dark"] .danger, html[data-theme="dark"] .chip,
+html[data-theme="dark"] .seg button, html[data-theme="dark"] .tabs.karta-tabs a { background:#1b2638; color:var(--text); }
+html[data-theme="dark"] input:hover, html[data-theme="dark"] select:hover, html[data-theme="dark"] textarea:hover { border-color:#4a5a75; }
+html[data-theme="dark"] button:not(.link):not(.burger):not(.collapse):not(.tema):hover, html[data-theme="dark"] .button:hover, html[data-theme="dark"] .pager a:hover,
+html[data-theme="dark"] .seg button:hover { background:#233149; }
+html[data-theme="dark"] .button.off:hover { background:#1b2638; }
+html[data-theme="dark"] .primary, html[data-theme="dark"] .tabs.karta-tabs a.active,
+html[data-theme="dark"] .toolbar .tabs a.active { background:var(--accent); border-color:var(--accent); color:#fff !important; }
+html[data-theme="dark"] .primary:hover { background:#3a82dd; }
+html[data-theme="dark"] .danger { border-color:#5a2a2a; color:var(--danger) !important; }
+html[data-theme="dark"] .seg button { border-color:#34425a; }
+html[data-theme="dark"] .seg button.on { background:linear-gradient(#3f7fcc, #2a5fa3); color:#fff; }
+html[data-theme="dark"] .actions.sticky { background:rgba(15,22,34,.92); }
+html[data-theme="dark"] .msg { color:#bfe8d2; border-color:#245040; }
+html[data-theme="dark"] .msg.error, html[data-theme="dark"] .msg.warning { color:#f6c4c1; border-color:#5a2a2a; }
+html[data-theme="dark"] .chip.off, html[data-theme="dark"] .karta-head.otkl .kv { color:#9aa3b2; }
+html[data-theme="dark"] .card, html[data-theme="dark"] .scroll { border-color:var(--line); box-shadow:none; }
+html[data-theme="dark"] .grid th, html[data-theme="dark"] .grid tfoot th { background:#1c2739; color:#b8c4d6; border-bottom-color:var(--line); }
+html[data-theme="dark"] .grid th a { color:#b8c4d6; }
+html[data-theme="dark"] .grid tbody tr:nth-child(even) td { background:#192334; }
+html[data-theme="dark"] tr.clickable:hover td, html[data-theme="dark"] .grid tbody tr.clickable:hover td { background:#1f3150; }
+html[data-theme="dark"] .grid tr.current td { background:#3a3218; }
+html[data-theme="dark"] .grid tr.otkl td, html[data-theme="dark"] .karta-head.otkl, html[data-theme="dark"] .hero.otkl { background:#1a2130; }
+html[data-theme="dark"] .grid tr.otkl:hover td { background:#212a3b; }
+html[data-theme="dark"] .tabs { border-bottom-color:var(--line); }
+html[data-theme="dark"] .tabs a { color:#b8c4d6; }
+html[data-theme="dark"] .tabs a.active { color:var(--text); background:#1b2638; }
+html[data-theme="dark"] .toolbar .tabs { background:#1b2638; }
+html[data-theme="dark"] .tabs a .i, html[data-theme="dark"] .hero dt .i { color:#8794a8; }
+html[data-theme="dark"] .kgroup h2, html[data-theme="dark"] .kgroup .kf, html[data-theme="dark"] .kf, html[data-theme="dark"] .plist li,
+html[data-theme="dark"] .hero > div + div, html[data-theme="dark"] .hero .nums > div, html[data-theme="dark"] .hero .links { border-color:var(--line); }
+html[data-theme="dark"] .kgroup .kf:nth-child(odd) { background:#1a2435; }
+html[data-theme="dark"] .kgroup .kl, html[data-theme="dark"] .hero .nums small, html[data-theme="dark"] .hero dt { color:#a3afc2; }
+html[data-theme="dark"] .hero .avatar { background:#1f3150; }
+html[data-theme="dark"] .hero.otkl .avatar { background:#222b3a; }
+html[data-theme="dark"] .gsearch input { background:#1b2638; color:var(--text); }
+html[data-theme="dark"] .rep-list li a:hover { background:#1f2b40; }
+html[data-theme="dark"] .nm-warn { background:#332914; color:#f0d9a6; }
+html[data-theme="dark"] table.rep tr.sec td { background:#1f2d45; color:#cfe0f7; }
+html[data-theme="dark"] table.rep tr.foot td { background:#1a2435; }
+html[data-theme="dark"] table.rep tr.total td { background:#22324d; }
+html[data-theme="dark"] table.rep tr.mark td { background:#253a5a; }
+html[data-theme="dark"] .err { color:#ff8a80; }
+html[data-theme="dark"] .kv .pok-inline input:focus { background:#1b2638; }
+html[data-theme="dark"] dialog.confirm { background:var(--card); color:var(--text); }
+html[data-theme="dark"] .dok, html[data-theme="dark"] .dok * { color:#000; }
+html[data-theme="dark"] .dok input, html[data-theme="dark"] .dok select { background:#fff; color:#000; }
+html[data-theme="dark"] .add-pop > form { background:var(--card); }
+}
+
+/* Карточка абонента: заголовок с кнопками и поиск остаются вверху при прокрутке. */
+.karta-top { position:sticky; top:var(--topbar); z-index:15; background:var(--bg, #f3f5f8); margin:-16px -22px 12px; padding:12px 22px 10px;
+  border-bottom:1px solid var(--line); }
+.karta-top .page-head { margin-bottom:8px; }
+.karta-poisk { flex:none; }
+html[data-theme="dark"] .karta-top { background:var(--bg); }
+@media print { .karta-top { position:static; margin:0; padding:0; border:0; } .karta-poisk { display:none; } }
+
+/* Схема договора (вкладка «Схема» карточки): дерево сверху вниз. */
+.shema-card { padding:16px; }
+.shema-leg { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; font-size:12px; margin:0 0 12px; }
+.shema-leg .lg { display:inline-flex; align-items:center; gap:6px; }
+.shema-leg .lg::before { content:""; width:14px; height:14px; border-radius:4px; border:2px solid var(--line-strong); background:var(--card); }
+.shema-leg .lg.sp-pribor::before { border-color:#2f7de1; } .shema-leg .lg.sp-nagruzka::before { border-color:#e08a1e; }
+.shema-leg .lg.sp-oba::before { border-color:#8b5cf6; } .shema-leg .lg.tek::before { background:#fff7d6; border-color:#e2b400; }
+.shema-leg .lg.otkl::before { border-style:dashed; opacity:.6; }
+.shema-scroll { overflow:auto; padding-bottom:8px; }
+.shema-scroll > .shema { width:max-content; min-width:100%; }
+.shema, .shema ul { list-style:none; margin:0; padding:0; display:flex; justify-content:center; }
+.shema ul { padding-top:22px; position:relative; }
+.shema li { position:relative; padding:22px 6px 0; display:flex; flex-direction:column; align-items:center; }
+.shema > li { padding-top:0; }
+/* соединительные линии */
+.shema li::before, .shema li::after { content:""; position:absolute; top:0; width:50%; height:22px; border-top:2px solid var(--line-strong); }
+.shema li::before { right:50%; } .shema li::after { left:50%; border-left:2px solid var(--line-strong); }
+.shema li:only-child::before, .shema li:only-child::after { border-top:0; }
+.shema li:only-child { padding-top:22px; }
+.shema li:first-child::before, .shema li:last-child::after { border-top:0; }
+.shema li:last-child::before { border-right:2px solid var(--line-strong); border-radius:0 6px 0 0; }
+.shema li:first-child::after { border-radius:6px 0 0 0; }
+.shema > li::before, .shema > li::after { display:none; }
+.shema ul::before { content:""; position:absolute; top:0; left:50%; height:22px; border-left:2px solid var(--line-strong); }
+.shema li:only-child::after { border-left:2px solid var(--line-strong); left:50%; width:0; }
+.uzel { min-width:170px; max-width:230px; background:var(--card); border:2px solid var(--line-strong); border-radius:10px; padding:8px 10px;
+  font-size:12px; line-height:1.35; box-shadow:0 1px 2px rgba(16,24,40,.06); text-align:left; }
+.uzel.koren { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; font-size:14px; text-align:center; }
+.uzel.koren .u-name { color:#e6efff; font-weight:400; font-size:12px; }
+.uzel.sp-pribor { border-color:#2f7de1; } .uzel.sp-nagruzka { border-color:#e08a1e; } .uzel.sp-oba { border-color:#8b5cf6; }
+.uzel { position:relative; }
+.uzel.abon { background:#e3eeff; }
+.shema-leg .lg.abon::before { background:#e3eeff; }
+.shema-leg .lg-schet { display:inline-flex; align-items:center; gap:6px; }
+.shema-leg .lg-schet .i { width:16px; height:16px; stroke-width:2.4; } .uzel .u-schet .i { width:17px; height:17px; stroke-width:2.4; }
+.uzel .u-schet { position:absolute; top:-13px; right:-13px; width:28px; height:28px; border-radius:50%; display:flex;
+  align-items:center; justify-content:center; background:#2f7de1; color:#fff; box-shadow:0 0 0 2px var(--card); }
+.shema-leg .lg-schet { color:#2f7de1; }
+.uzel.tek { background:#fff7d6; box-shadow:0 0 0 3px rgba(226,180,0,.35); }
+.uzel.otkl { border-style:dashed; opacity:.65; }
+.uzel .svyaz { font-size:11px; color:var(--muted); border-bottom:1px dashed var(--line); margin:-2px 0 5px; padding-bottom:4px; }
+.uzel .u-top { display:flex; flex-wrap:wrap; gap:4px 6px; align-items:center; }
+.uzel .u-ls { font-weight:700; } .uzel .u-pr { color:var(--muted); }
+.uzel .u-name { font-weight:500; margin:2px 0; }
+.uzel .u-sp { color:var(--muted); }
+.uzel .u-nach { margin-top:3px; }
+html[data-theme="dark"] .uzel.tek { background:#3a3210; }
+html[data-theme="dark"] .uzel.abon, html[data-theme="dark"] .shema-leg .lg.abon::before { background:#1c2f52; }
+
+/* Подтверждение изменения показания рядом с галочкой (карточка). */
+.podtv { position:absolute; z-index:60; min-width:220px; max-width:320px; background:var(--card); color:var(--text);
+  border:1px solid var(--line-strong); border-radius:var(--radius); padding:12px 14px;
+  box-shadow:0 10px 30px rgba(16,24,40,.18), 0 2px 6px rgba(16,24,40,.08); animation:podtv-in .12s ease-out; }
+.podtv::before { content:""; position:absolute; top:-7px; left:var(--ugol, 50%); width:12px; height:12px; margin-left:-6px;
+  background:var(--card); border-left:1px solid var(--line-strong); border-top:1px solid var(--line-strong); transform:rotate(45deg); }
+.podtv.verh::before { top:auto; bottom:-7px; transform:rotate(225deg); }
+.podtv-z { font-weight:600; margin-bottom:8px; }
+.podtv-r { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-variant-numeric:tabular-nums; margin-bottom:12px; }
+.podtv-bylo { color:var(--muted); text-decoration:line-through; }
+.podtv-str { color:var(--muted); }
+.podtv-stalo { font-weight:700; color:var(--accent-text); background:var(--accent-weak); border-radius:6px; padding:1px 7px; }
+.podtv-b { display:flex; gap:8px; justify-content:flex-end; }
+@keyframes podtv-in { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
+.podtv-b .primary, html[data-theme="dark"] .podtv-b button.primary { background:var(--accent) !important; border-color:var(--accent); color:#fff; }
+/* Кнопка «информация о приборе учёта» у показаний предыдущих. */
+.pribor-info { margin-left:8px; width:26px; height:26px; padding:0; display:inline-flex; align-items:center; justify-content:center;
+  border-radius:50%; border:1px solid var(--line-strong); background:var(--card); color:var(--accent-text); vertical-align:middle; cursor:pointer; }
+.pribor-info:hover { background:var(--accent-weak); border-color:var(--accent); }
+.pribor-info .i { width:15px; height:15px; }
+.pribor-pop { min-width:300px; max-width:400px; }
+.pribor-pop .podtv-z { display:flex; align-items:center; gap:6px; }
+.pribor-pop .podtv-z .i { width:16px; height:16px; color:var(--accent-text); }
+.pribor-dl { display:grid; grid-template-columns:auto 1fr; gap:5px 12px; margin:0 0 12px; font-size:13px; }
+.pribor-dl dt { color:var(--muted); } .pribor-dl dd { margin:0; font-weight:500; }
+html[data-theme="dark"] .podtv-b a.button.primary { background:var(--accent) !important; color:#fff; }
+.chip.danger { background:var(--danger-weak); color:var(--danger); }
+/* Окна вкладки по колонкам (layout.KOLONKI). */
+.kgroups.kcols { columns:auto; display:grid; grid-template-columns:repeat(auto-fill, minmax(380px, 1fr)); gap:0 12px; align-items:start; }
+.kcols .kcol { min-width:0; }
+/* Строки показаний выделены цветом: настоящие — зелёным, предыдущие — синим. */
+.kgroup .kf.kf-pok_new, .kgroup .kf.kf-pok_newg { background:#e7f6ec; box-shadow:inset 3px 0 0 #2e9d5b; border-radius:6px; }
+.kgroup .kf.kf-pok_old, .kgroup .kf.kf-pok_oldg { background:#e8f1fd; box-shadow:inset 3px 0 0 #2f7de1; border-radius:6px; }
+.kgroup .kf.kf-pok_new .kl, .kgroup .kf.kf-pok_newg .kl, .kgroup .kf.kf-pok_old .kl, .kgroup .kf.kf-pok_oldg .kl { font-weight:600; }
+html[data-theme="dark"] .kgroup .kf.kf-pok_new, html[data-theme="dark"] .kgroup .kf.kf-pok_newg { background:#16302a; box-shadow:inset 3px 0 0 #4cc38a; }
+html[data-theme="dark"] .kgroup .kf.kf-pok_old, html[data-theme="dark"] .kgroup .kf.kf-pok_oldg { background:#1a2c47; box-shadow:inset 3px 0 0 #4d94ee; }
+.kv .pok-inline { width:auto; flex:1 1 0; min-width:90px; }  /* единица измерения — в той же строке */
+
+/* «Полезный отпуск» — оформление как в старом отчете polez_otpusk.frx: серая
+   шапка, тёмно-серые колонки «Всего…», жирные итоги по городам, серый блок
+   «Итого по филиалу» крупнее. */
+.rep-polez .rep-head h2 { font-size:20px; letter-spacing:.02em; }
+.rep-polez table.rep { --pz-sv:#d9d9d9; --pz-tm:#bfbfbf; --pz-itog:#e8e8e8; --pz-tarif:#e2e2e2; --pz-line:#9aa3ad; color:#000; }
+/* Вертикальные линии между колонками и на экране, как в печатной форме. */
+@media screen {
+  .rep-polez table.rep th, .rep-polez table.rep td { border-right:1px solid var(--pz-line); }
+  .rep-polez table.rep th { border-bottom:1px solid var(--pz-line); }
+  .rep-polez table.rep th:first-child, .rep-polez table.rep td:first-child { border-left:1px solid var(--pz-line); }
+  .rep-polez table.rep thead tr:last-child th { border-left:0; }
+}
+.rep-polez table.rep th { background:var(--pz-sv); color:#000; font-weight:700; text-align:center; vertical-align:middle; }
+.rep-polez table.rep thead tr:first-child th:nth-child(3), .rep-polez table.rep thead tr:first-child th:nth-child(4),
+.rep-polez table.rep thead tr:first-child th:nth-child(7), .rep-polez table.rep thead tr:first-child th:nth-child(8) { background:var(--pz-tm); }
+.rep-polez table.rep td { background:#fff; }
+.rep-polez table.rep tr.mark:not(.itog) td { background:var(--pz-tarif); font-weight:700; }
+.rep-polez table.rep tr.mark:not(.itog) td:first-child { background:var(--pz-sv); }
+.rep-polez table.rep tr.mark:not(.itog) td.vsego:nth-last-child(-n+2) { background:var(--pz-tm); }
+.rep-polez table.rep tr.foot td { font-weight:700; border-bottom:2px solid #000; }
+.rep-polez table.rep tr.itog td { background:var(--pz-itog); font-size:1.08em; }
+.rep-polez table.rep tr.itog td.vsego { background:var(--pz-tm); }
+.rep-polez table.rep tr.itog.foot td { font-size:1.15em; font-weight:700; }
+.rep-polez table.rep tbody tr:not(.foot):not(.mark) td:first-child { font-size:.9em; }
+@media print {
+  .rep-polez table.rep th, .rep-polez table.rep td { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .rep-polez table.rep tr.foot td { border-bottom:2px solid #000; }
+  .rep-polez table.rep tr.mark td { height:auto; }
+}
+html[data-theme="dark"] .rep-polez table.rep { --pz-sv:#2a3446; --pz-tm:#364257; --pz-itog:#222c3c; --pz-tarif:#253041; --pz-line:#3e4b62; color:var(--text); }
+html[data-theme="dark"] .rep-polez table.rep th { color:var(--text); }
+html[data-theme="dark"] .rep-polez table.rep td { background:var(--card); }
+html[data-theme="dark"] .rep-polez table.rep tr.foot td { border-bottom-color:var(--line-strong); }
+.rep-polez .rep-head h2 { color:#000; } .rep-polez .rep-sign { margin-top:40px; }
+html[data-theme="dark"] .rep-polez .rep-head h2 { color:var(--text); }
+/* Узкая текстовая колонка отчета (Акцепт: А, БА, С) — по содержимому, без переноса;
+   ширина остаётся наименованию абонента. */
+table.rep td.uzk, table.rep th.uzk { min-width:0; width:1%; white-space:nowrap; text-align:center; }
+/* Числа отчета не переносятся («2 433,260» в одну строку). */
+table.rep td.num { white-space:nowrap; }
+
+/* Отчет по группам (как OT_KATEG старой программы): у группы своя шапка с
+   рамкой, строки «зеброй» без вертикальных линий, «всего:» и «ИТОГО :» жирным. */
+.rep-gruppy { font-family:"Times New Roman", Times, serif; color:#000; }
+.rep-gruppy .rep-head { text-align:center; margin-bottom:14px; }
+.rep-gruppy .rep-head h2 { font-size:17px; font-weight:700; margin:0 0 4px; color:#000; }
+.rep-gruppy .rep-gorod { margin-left:8px; }
+.rep-gruppy .rep-head p { margin:0; font-weight:700; color:#000; }
+.rep-gr { margin:0 0 16px; page-break-inside:auto; }
+.rep-gr-z { margin:0 0 3px 36px; font-size:15px; }
+.rep-gr-z b { margin-left:18px; }
+.rep-gr-t { width:100%; border-collapse:collapse; table-layout:fixed; font-size:13px; }
+.rep-gr-t col:nth-child(1) { width:5%; } .rep-gr-t col:nth-child(2) { width:6.5%; } .rep-gr-t col:nth-child(3) { width:7%; }
+.rep-gr-t col:nth-child(5) { width:6.5%; } .rep-gr-t col:nth-child(6) { width:9%; } .rep-gr-t col:nth-child(7) { width:9.5%; }
+.rep-gr-t col:nth-child(8) { width:10.5%; }
+.rep-gr-t th { border:1px solid #000; font-weight:700; font-size:12.5px; line-height:1.15; padding:2px 3px; text-align:center;
+  vertical-align:middle; background:#fff; color:#000; }
+.rep-gr-t th:nth-child(4) { font-size:14px; }
+.rep-gr-t th.num { text-align:center; }
+.rep-gr-t td { padding:3px 4px; vertical-align:top; line-height:1.25; }
+.rep-gr-t td.num { text-align:right; white-space:nowrap; }
+.rep-gr-t td:nth-child(1) { text-align:center; }
+.rep-gr-t td.uzk { text-align:center; }
+.rep-gr-t tbody:first-of-type tr:nth-child(even) td { background:#c8c8c8; }
+.rep-gr-t tbody:first-of-type tr:last-child td { border-bottom:1px solid #000; }
+.rep-gr-t tr { page-break-inside:avoid; }
+.rep-gr-vsego td { padding-top:5px; font-weight:700; }
+.rep-gr-vsego td:nth-child(4) { text-align:center; font-weight:400; font-size:14px; }
+.rep-gr-vsego td:nth-child(4) b { font-weight:700; }
+.rep-gr-itogo { margin-top:14px; }
+.rep-gr-itogo td { font-weight:700; }
+/* «ИТОГО :» шире узкой колонки «Акцепт» — выступает влево, не переносясь. */
+.rep-gr-itogo td.uzk { position:relative; }
+.rep-gr-itogo td.uzk span { position:absolute; right:4px; top:3px; white-space:nowrap; }
+.rep-gruppy .rep-sign { margin-top:40px; font-size:13px; }
+.rep-gruppy .rep-sign p { margin:14px 0; font-weight:700; }
+@media print {
+  .rep-gruppy { padding:0; }
+  .rep-gr-t { font-size:9.5pt; }
+  .rep-gr-t th { font-size:9pt; } .rep-gr-t th:nth-child(4) { font-size:10pt; }
+  .rep-gr-t td { padding:2px 3px; }
+  .rep-gr-t th, .rep-gr-t td { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .rep-gr-z { font-size:11pt; }
+  .rep-gruppy .rep-head h2 { font-size:13pt; }
+}
+html[data-theme="dark"] .rep-gruppy, html[data-theme="dark"] .rep-gruppy .rep-head h2, html[data-theme="dark"] .rep-gruppy .rep-head p { color:var(--text); }
+html[data-theme="dark"] .rep-gr-t th { background:var(--card); color:var(--text); border-color:var(--line-strong); }
+html[data-theme="dark"] .rep-gr-t tbody:first-of-type tr:nth-child(even) td { background:#222c3c; }
+html[data-theme="dark"] .rep-gr-t tbody:first-of-type tr:last-child td { border-bottom-color:var(--line-strong); }
+.rep-gr-itogo tbody tr:last-child td { border-bottom:0; background:none; }
+/* «Расшифровка по министерствам» (OT_MINIST): название министерства по центру,
+   «всего: …» слева под таблицей. */
+.rep-gr-z.rep-gr-centr { margin:0 0 2px; text-align:center; font-weight:700; font-size:15px; }
+.rep-gr-vsego-l td:first-child { text-align:left !important; font-weight:400 !important; font-size:14px; padding-left:8px; }
+.rep-minist .rep-gr { margin-bottom:22px; }
+@media print { .rep-gr-z.rep-gr-centr { font-size:11pt; } .rep-gr-vsego-l td:first-child { font-size:10.5pt; } }
+.rep-gr-vsego-l td.num { font-weight:700; font-size:inherit; text-align:right; }
+.rep-gr-t.rep-gr-itogo td { border-bottom:0 !important; }
+
+/* «Потребление по котельным» — как старый p_kot1n.frx: серая шапка в три
+   яруса, сетка у всех клеток, мелкие числа, итог без рамки. */
+.rep-kot { font-family:"Times New Roman", Times, serif; color:#000; }
+.rep-kot .rep-head h2, .rep-kot .rep-head p { color:#000; }
+.rep-kot table.rep { border-collapse:collapse; width:100%; table-layout:fixed; }
+.rep-kot table.rep th { background:#c0c0c0; color:#000; border:1px solid #000; font-weight:400; font-size:12px;
+  text-transform:none; letter-spacing:0; text-align:center; vertical-align:middle; padding:2px 3px; line-height:1.15; }
+.rep-kot table.rep thead tr:first-child th:first-child { font-style:italic; font-size:15px; width:19%; }
+.rep-kot table.rep thead tr:first-child th:nth-child(2) { font-size:17px; }
+.rep-kot table.rep td { border:1px solid #000; font-size:11px; padding:2px 4px; background:#fff; color:#000; }
+.rep-kot table.rep td:first-child { font-size:14px; white-space:nowrap; min-width:0; }
+.rep-kot table.rep tr.total td { border:0; font-weight:400; background:none; font-size:11px; }
+.rep-kot table.rep tr.total td:first-child { color:transparent; }
+.rep-kot .rep-note { font-weight:700; margin:24px 0 0 50px; font-size:13px; }
+.rep-kot .rep-sign { margin:20px 0 0 70px; } .rep-kot .rep-sign p { font-weight:700; margin:14px 0; }
+@media print {
+  .rep-kot table.rep { border-collapse:collapse; border:0; table-layout:fixed; }
+  .rep-kot table.rep th, .rep-kot table.rep td { border:1px solid #000; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .rep-kot table.rep th { font-size:8pt; padding:1px 2px; }
+  .rep-kot table.rep thead tr:first-child th:first-child { font-size:10.5pt; }
+  .rep-kot table.rep thead tr:first-child th:nth-child(2) { font-size:12pt; }
+  .rep-kot table.rep td { font-size:7.5pt; padding:1px 3px; }
+  .rep-kot table.rep td:first-child { font-size:10pt; }
+  .rep-kot table.rep tr.total td { border:0; font-size:7.5pt; }
+  .rep-kot .rep-note { font-size:9pt; }
+}
+html[data-theme="dark"] .rep-kot, html[data-theme="dark"] .rep-kot .rep-head h2, html[data-theme="dark"] .rep-kot .rep-head p { color:var(--text); }
+html[data-theme="dark"] .rep-kot table.rep th { background:#2a3446; color:var(--text); border-color:var(--line-strong); }
+html[data-theme="dark"] .rep-kot table.rep td { background:var(--card); color:var(--text); border-color:var(--line-strong); }
+.rep-kot .scroll { overflow-x:auto; } .rep-kot table.rep { min-width:900px; }
+.rep-kot .scroll, .rep-kot table.rep, .rep-kot table.rep th { border-radius:0 !important; }
+
+/* Отчеты по приборам учета — как старый otch_potr_pribor.frx: Times, сетка,
+   белая шапка, «Приложение №2» справа, подпись с подстрочными пояснениями. */
+.rep-pribor { font-family:"Times New Roman", Times, serif; color:#000; }
+.rep-pribor .rep-approve { width:auto; text-align:right; font-size:13px; }
+.rep-pribor .rep-head h2 { font-size:16px; font-weight:400; text-transform:none; color:#000; margin:6px 0 4px; }
+.rep-pribor .rep-head p { font-size:16px; color:#000; }
+.rep-pribor table.rep { border-collapse:collapse; width:100%; table-layout:fixed; min-width:900px; border-radius:0; }
+.rep-pribor .scroll { border-radius:0; }
+.rep-pribor table.rep th { background:#fff; color:#000; border:1px solid #000; font-weight:400; font-size:12px; text-transform:none;
+  letter-spacing:0; text-align:center; vertical-align:middle; padding:2px 3px; line-height:1.2; border-radius:0 !important; position:static; }
+.rep-pribor table.rep td { border:1px solid #000; background:#fff; color:#000; font-size:12.5px; padding:2px 4px; vertical-align:top;
+  min-width:0; white-space:normal; }
+.rep-pribor table.rep td.num { white-space:nowrap; }
+.rep-pribor table.rep td:first-child { text-align:center; }
+.rep-pribor table.rep td:nth-child(5) { text-align:center; }
+.rep-pribor table.rep tbody tr:nth-child(even) td { background:#fff; }
+.rep-pribor table.rep thead tr:first-child th:nth-child(1) { width:3%; }
+.rep-pribor table.rep thead tr:first-child th:nth-child(2) { width:21%; }
+.rep-pribor table.rep thead tr:first-child th:nth-child(3) { width:14%; }
+.rep-pribor table.rep thead tr:first-child th:nth-child(4) { width:12%; }
+.rep-pribor table.rep thead tr:first-child th:nth-child(5) { width:4%; }
+.rep-pribor table.rep thead tr:first-child th:nth-child(6) { width:14%; }
+.rep-pribor table.rep thead tr:first-child th:nth-child(7) { width:7%; }
+.rep-priborg table.rep thead tr:first-child th:nth-child(4) { width:5%; }
+.rep-priborg table.rep thead tr:first-child th:nth-child(5) { width:16%; }
+.rep-priborg table.rep thead tr:first-child th:nth-child(6) { width:8%; }
+.rep-priborg table.rep td:nth-child(5) { text-align:right; } .rep-priborg table.rep td:nth-child(4) { text-align:center; }
+.rep-podpis { display:flex; align-items:flex-end; gap:40px; margin:30px 0 0 10px; font-size:13px; page-break-inside:avoid; }
+.rep-podpis small { display:block; font-size:7px; text-align:center; border-top:1px solid #000; margin-top:1px; padding-top:1px; }
+.rep-podpis .rp-dolj { width:330px; } .rep-podpis .rp-dolj span { display:block; }
+.rep-podpis .rp-mid { margin-left:auto; } .rep-podpis .rp-l { display:inline-block; width:95px; border-bottom:1px solid #000; }
+.rep-podpis .rp-l.rp-k { width:75px; }
+.rep-podpis .rp-fio { width:115px; margin-right:12%; text-align:center; } .rep-podpis .rp-fio span { font-size:15px; }
+@media print {
+  .rep-pribor table.rep { min-width:0; border:0; border-collapse:collapse; }
+  .rep-pribor table.rep th, .rep-pribor table.rep td { border:1px solid #000 !important; }
+  .rep-pribor table.rep th { font-size:8.5pt; } .rep-pribor table.rep td { font-size:9pt; padding:1px 3px; }
+  .rep-pribor .rep-head h2, .rep-pribor .rep-head p { font-size:11.5pt; }
+  .rep-pribor .rep-approve { font-size:9.5pt; }
+  .rep-podpis { font-size:9.5pt; }
+}
+html[data-theme="dark"] .rep-pribor, html[data-theme="dark"] .rep-pribor .rep-head h2, html[data-theme="dark"] .rep-pribor .rep-head p { color:var(--text); }
+html[data-theme="dark"] .rep-pribor table.rep th, html[data-theme="dark"] .rep-pribor table.rep td,
+html[data-theme="dark"] .rep-pribor table.rep tbody tr:nth-child(even) td { background:var(--card); color:var(--text); border-color:var(--line-strong); }
+html[data-theme="dark"] .rep-podpis small, html[data-theme="dark"] .rep-podpis .rp-l { border-color:var(--text); }
+
 /* Просмотр закрытого месяца (только просмотр) */
 .mes-vybor { display:flex; flex-direction:column; gap:2px; }
 .mes-vybor select { background:rgba(255,255,255,.12); color:#fff; border:1px solid rgba(255,255,255,.3); border-radius:6px;
@@ -522,3 +867,4 @@ form.otozvat .button { height:26px; padding:0 10px; font-size:12px; }
   border-radius:var(--radius-sm); background:#fff4d6; border:1px solid #f0d08a; color:#5a3d00; }
 .prosmotr-bar svg { width:18px; height:18px; flex:none; }
 .prosmotr-bar span { flex:1; min-width:200px; }
+html[data-theme="dark"] .prosmotr-bar { background:#3a2e10; border-color:#6b5420; color:#ffe2a0; }

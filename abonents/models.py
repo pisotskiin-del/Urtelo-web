@@ -228,6 +228,21 @@ class Pismo(models.Model):
         last = cls.objects.aggregate(m=models.Max("nomer"))["m"]
         return last + 1 if last else int(getattr(settings, "TEPLO_PISMO_NOMER", 1) or 1)
 
+    @classmethod
+    def zarezervirovat(cls, **polya):
+        """Создать запись реестра со следующим свободным номером. На сервере
+        документы могут отправлять одновременно несколько человек: если номер
+        уже занят другим, берётся следующий."""
+        from django.db import IntegrityError, transaction
+        polya.setdefault("oshibka", "Отправка не завершилась")
+        for _ in range(50):
+            try:
+                with transaction.atomic():
+                    return cls.objects.create(nomer=cls.sleduyushchij_nomer(), **polya)
+            except IntegrityError:
+                continue
+        raise RuntimeError("Не удалось получить номер документа в реестре писем")
+
 
 class KredoPriem(models.Model):
     """Полученные из КРЭДО показания приборов учёта (кнопки «Прием
@@ -292,3 +307,38 @@ class KredoOrg(models.Model):
 
     def __str__(self):
         return self.s_name
+
+
+class KredoPeredacha(models.Model):
+    """Передача в КРЭДО абонентов, договоров и точек потребления (Set_URAbon,
+    Set_URDogv, Set_URPotr) по договору из карты или по всему участку, приборов
+    учёта (Set_URDevice и справочники) и последних показаний (Set_URDeviceMeters).
+    Пакеты XML и ответы сервиса хранятся целиком."""
+
+    OK, OSHIBKA, PROVERKA = "ok", "oshibka", "proverka"
+    VIDY = [("dogovory", "Абоненты и договоры"), ("pribory", "Приборы учёта"), ("pokazaniya", "Последние показания")]
+
+    created = models.DateTimeField("Когда", auto_now_add=True)
+    vid = models.CharField("Что передано", max_length=10, default="dogovory", choices=VIDY)
+    itogo = models.CharField("Строк в пакетах", max_length=500, blank=True)
+    user = models.CharField("Кто", max_length=150, blank=True)
+    cod_gor = models.IntegerField("Участок")
+    nom_dog = models.IntegerField("Договор", null=True, blank=True, help_text="Пусто — весь участок")
+    proverka = models.BooleanField("Только проверка", default=False)
+    status = models.CharField("Результат", max_length=10, default=OSHIBKA,
+                              choices=[(OK, "Передано"), (OSHIBKA, "Ошибка"), (PROVERKA, "Проверка, не передавалось")])
+    abon = models.IntegerField("Абонентов", default=0)
+    dogv = models.IntegerField("Договоров", default=0)
+    potr = models.IntegerField("Точек потребления", default=0)
+    zamechaniya = models.TextField("Замечания", blank=True)
+    xml = models.TextField("Пакеты XML", blank=True)
+    otvet = models.TextField("Ответ сервиса", blank=True)
+    oshibka = models.TextField("Ошибка", blank=True)
+
+    class Meta:
+        verbose_name = "Передача договоров в КРЭДО"
+        verbose_name_plural = "Передачи договоров в КРЭДО"
+        ordering = ["-pk"]
+
+    def __str__(self):
+        return f"{self.created:%d.%m.%Y %H:%M} участок {self.cod_gor}" + (f", договор {self.nom_dog}" if self.nom_dog else "")

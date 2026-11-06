@@ -9,12 +9,12 @@ register = template.Library()
 # Иконки разделов карты абонента по заголовку блока.
 GROUP_ICONS = {
     "Способ расчёта": "sliders", "Потребление по прибору": "gauge",
-    "Потребление по присоединённой нагрузке": "thermo", "Итоги": "chart", "Лимит и прочее": "shield",
+    "Потребление по присоединённой нагрузке": "thermo", "Итоги": "chart", "Перерасчеты": "calc", "Лимит и прочее": "shield",
     "Присоединённые объекты": "link", "Договор": "file", "Справочники": "book", "Здание и нагрузка": "building",
     "Руководство": "user", "Адрес юридический": "pin", "Адрес объекта": "pin", "Связь": "phone", "Банк": "bank",
     "Свидетельство о гос. регистрации": "badge", "Данные для акта отпущенной тепловой энергии": "file",
 }
-TAB_ICONS = {"otop": "flame", "gvs": "drop", "ishod": "file"}
+TAB_ICONS = {"otop": "flame", "gvs": "drop", "ishod": "file", "shema": "link"}
 
 
 @register.simple_tag
@@ -66,6 +66,12 @@ def rcells(row, cols, links=None, index=None):
     if links is not None and index is not None:
         links = links[index] if index < len(links) else None
     return list(zip(row, cols, links or [None] * len(cols)))
+
+
+@register.filter
+def nerazryv(title):
+    """Заголовок колонки без переноса внутри «п/п» («№ п/ п»)."""
+    return str(title).replace("п/п", "п/\u2060п")
 
 
 @register.filter

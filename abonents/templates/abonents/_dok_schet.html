@@ -15,15 +15,15 @@
       <td class="num">{{ s.otopl|floatformat:3 }}</td><td class="num">{{ s.gvs|floatformat:3 }}</td><td class="num">{{ s.poteri|floatformat:3 }}</td>
       <td class="num">{{ s.gkal|floatformat:3 }}</td><td class="num">{{ s.tarif|floatformat:2 }}</td><td class="num">{{ s.itog_r|floatformat:2 }}</td></tr>
     {% endfor %}
-    <tr class="dok-sub"><td></td><td>Арифметическое отклонение</td><td colspan="5"></td><td class="num">{{ k.otklonenie|floatformat:2 }}</td></tr>
-    <tr class="dok-sub"><td></td><td>Всего: {{ k.name }}</td>
+    <tr class="dok-sub"><td>&nbsp;</td><td>Арифметическое отклонение</td><td colspan="5">&nbsp;</td><td class="num">{{ k.otklonenie|floatformat:2 }}</td></tr>
+    <tr class="dok-sub"><td>&nbsp;</td><td>Всего: {{ k.name }}</td>
       <td class="num">{{ k.otopl|floatformat:3 }}</td><td class="num">{{ k.gvs|floatformat:3 }}</td><td class="num">{{ k.poteri|floatformat:3 }}</td>
-      <td class="num">{{ k.gkal|floatformat:3 }}</td><td></td><td class="num">{{ k.itog|floatformat:2 }}</td></tr>
+      <td class="num">{{ k.gkal|floatformat:3 }}</td><td>&nbsp;</td><td class="num">{{ k.itog|floatformat:2 }}</td></tr>
   </tbody>
   {% endfor %}
-  <tfoot><tr><th></th><th class="left">ИТОГО:</th>
+  <tfoot><tr><th>&nbsp;</th><th class="left">ИТОГО:</th>
     <th class="num">{{ dok.otopl|floatformat:3 }}</th><th class="num">{{ dok.gvs|floatformat:3 }}</th><th class="num">{{ dok.poteri|floatformat:3 }}</th>
-    <th class="num">{{ dok.gkal|floatformat:3 }}</th><th></th><th class="num">{{ dok.itog|floatformat:2 }}</th></tr></tfoot>
+    <th class="num">{{ dok.gkal|floatformat:3 }}</th><th>&nbsp;</th><th class="num">{{ dok.itog|floatformat:2 }}</th></tr></tfoot>
 </table>
 <p class="dok-sign">{{ ved.0|default:"Ведущий специалист" }} СУиРТЭ МГУП "Тирастеплоэнерго" __________________ {{ ved.1 }}</p>
 <p class="dok-foot">Для получения консультаций обращайтесь в отдел учета и реализации тепловой энергии{% if isp.1 %}: исп. {{ isp.1 }}{% endif %}<br>

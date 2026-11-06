@@ -25,4 +25,6 @@
 </div>
 
 {% include "abonents/_report.html" %}
+{% if report.landscape %}{# Вся страница альбомная: иначе Chrome печатает альбомный лист повёрнутым на книжном. #}
+<style>@page { size:A4 landscape; margin:7mm 10mm; }</style>{% endif %}
 {% endblock %}

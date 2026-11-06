@@ -1,0 +1,13 @@
+{% load ui %}<template id="pribor-info-tpl"><div class="podtv pribor-pop" role="dialog" aria-label="Информация о приборе учёта">
+  <div class="podtv-z">{% icon "gauge" %} Прибор учёта л/№ {{ p.potreb_id }}</div>
+  {% if teplosch %}<dl class="pribor-dl">
+    <dt>Тип прибора</dt><dd>{{ teplosch.tip_prib|default:"—" }}</dd>
+    <dt>№ устройства</dt><dd>{{ teplosch.nomer_prib|default:"—" }}</dd>
+    <dt>Допущен в эксплуатацию</dt><dd>{{ teplosch.data_zapus|date:"d.m.Y"|default:"—" }}</dd>
+    <dt>Поверка</dt><dd>{% if teplosch.ndata_pov or teplosch.kdata_pov %}{{ teplosch.ndata_pov|date:"d.m.Y"|default:"…" }} — {{ teplosch.kdata_pov|date:"d.m.Y"|default:"…" }}{% if teplosch.kdata_pov and teplosch.kdata_pov < segodnya %} <span class="chip danger">просрочена</span>{% endif %}{% else %}—{% endif %}</dd>
+    <dt>Место установки</dt><dd>{{ teplosch.mesto_ust|default:"—" }}</dd>
+    <dt>Место и № пломбы</dt><dd>{{ teplosch.mesto_ustp|default:"—" }}</dd>
+    <dt>Объект</dt><dd>{{ teplosch.name_obek|default:"—" }}{% if teplosch.adres_obek %}, {{ teplosch.adres_obek }}{% endif %}</dd>
+  </dl>{% else %}<p class="muted">Информация о приборе не заполнена.</p>{% endif %}
+  <div class="podtv-b"><a class="button primary" href="{% url 'abonents:teplosch' p.potreb_id %}">{% if teplosch %}Открыть{% else %}Заполнить{% endif %}</a><button type="button" data-zakryt>Закрыть</button></div>
+</div></template>
