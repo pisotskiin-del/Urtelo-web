@@ -59,13 +59,39 @@ def period(mes, god):
     return nach.strftime("%d.%m.%Y"), kon.strftime("%d.%m.%Y")
 
 
+NE_ZDES = ("Отправка в КРЭДО на общем сервере отключена: подпись — сертификатом "
+           "начальника. Войдите на сервер через удалённый рабочий стол и откройте программу "
+           "ярлыком «Теплоснабжение».")
+
+
+NE_PODPIS = ("На общем сервере документы в КРЭДО не подписываются: окно выбора сертификата "
+             "там некому показать. Войдите на сервер через удалённый рабочий стол, откройте "
+             "программу ярлыком «Теплоснабжение» и отправьте документ оттуда.")
+
+
+def razresheno():
+    if not getattr(settings, "TEPLO_KREDO_ZDES", True):
+        raise KredoError(NE_ZDES)
+
+
+def podpis_razreshena():
+    """Подпись документа (окно выбора сертификата) — не в общем фоновом сервере."""
+    razresheno()
+    if not getattr(settings, "TEPLO_KREDO_PODPIS", True):
+        raise KredoError(NE_PODPIS)
+
+
 class ComInvoker:
     """Вызов процедур КРЭДО через RRIC_COM_OBJECT.Invoker."""
 
     def __init__(self, cod_gor):
         self.n = nastrojki(cod_gor)
 
-    def exec_proc(self, name, params):
+    def exec_proc(self, name, params, xml=None):
+        """Вызвать процедуру. xml — пакет данных: добавляется параметром
+        @xmlData={base64}…, закодированный методом ToBase64 объекта (как в
+        старой программе)."""
+        razresheno()
         try:
             import pythoncom
             import win32com.client
@@ -84,6 +110,8 @@ class ComInvoker:
             x.ServiceCertName = self.n["service"]
             x.EndpointUrl = self.n["endpoint"]
             x.MaxMessageSize = 1000000000
+            if xml is not None:
+                params = f"{params},@xmlData={{base64}}{x.ToBase64(xml)}"
             # Метод без аргументов при позднем связывании читается как свойство:
             # со скобками pywin32 вызвал бы ToString() результата.
             c = x.CreateChannel

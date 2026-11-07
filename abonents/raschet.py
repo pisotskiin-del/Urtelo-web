@@ -48,12 +48,20 @@ class Table:
     def __init__(self, model):
         self.places = {f.attname: f.decimal_places for f in model._meta.concrete_fields
                        if f.get_internal_type() == "DecimalField"}
+        # Наибольшее значение поля: в старой программе больше — «переполнение»
+        # (в DBF записываются звёздочки), PostgreSQL такое число не запишет.
+        self.predel = {f.attname: Decimal(10) ** (f.max_digits - f.decimal_places)
+                       for f in model._meta.concrete_fields if f.get_internal_type() == "DecimalField"}
         self.changed = set()
+        self.perepolnenie = []   # (л/№, поле, значение)
 
     def put(self, rec, name, value):
         places = self.places.get(name)
         if places is not None:
             value = Decimal(value).quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP)
+            if abs(value) >= self.predel[name]:
+                self.perepolnenie.append((getattr(rec, "potreb_id", None) or getattr(rec, "ln", None), name, str(value)))
+                value = None
         setattr(rec, name, value)
         self.changed.add(name)
 
@@ -63,14 +71,18 @@ class Result:
     potreb: int = 0
     created_poteri: list = field(default_factory=list)   # л/№, для которых создана запись потерь
     zero_division: list = field(default_factory=list)    # (л/№, что считалось)
+    perepolnenie: list = field(default_factory=list)     # (л/№, поле, значение) — не помещается в поле
     limits: list = field(default_factory=list)          # записи таблицы limit
     cities: list = field(default_factory=list)          # итоги по городам
     otkluchen: list = field(default_factory=list)       # л/№, которые не рассчитывались (договор не заключён)
 
 
 def _div(a, b, result, rec, what):
+    """a / b; при b = 0 — 0 и запись в отчёт. В старой программе здесь ошибка
+    «переполнение данных» (деление на ноль, в том числе 0 / 0), и расчёт
+    договора портится; новая начисляет 0 и показывает лицевой в итогах."""
     if b == 0:
-        if a != 0:
+        if (rec.potreb_id, what) not in result.zero_division:
             result.zero_division.append((rec.potreb_id, what))
         return ZERO
     return a / b
@@ -301,6 +313,7 @@ def compute(recs, cities, sp_by_ln):
             ))
 
     result.limits = limits
+    result.perepolnenie = pt.perepolnenie + st.perepolnenie
     for code, city in sorted(cities.items()):
         in_city = [r for r in recs if r.cod_gor_id == code]
         row = {"city": city, "count": len(in_city), **totals[code]}

@@ -32,7 +32,7 @@ def env_bool(name, default=False):
 
 SECRET_KEY = env("DJANGO_SECRET_KEY", "dev-only-insecure-key-change-me")
 DEBUG = env_bool("DJANGO_DEBUG", True)
-ALLOWED_HOSTS = [h for h in env("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h]
+ALLOWED_HOSTS = [h.strip() for h in env("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -61,7 +61,19 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "teplo.middleware.PonyatnyeOshibki",
+    "abonents.prosmotr.ProsmotrMiddleware",
 ]
+
+# На сервере (requirements-server.txt) оформление и картинки отдаёт whitenoise:
+# при DJANGO_DEBUG=0 сам Django их не отдаёт.
+try:
+    import whitenoise  # noqa: F401
+    MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
+except ImportError:
+    pass
+
+# Просмотр закрытого месяца: чтения идут из полной копии данных месяца.
+DATABASE_ROUTERS = ["abonents.kopiya.ArhivRouter"]
 
 ROOT_URLCONF = "teplo.urls"
 
@@ -150,12 +162,21 @@ TEPLO_PDF_FONT_BOLD = env("TEPLO_PDF_FONT_BOLD", "")
 # Почта. Сервер, порт, адрес отправителя, тема и текст письма — в «Настройке рассылки
 # писем» (smtp_nas, админка). Пароль почтового ящика лучше задать здесь, а не в smtp_nas.
 TEPLO_SMTP_PASSWORD = env("TEPLO_SMTP_PASSWORD", "")
+# Файл корневого сертификата почтового сервера (.crt/.pem), если он не из общеизвестных.
+TEPLO_SMTP_CA = env("TEPLO_SMTP_CA", "")
 # Первый номер документа в реестре отправленных писем (продолжить нумерацию старой программы).
 TEPLO_PISMO_NOMER = int(env("TEPLO_PISMO_NOMER", "1") or 1)
 
 # Обмен с КРЭДО (РРИЦ) через COM-объект RRIC_COM_OBJECT (только Windows, pywin32).
 # Сертификаты клиента — в хранилище «Личные» пользователя Windows, под которым работает
 # программа; здесь — их отпечатки по участкам.
+# 0 — в этой копии программы обмен с КРЭДО выключен (общий сервер для входа по адресу:
+# подписать там нечем, подписывает начальник в своей копии через удалённый рабочий стол).
+TEPLO_KREDO_ZDES = env_bool("TEPLO_KREDO_ZDES", True)
+# 0 — здесь не подписывать документы (общий сервер в фоне: окно выбора сертификата
+# никто не увидит). Статусы, отзыв и показания из КРЭДО при этом работают. server.py
+# ставит 0 сам; копия начальника (teplo.pyw) подписывает.
+TEPLO_KREDO_PODPIS = env_bool("TEPLO_KREDO_PODPIS", True)
 TEPLO_KREDO_ENDPOINT = env("TEPLO_KREDO_ENDPOINT", "http://www.rric.org:7742/RRIC_EP_SERVICE/WcfService")
 TEPLO_KREDO_SERVICE_CERT = env("TEPLO_KREDO_SERVICE_CERT", "Rric Wcf Service")
 TEPLO_KREDO_THUMB = {
@@ -173,3 +194,10 @@ TEPLO_KREDO_OTPRAVITEL = {
     2: {"org": env("TEPLO_KREDO_ORG_OUT_DUB", ""), "pid": env("TEPLO_KREDO_PID_OUT_DUB", "")},
     3: {"org": env("TEPLO_KREDO_ORG_OUT_KAM", ""), "pid": env("TEPLO_KREDO_PID_OUT_KAM", "")},
 }
+
+# Папка полных копий закрытых месяцев (ГГГГ-ММ.sqlite3), по умолчанию arhiv_mesyacev
+# рядом с manage.py. Её нужно включать в резервные копии.
+TEPLO_ARHIV_DIR = env("TEPLO_ARHIV_DIR", "")
+if len(sys.argv) > 1 and sys.argv[1] == "test":
+    import tempfile
+    TEPLO_ARHIV_DIR = tempfile.mkdtemp(prefix="teplo_arhiv_")

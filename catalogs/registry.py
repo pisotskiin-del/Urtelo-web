@@ -37,6 +37,11 @@ EXTRA_MODELS = [("abonents", "Podpisant"), ("abonents", "TarifGorod"), ("abonent
 SECRET_FIELDS = {"password"}
 
 LIST_COLUMNS_LIMIT = 8
+# Столбцы таблицы справочника, если нужны не первые LIST_COLUMNS_LIMIT полей.
+LIST_COLUMNS = {
+    # Без кодов прибора, типа и места; с датами поверки и проверки (02.11.2026).
+    "seturdevice": ["liz", "p_kod", "d_num", "d_date", "d_pok", "d_pov", "d_next_pov", "d_prov", "d_stat"],
+}
 SEARCH_TYPES = (models.CharField, models.TextField)
 
 
@@ -65,6 +70,9 @@ def data_fields(model):
 
 
 def list_fields(model):
+    names = LIST_COLUMNS.get(model._meta.model_name)
+    if names:
+        return [model._meta.get_field(n) for n in names]
     return [f for f in data_fields(model) if not isinstance(f, models.TextField)][:LIST_COLUMNS_LIMIT]
 
 

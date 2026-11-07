@@ -45,6 +45,7 @@ class Col:
     kind: str = "text"      # text, int, num, date
     places: int = 3
     total: bool = False     # суммировать в итогах
+    css: str = ""           # класс ячеек колонки (оформление отдельных отчетов)
 
 
 @dataclass
@@ -56,6 +57,7 @@ class Section:
     foot_links: list = None
     mark_rows: bool = False  # строки выделены цветом и выше обычных (строка тарифов)
     mark_foot: bool = False  # так же выделенный итог (итог по филиалу)
+    css: str = ""            # класс строк раздела (оформление отдельных отчетов)
 
 
 @dataclass
@@ -77,6 +79,10 @@ class Report:
     signatures: list = field(default_factory=list)
     landscape: bool = False
     approve: list = field(default_factory=list)   # гриф «УТВЕРЖДАЮ» справа вверху
+    css: str = ""           # класс отчета: своё оформление, как в старой программе
+    podpis: tuple = None    # (должность, ФИО) — подпись с подстрочными пояснениями, как в отчетах по приборам
+    gruppy: bool = False    # группы отдельными таблицами, как в старых отчетах OT_KATEG и OT_MINIST
+    sek_label: str = ""     # «Категория потребителя» перед названием группы (иначе название по центру)
 
 
 @dataclass
@@ -170,7 +176,7 @@ def ot_kateg(city, opts):
     else:
         qs = qs.filter(nom_dog__gt=0)
     names, akc = _kategor(), _akcept()
-    cols = [Col("№ п/п", "int"), Col("Лиц. №", "int"), Col("Код бух.", "int"), Col("Абонент"), Col("Акцепт"),
+    cols = [Col("№ п/п", "int"), Col("Лиц. №", "int"), Col("Код бух.", "int"), Col("Абонент"), Col("Акцепт", css="uzk"),
             Col("Выстав. аванс", "num", total=True), Col("Отпуск (Гкал)", "num", total=True),
             Col("К оплате (Гкал)", "num", total=True)]
     sections = _grouped(
@@ -180,9 +186,14 @@ def ot_kateg(city, opts):
                    n(p.nac_vsego) + n(p.predopl), n(p.nac_vsego)],
         cols)
     rows = [r for s in sections for r in s.rows]
+    # Как в старом отчете OT_KATEG: «всего: Местный бюджет» — название категории как в справочнике.
+    po_zagl = {(v or "").upper(): (v or "").strip() for v in names.values()}
+    for s in sections:
+        s.foot[3] = f"всего: {po_zagl.get(s.title) or s.title}"
     return Report("ОТПУСК ТЕПЛОВОЙ ЭНЕРГИИ ДЛЯ АБОНЕНТОВ", _city_lines(city),
-                  [Table(cols, sections, total=_sum_row(cols, rows, "ИТОГО:", label_col=4))],
-                  signatures=_signatures(city))
+                  [Table(cols, sections, total=_sum_row(cols, rows, "ИТОГО :", label_col=4))],
+                  signatures=_signatures(city), css="budzhet", gruppy=True,
+                  sek_label="Категория потребителя")
 
 
 def ot_minist(city, opts):
@@ -190,19 +201,24 @@ def ot_minist(city, opts):
     министерствам."""
     qs = Potreb.objects.filter(cod_gor=city.cod_gorod, nom_dog__gt=0, id_kategor=3).exclude(id_katabon=3)
     names, akc = dict(Minist.objects.values_list("cod_minist", "name_minis")), _akcept()
-    cols = [Col("№ п/п", "int"), Col("Код АС", "int"), Col("Код бух.", "int"), Col("Абонент"), Col("Акцепт"),
+    cols = [Col("№ п/п", "int"), Col("Код АС", "int"), Col("Код бух.", "int"), Col("Абонент"), Col("Акцепт", css="uzk"),
             Col("Выстав. аванс", "num", total=True), Col("Отпуск (Гкал)", "num", total=True),
             Col("К оплате (Гкал)", "num", total=True)]
     sections = _grouped(
         qs.order_by("cod_minist", "potreb_id"), lambda p: p.cod_minist_id,
-        lambda k: (names.get(k) or "Министерство не указано").strip().upper(),
+        lambda k: (names.get(k) or "").strip().upper(),   # без министерства — без названия, как в старом отчете
         lambda p: [0, p.cod_ac, p.cod_buhg, p.name_potre, akc.get(p.accept), n(p.predopl),
                    n(p.nac_vsego), n(p.nac_vsego) - n(p.predopl)],
         cols)
     rows = [r for s in sections for r in s.rows]
-    return Report("РЕСПУБЛИКАНСКИЙ БЮДЖЕТ", ["Расшифровка по министерствам"] + _city_lines(city),
+    # Как в старом OT_MINIST: «всего: Министерство здравоохранения ПМР» — название как в справочнике.
+    po_zagl = {(v or "").strip().upper(): (v or "").strip() for v in names.values()}
+    for s in sections:
+        s.foot[3] = f"всего: {po_zagl.get(s.title, s.title)}".rstrip()
+    return Report("РЕСПУБЛИКАНСКИЙ БЮДЖЕТ", [_city_lines(city)[0], "Расшифровка по министерствам"]
+                  + _city_lines(city)[1:],
                   [Table(cols, sections, total=_sum_row(cols, rows, "ИТОГО:", label_col=4))],
-                  signatures=_signatures(city))
+                  signatures=_signatures(city), css="minist", gruppy=True)
 
 
 def ved_potreb(city, opts):
@@ -283,13 +299,19 @@ def p_kot1(city, opts):
         rows.append(r)
     total = _sum_row(cols, rows, "Итого")
     vsego = (total[-2] or 0) + (total[-1] or 0)
-    notes = [f"ВСЕГО ПОТРЕБЛЕНИЕ ПО КОТЕЛЬНЫМ: {vsego:.2f} ГКал"]
+    from django.utils import formats
+    notes = [f"ВСЕГО ПОТРЕБЛЕНИЕ ПО КОТЕЛЬНЫМ: {formats.number_format(vsego, 2, use_l10n=True, force_grouping=True)} ГКал"]
     if bez_kot:
         notes.append("Не указан № котельной у потребителей: " + ", ".join(map(str, bez_kot)))
     lines = [" ".join(_city_lines(city))] + ([dict(VID_USLUGA)[vid]] if vid else [])
+    # Шапка в три яруса, как в старом p_kot1n.frx: «Наименование котельной»,
+    # над категориями — «Потребление ГКал», внизу ГВС / Отопл.
+    head = [[("Наименование котельной", 1, 3), ("Потребление ГКал", len(cols) - 1, 1)],
+            [(title, 2, 1) for _, title in KOT_KATEG + [(None, "Всего")]],
+            [(c.title, 1, 1) for c in cols[1:]]]
     return Report("ФАКТИЧЕСКОЕ ПОТРЕБЛЕНИЕ ПО КОТЕЛЬНЫМ", lines,
-                  [Table(cols, [Section(rows=rows)], groups=groups, total=total)],
-                  notes=notes, signatures=_signatures(city), landscape=True)
+                  [Table(cols, [Section(rows=rows)], groups=groups, total=total, head=head)],
+                  notes=notes, signatures=_signatures(city), landscape=True, css="kot")
 
 
 def p_kot2(city, opts):
@@ -437,13 +459,13 @@ POLEZ_COLS = [Col("Категории потребителей"),
               Col("Население абонентское (с господд.)", "num", 2, total=True),
               Col("Население абонентское (без господд.)", "num", 2, total=True),
               Col("Население хозрасчет", "num", 2, total=True),
-              Col("Всего население (Гкал)", "num", 2, total=True),
-              Col("Всего хозрасчёт (Гкал)", "num", 2, total=True),
+              Col("Всего население (Гкал)", "num", 2, total=True, css="vsego"),
+              Col("Всего хозрасчёт (Гкал)", "num", 2, total=True, css="vsego"),
               Col("Местный", "num", 2, total=True),
               Col("Республ.", "num", 2, total=True),
               Col("Организация СКиИОД", "num", 2, total=True),
-              Col("Всего бюджет (Гкал)", "num", 2, total=True),
-              Col("ВСЕГО (Гкал)", "num", 2, total=True)]
+              Col("Всего бюджет (Гкал)", "num", 2, total=True, css="vsego"),
+              Col("ВСЕГО (Гкал)", "num", 2, total=True, css="vsego")]
 # Колонки «Всего…», которые в строках «П/У» и «Нагр.» старый отчет оставляет пустыми.
 POLEZ_VSEGO = (5, 10, 11)
 
@@ -502,7 +524,7 @@ def polez_otpusk(city, opts):
         pu_rows.append(rows[0])
         nagr_rows.append(rows[1])
     pu, nagr = _sum_row(POLEZ_COLS, pu_rows, "П/У"), _sum_row(POLEZ_COLS, nagr_rows, "Нагр.")
-    itog = Section(rows=[shown(pu), shown(nagr)])
+    itog = Section(rows=[shown(pu), shown(nagr)], css="itog")
     itog.links = [links(0, key, r) for key, r in zip(("pu", "nagr"), itog.rows)]
     itog.foot = _sum_row(POLEZ_COLS, [pu, nagr], "Итого по филиалу")
     itog.mark_foot = True
@@ -523,8 +545,7 @@ def polez_otpusk(city, opts):
     return Report("ПОЛЕЗНЫЙ ОТПУСК", lines,
                   [Table(POLEZ_COLS, [Section(rows=[tarif_row], mark_rows=True)] + sections + [itog], head=head)],
                   signatures=[_ved_spec(city, "\u2003" * 12)],
-                  landscape=True,
-                  approve=_utverjdau(city))
+                  landscape=True, css="polez")   # без грифа «УТВЕРЖДАЮ»: отчет не утверждается (03.11.2026)
 
 
 def _ved_spec(city, sep):
@@ -669,9 +690,26 @@ def _ispol_sign(city):
 
 
 def _pribor_head(city, title):
-    return ([title, f"по участку г.{(city.name_gorod or '').strip()}",
-             f"за {(city.name_mes or '').strip()} {city.god} г."],
-            _approve() + ["Приложение №2", "к приказу от 08.04.2024г.№290"])
+    """Заголовок отчетов по приборам учета, как в старой форме otch_potr_pribor:
+    «… за Октябрь 2026г.», «по участку г.Рыбница», справа «Приложение №2»."""
+    return ([f"{title} за {(city.name_mes or '').strip()} {city.god}г.",
+             f"по участку г.{(city.name_gorod or '').strip()}"],
+            ["Приложение №2", "к приказу от 08.04.2024г.№290"])
+
+
+def _pribor_report(city, title, cols, head, rows, css):
+    from .models import Podpisant
+    for i, r in enumerate(rows, 1):
+        r[0] = i
+    lines, approve = _pribor_head(city, title)
+    return Report(lines[0], lines[1:], [Table(cols, [Section(rows=rows)], head=head)],
+                  signatures=_ispol_sign(city), landscape=True, approve=approve, css=css,
+                  podpis=_signer(Podpisant.PRIBORY, city))
+
+
+_PRIBOR_SHAPKA = [("№ п/п", 1, 2), ("Наименование абонента (потребителя)", 1, 2),
+                  ("Фактический адрес объекта теплопотребления", 1, 2)]
+_PRIBOR_HVOST = [("Показания", 2, 1), ("Расчет потребления (в Гкал)", 1, 2), ("Примечание", 1, 2)]
 
 
 def otch_pribor(city, opts):
@@ -686,7 +724,7 @@ def otch_pribor(city, opts):
             devices.setdefault(round(float(d.p_kod)), []).append(d)
         except ValueError:
             continue
-    cols = [Col("Л/№", "int"), Col("Наименование абонента (потребителя)"), Col("Фактический адрес объекта"),
+    cols = [Col("№ п/п", "int"), Col("Наименование абонента (потребителя)"), Col("Фактический адрес объекта"),
             Col("Тип и номер прибора"), Col("ед. изм."), Col("Показания предыдущие", "num"),
             Col("Показания настоящие", "num"), Col("Расчет потребления (Гкал)", "num", 3, total=True),
             Col("Примечание")]
@@ -701,16 +739,17 @@ def otch_pribor(city, opts):
             tip = f"{(info.name or '').strip() if info else ''}  №{(d.d_num or '').strip() if d else ''}"
             rows.append([p.potreb_id, p.glav_potre, p.adres_sd, tip, (info.edn or "").strip() if info else "",
                          n(p.pok_old), n(p.pok_new), rasch, p.prim_chot])
-    lines, approve = _pribor_head(city, "Отчет о потреблении тепловой энергии по приборам учета тепловой энергии")
-    return Report(lines[0], lines[1:], [Table(cols, [Section(rows=rows)], total=_sum_row(cols, rows, "Итого"))],
-                  signatures=_ispol_sign(city), landscape=True, approve=approve)
+    head = [_PRIBOR_SHAPKA + [("Тип и номер прибора", 1, 2), ("ед. изм.", 1, 2)] + _PRIBOR_HVOST,
+            [("предыдущие", 1, 1), ("настоящие", 1, 1)]]
+    return _pribor_report(city, "Отчет о потреблении тепловой энергии по приборам учета тепловой энергии",
+                          cols, head, rows, "pribor")
 
 
 def otch_priborg(city, opts):
     """Кнопка «Отчет по приборам учета (ГВС)» (otch_potr_priborg): потребление
     по разнице показаний счетчика ГВС, 1 куб.м = 0,0533 Гкал."""
     from .raschet import GVS_GKAL
-    cols = [Col("Л/№", "int"), Col("Наименование абонента (потребителя)"), Col("Фактический адрес объекта"),
+    cols = [Col("№ п/п", "int"), Col("Наименование абонента (потребителя)"), Col("Фактический адрес объекта"),
             Col("ед. изм."), Col("Показания предыдущие", "num"), Col("Показания настоящие", "num"),
             Col("Расчет потребления (Гкал)", "num", 3, total=True), Col("Примечание")]
     rows = []
@@ -719,9 +758,8 @@ def otch_priborg(city, opts):
         if rasch > 0:
             rows.append([p.potreb_id, p.glav_potre, p.adres_sd, "куб.м.", n(p.pok_oldg), n(p.pok_newg), rasch,
                          p.prim_chgvs])
-    lines, approve = _pribor_head(city, "Отчет о потреблении ГВС по приборам учета")
-    return Report(lines[0], lines[1:], [Table(cols, [Section(rows=rows)], total=_sum_row(cols, rows, "Итого"))],
-                  signatures=_ispol_sign(city), landscape=True, approve=approve)
+    head = [_PRIBOR_SHAPKA + [("ед. изм.", 1, 2)] + _PRIBOR_HVOST, [("предыдущие", 1, 1), ("настоящие", 1, 1)]]
+    return _pribor_report(city, "Отчет о потреблении ГВС по приборам учета", cols, head, rows, "pribor rep-priborg")
 
 
 DATE = "date"

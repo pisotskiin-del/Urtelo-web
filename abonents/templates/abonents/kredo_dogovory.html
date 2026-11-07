@@ -1,0 +1,36 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}КРЭДО: {{ zagolovok }}{% endblock %}
+{% block content %}
+<p class="crumbs">{% for url, t in crumbs %}<a href="{{ url }}">{{ t }}</a><span class="sep">›</span>{% endfor %}КРЭДО<span class="sep">›</span>{{ zagolovok }}</p>
+<div class="page-head"><h1>Передать в КРЭДО: {{ zagolovok }}</h1></div>
+{% if cities %}<nav class="tabs">{% for c in cities %}<a href="?gorod={{ c.cod_gorod }}" {% if c.cod_gorod == city.cod_gorod %}class="active"{% endif %}>{{ c.name_gorod }}</a>{% endfor %}</nav>{% endif %}
+<section class="card">
+  <p>{{ opisanie }}{% if vid == "dogovory" %} {% if nom_dog %}Передаётся договор № {{ nom_dog }}.{% else %}Передаются все абоненты участка, у которых заполнено название объекта.{% endif %}{% endif %}
+    {% if nast %}Организация в КРЭДО {{ nast.comorg }}, сертификат {{ nast.cert }}.{% endif %}</p>
+  {% if zamech %}<details class="msg warning"><summary>Замечания: {{ zamech|length }}</summary><ul>{% for z in zamech %}<li>{{ z }}</li>{% endfor %}</ul></details>{% endif %}
+  {% if can_change and nast %}
+  <form method="post" class="actions">{% csrf_token %}
+    <button name="action" value="proverka" title="Собрать пакеты XML и сохранить их в журнале, ничего не отправляя">{% icon "file" %} Проверить без отправки</button>
+    {% if zdes %}<button class="primary" name="action" value="peredat"
+      data-itogo="{{ itogo }}" onclick="if(!confirm('Передать в КРЭДО?\n\n'+this.dataset.itogo))return false;this.disabled=true;this.textContent='Передаю в КРЭДО…';this.form.insertAdjacentHTML('beforeend','<input type=hidden name=action value=peredat>');this.form.submit()">{% icon "open" %} Передать в КРЭДО</button>
+    {% else %}<span class="muted">{{ ne_zdes }}</span>{% endif %}
+  </form>
+  {% endif %}
+</section>
+{% for proc, nazv, polya, rows in pakety %}
+<h2>{{ forloop.counter }}. {{ nazv }} ({{ proc }}): {{ rows|length }}</h2>
+{% if rows %}<div class="scroll"><table class="grid">
+  <thead><tr>{% for f in polya %}<th>{{ f }}</th>{% endfor %}</tr></thead>
+  <tbody>{% for r in rows %}<tr>{% for v in r %}<td>{% if v is None %}{% elif v.year %}{{ v|date:"d.m.Y" }}{% else %}{{ v }}{% endif %}</td>{% endfor %}</tr>{% endfor %}</tbody>
+</table></div>{% else %}<p class="muted">Нет строк</p>{% endif %}
+{% endfor %}
+<h2>Журнал передач</h2>
+<div class="scroll"><table class="grid">
+  <thead><tr><th>Когда</th><th>Кто</th><th>Результат</th><th>Строк в пакетах</th><th></th></tr></thead>
+  <tbody>
+  {% for z in zhurnal %}<tr><td>{{ z.created|date:"d.m.Y H:i" }}</td><td>{{ z.user }}</td><td>{{ z.get_status_display }}{% if z.oshibka %}: {{ z.oshibka|truncatechars:80 }}{% endif %}</td>
+    <td>{{ z.itogo|default:"—" }}</td><td><a href="{% url 'abonents:kredo_peredacha' z.pk %}">открыть</a></td></tr>
+  {% empty %}<tr><td colspan="5" class="muted">Ещё не передавали</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}

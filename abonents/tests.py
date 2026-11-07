@@ -642,7 +642,7 @@ class ReportsTests(KartaBase):
                                    d_next_pov=date(2026, 1, 1))
         rep, _ = reports.build(reports.BY_KEY["otch_pribor"], self.ryb, {})
         row = rep.tables[0].sections[0].rows[0]
-        self.assertEqual((row[0], row[3], row[7]), (5, "ВКТ-7  №123", Decimal("5.0")))
+        self.assertEqual((row[0], row[3], row[7]), (1, "ВКТ-7  №123", Decimal("5.0")))
         self.assertEqual(rep.signatures[0],
                          "Инспектор по контролю за потреблением тепловой энергии юридическим лицам")
         self.assertTrue(rep.signatures[1].endswith("Химач Н.И."))
@@ -671,7 +671,7 @@ class ReportsTests(KartaBase):
         self.assertEqual(x["Content-Disposition"], 'attachment; filename="ot_kateg_1.xlsx"')
         ws = load_workbook(BytesIO(x.content)).active
         values = [c for row in ws.iter_rows(values_only=True) for c in row if c is not None]
-        self.assertIn("ИТОГО:", values)
+        self.assertIn("ИТОГО :", values)
         self.assertIn(10.5, values)
         self.assertEqual(self.client.get("/abonents/otchety/net/").status_code, 404)
 
@@ -889,6 +889,52 @@ class ArhivTests(KartaBase):
         self.assertContains(r, 'type="month"')
         self.assertContains(r, "декабрь 2026")
         self.assertContains(self.client.get("/abonents/otchety/"), "Полезный отпуск за период")
+
+
+class PokazaniyaImportTests(KartaBase):
+    def test_tolko_pokazaniya(self):
+        import tempfile
+        from pathlib import Path
+        import dbf
+        from django.core.management import call_command
+        folder = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__("shutil").rmtree, folder)
+        Potreb.objects.filter(potreb_id=5).update(pok_new=Decimal("1.000"), pok_old=Decimal("0.500"), org_in="ORG")
+        t = dbf.Table(str(folder / "potreb.dbf"), "potreb_id N(6,0); pok_new N(9,3); pok_old N(9,3); pok_newg N(10,0); "
+                      "org_in C(40)", codepage="cp1251", dbf_type="vfp")
+        t.open(dbf.READ_WRITE)
+        t.append((5, 12.5, 1.0, 7, "СТАРОЕ"))
+        t.append((99999, 1, 1, 1, ""))
+        t.close()
+        out = io.StringIO()
+        call_command("pokazaniya_import", dir=str(folder), stdout=out)
+        self.assertIn("Ничего не записано", out.getvalue())
+        self.assertEqual(Potreb.objects.get(potreb_id=5).pok_new, Decimal("1.000"))
+        call_command("pokazaniya_import", dir=str(folder), zapisat=True, stdout=out)
+        p = Potreb.objects.get(potreb_id=5)
+        self.assertEqual((p.pok_new, p.pok_old, p.pok_newg), (Decimal("12.500"), Decimal("1.000"), 7))
+        self.assertEqual(p.org_in, "ORG")          # остальное не тронуто
+
+
+class PerenosTests(KartaBase):
+    def test_obrezat_dlinnye_stroki(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        from dbfsync.management.commands.perenos_v_postgres import obrezat
+        d = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__("shutil").rmtree, d)
+        f = d / "x.json"
+        f.write_text(json.dumps([{"model": "catalogs.potreb", "pk": 1, "fields": {"name_kot": "Я" * 30, "liz": "1"}}]),
+                     encoding="utf-8")
+        self.assertEqual(obrezat(f, io.StringIO()), 1)
+        self.assertEqual(json.loads(f.read_text(encoding="utf-8"))[0]["fields"]["name_kot"], "Я" * 25)
+
+    def test_tolko_postgres(self):
+        from django.core.management import call_command
+        from django.core.management.base import CommandError
+        with self.assertRaisesMessage(CommandError, "не на PostgreSQL"):
+            call_command("perenos_v_postgres", iz=__file__)
 
 
 def timezone_now():
@@ -1352,6 +1398,38 @@ class KredoSchetTests(DokumentyTests):
         self.assertContains(r, "pywin32")
         self.assertEqual(Pismo.objects.filter(kredo_doc=guid).count(), 1)
 
+    def test_nomer_zanyat_drugim(self):
+        from unittest import mock
+        from abonents.models import Pismo
+        Pismo.objects.create(nomer=8, cod_gor=1, nom_dog=1, potreb_id=1, nom_mes=1, god=2026)
+        # другой пользователь успел занять 8, пока мы считали номер
+        with mock.patch.object(Pismo, "sleduyushchij_nomer", side_effect=[8, 9]):
+            z = Pismo.zarezervirovat(cod_gor=1, nom_dog=1, potreb_id=1, nom_mes=1, god=2026)
+        self.assertEqual(z.nomer, 9)
+
+    def test_podpis_vyklyuchena_na_obshchem_servere(self):
+        from django.test import override_settings
+        from abonents import kredo, kredo_dok
+        with override_settings(TEPLO_KREDO_PODPIS=False):
+            with self.assertRaisesMessage(kredo.KredoError, "удалённый рабочий стол"):
+                with kredo_dok.ComCrypto().objekt():
+                    pass
+            kredo.razresheno()   # статусы и показания — можно
+        self.login("Оператор")
+        with override_settings(TEPLO_KREDO_PODPIS=False):
+            r = self.client.post(reverse("abonents:dokument", args=[1, 6, "schet"]), {"action": "kredo"}, follow=True)
+        self.assertContains(r, "не подписываются")
+
+    def test_kredo_vyklyuchen_na_obshchem_servere(self):
+        from django.test import override_settings
+        from abonents import kredo, kredo_dok
+        with override_settings(TEPLO_KREDO_ZDES=False):
+            with self.assertRaisesMessage(kredo.KredoError, "удалённый рабочий стол"):
+                kredo.ComInvoker(1).exec_proc("Kredo_DocumentsOut", {})
+            with self.assertRaisesMessage(kredo.KredoError, "удалённый рабочий стол"):
+                with kredo_dok.ComCrypto().objekt():
+                    pass
+
     def test_otozvat(self):
         from django.test import override_settings
         from abonents import documents, kredo, kredo_dok
@@ -1554,3 +1632,173 @@ class VedomostiTests(KartaBase):
             r = self.client.get(reverse("abonents:otchet", args=[key]) + "?gorod=1")
             self.assertEqual(r.status_code, 200, key)
         self.assertContains(self.client.get(reverse("abonents:otchety")), "Ведомости, реестры")
+
+
+class ProsmotrTests(KartaBase):
+    """Просмотр закрытого месяца: данные архива, правка запрещена."""
+
+    def setUp(self):
+        super().setUp()
+        from abonents import nov_mes
+        Danrasch.objects.update(nom_mes=10, name_mes="Октябрь", god=2026)
+        Potreb.objects.filter(potreb_id__in=[5, 7, 9]).update(d_stat=60)
+        Potreb.objects.filter(potreb_id=5).update(nac_vsego=Decimal("10.5"), pok_new=Decimal("12.5"),
+                                                  glav_potre="Магазин в октябре")
+        nov_mes.run("тест")                       # закрыт октябрь, теперь ноябрь
+        Potreb.objects.filter(potreb_id=5).update(glav_potre="Магазин в ноябре", nac_vsego=Decimal("1"))
+        Potreb.objects.create(potreb_id=13, nom_dog=6, name_potre="Новый в ноябре", cod_gor=self.ryb, d_stat=60)
+        self.login("Администратор")
+
+    def open(self, mes="2026-10"):
+        return self.client.get("/abonents/mesyac/", {"mes": mes, "next": "/abonents/5/"}, follow=True)
+
+    def test_selector_lists_closed_months(self):
+        response = self.client.get("/abonents/")
+        self.assertContains(response, 'value="2026-10"')
+        self.assertContains(response, "Октябрь 2026 — архив")
+        self.assertNotContains(response, "только просмотр")
+
+    def test_card_from_archive_without_edit_buttons(self):
+        response = self.open()
+        self.assertEqual(response.redirect_chain[-1][0], "/abonents/5/")
+        self.assertContains(response, "Магазин в октябре")
+        self.assertNotContains(response, "Магазин в ноябре")
+        self.assertContains(response, "только просмотр")
+        self.assertNotContains(response, "/abonents/5/edit/")
+        self.assertNotContains(response, "/abonents/5/delete/")
+        self.assertNotContains(response, 'name="znach"')
+        self.assertContains(response, "mes=2026-10")   # счёт и акт — за просматриваемый месяц
+        # Абонента, добавленного после закрытия месяца, в архиве нет.
+        response = self.client.get("/abonents/13/", follow=True)
+        self.assertContains(response, "в архиве за октябрь 2026 нет")
+
+    def test_list_and_contract_from_archive(self):
+        self.open()
+        response = self.client.get("/abonents/", {"gorod": 1})
+        self.assertContains(response, "Магазин в октябре")
+        self.assertNotContains(response, "Новый в ноябре")
+        response = self.client.get("/abonents/dogovor/1/6/")
+        self.assertContains(response, "10,5")
+        self.assertNotContains(response, "Новый в ноябре")
+        response = self.client.get("/abonents/raschet/itog/")
+        self.assertContains(response, "12,500")   # 10,5 + 2 — начислено в октябре
+
+    def test_nothing_can_be_changed(self):
+        self.open()
+        response = self.client.post("/abonents/5/pokazanie/pok_new/", {"znach": "99", "tab": "otop"}, follow=True)
+        self.assertContains(response, "только просмотр")
+        self.assertEqual(Potreb.objects.get(potreb_id=5).pok_new, Decimal("12.5"))
+        self.client.post("/abonents/5/edit/?tab=ishod", {"name_potre": "Другое"})
+        self.client.post("/abonents/5/delete/")
+        self.assertTrue(Potreb.objects.filter(potreb_id=5, name_potre='ООО "Крипс"').exists())
+        self.client.post("/abonents/nov-mes/", {"ready": "1"})
+        self.assertEqual(Danrasch.objects.first().nom_mes, 11)
+        self.client.post("/abonents/raschet/")
+        self.assertEqual(Potreb.objects.get(potreb_id=5).nac_vsego, Decimal("1"))
+        response = self.client.get("/abonents/5/edit/", follow=True)
+        self.assertEqual(response.redirect_chain[-1][0], "/abonents/5/")
+        response = self.client.get("/abonents/new/", follow=True)
+        self.assertEqual(response.redirect_chain[-1][0], "/abonents/")
+
+    def test_back_to_current_month(self):
+        self.open()
+        response = self.client.get("/abonents/mesyac/", {"mes": "", "next": "/abonents/5/"}, follow=True)
+        self.assertContains(response, "Магазин в ноябре")
+        self.assertNotContains(response, "только просмотр")
+        response = self.client.post("/abonents/5/pokazanie/pok_new/", {"znach": "20", "tab": "otop"})
+        self.assertEqual(Potreb.objects.get(potreb_id=5).pok_new, Decimal("20"))
+
+    def test_unknown_month_and_undone_month(self):
+        from abonents import nov_mes
+        response = self.open("2020-01")
+        self.assertContains(response, "нет в архиве")
+        self.open()
+        nov_mes.undo()                           # месяц убрали из архива — снова текущий
+        response = self.client.get("/abonents/5/")
+        self.assertNotContains(response, "только просмотр")
+
+    def test_other_pages_open_in_archive(self):
+        self.open()
+        for url in ["/abonents/raschet/", "/abonents/raschet/dannye/", "/abonents/nov-mes/",
+                    "/abonents/raschet/itog/rasshifr/?gorod=1&pole=nac_vsego", "/abonents/dogovor/1/6/schet/",
+                    "/abonents/dokumenty/", "/abonents/otchety/", "/abonents/otchety/ot_kateg/",
+                    "/abonents/otchety/arh_ras_ab/?ls=5", "/abonents/5/?tab=otop", "/catalogs/"]:
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200, url)
+            self.assertContains(response, "только просмотр")
+        self.assertContains(self.client.get("/abonents/raschet/itog/rasshifr/?gorod=1&pole=nac_vsego"), "за Октябрь 2026")
+        # Есть полная копия месяца — отчет строится по ней, предупреждения нет.
+        self.assertNotContains(self.client.get("/abonents/otchety/ot_kateg/"), "строится по текущим данным")
+        self.assertNotContains(self.client.get("/abonents/raschet/dannye/"), "Сохранить")
+
+
+class KopiyaMesyacaTests(KartaBase):
+    """Полная копия данных месяца: прошлый месяц показывается ровно таким, каким
+    был до перехода, со всеми справочниками и дополнительными таблицами."""
+
+    def setUp(self):
+        super().setUp()
+        from abonents import nov_mes
+        Danrasch.objects.update(nom_mes=10, name_mes="Октябрь", god=2026)
+        Potreb.objects.filter(potreb_id__in=[5, 7, 9]).update(d_stat=60)
+        SpTeplpoteri.objects.create(ln=5, diametr1=Decimal("57"), dlina1=Decimal("12"))
+        nov_mes.run("тест")                       # закрыт октябрь, теперь ноябрь
+        # После перехода меняются справочники и дополнительные таблицы.
+        Kategorpot.objects.filter(id_kotegor=1).update(name_kateg="Категория в ноябре")
+        GvsKot.objects.filter(id_kot=16).update(name_kot="Котельная в ноябре")
+        SpTeplpoteri.objects.filter(ln=5).update(dlina1=Decimal("99"))
+        self.login("Администратор")
+        self.client.get("/abonents/mesyac/", {"mes": "2026-10"})
+
+    def test_copy_file_created_and_removed_on_undo(self):
+        from abonents import kopiya, nov_mes
+        self.assertTrue(kopiya.est(10, 2026))
+        nov_mes.undo()
+        self.assertFalse(kopiya.est(10, 2026))
+
+    def test_catalogs_as_before_transition(self):
+        response = self.client.get("/abonents/5/")
+        self.assertContains(response, "Хозрасчет")
+        self.assertNotContains(response, "Категория в ноябре")
+        self.assertContains(response, "(Р) Котельная №2")
+        self.assertNotContains(response, "Котельная в ноябре")
+        self.assertContains(response, "Октябрь 2026")   # расчетный месяц в карточке
+        response = self.client.get("/abonents/5/poteri/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "12")
+        self.assertNotContains(response, 'value="99')
+        # Вернулись в текущий месяц — всё новое.
+        self.client.get("/abonents/mesyac/", {"mes": ""})
+        self.assertContains(self.client.get("/abonents/5/"), "Категория в ноябре")
+
+    def test_copy_is_read_only(self):
+        self.client.post("/abonents/5/poteri/", {"dlina1": "1"})
+        self.assertEqual(SpTeplpoteri.objects.get(ln=5).dlina1, Decimal("99"))
+        from abonents import kopiya
+        alias = kopiya.otkryt(10, 2026)
+        try:
+            from django.db import DatabaseError
+            with self.assertRaises(DatabaseError):
+                Kategorpot.objects.using(alias).update(name_kateg="x")
+        finally:
+            kopiya.zakryt(alias)
+
+    def test_without_copy_falls_back_to_archive(self):
+        from abonents import kopiya
+        kopiya.udalit(10, 2026)
+        response = self.client.get("/abonents/5/")
+        self.assertContains(response, "только просмотр")
+        self.assertContains(response, "Крипс")
+        self.assertContains(self.client.get("/abonents/otchety/ot_kateg/"), "строится по текущим данным")
+
+    def test_old_copy_gets_new_columns(self):
+        import sqlite3
+        from abonents import kopiya
+        path = kopiya.put(10, 2026)
+        con = sqlite3.connect(path)
+        con.execute("ALTER TABLE %s DROP COLUMN name_kateg" % Kategorpot._meta.db_table)
+        con.commit()
+        con.close()
+        response = self.client.get("/abonents/5/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Крипс")

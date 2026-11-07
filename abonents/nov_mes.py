@@ -89,11 +89,23 @@ def _rows(model):
     return list(model.objects.order_by("pk").values())
 
 
-@transaction.atomic
 def run(user=""):
     mes, god = current()
     if mes is None:
         raise ValueError("Нет данных для расчета (danrasch пуст)")
+    # 0. Полная копия данных месяца до перехода (просмотр закрытого месяца).
+    from . import kopiya
+    kopiya.sozdat(mes, god)
+    try:
+        return _run(user)
+    except BaseException:
+        kopiya.udalit(mes, god)
+        raise
+
+
+@transaction.atomic
+def _run(user):
+    mes, god = current()
     potrebs = list(Potreb.objects.order_by("pk"))
     total = sum((p.nac_vsego or 0 for p in potrebs), Decimal(0))
 
@@ -188,6 +200,8 @@ def undo():
     Abot.objects.bulk_create([Abot(**{k: v for k, v in r.items() if k != Abot._meta.pk.attname}) for r in t["abot"]])
     Arhiv.objects.filter(nom_mes=arh.nom_mes, god=arh.god).order_by("-pk").first().delete()
     arh.delete()
+    from . import kopiya
+    kopiya.udalit(arh.nom_mes, arh.god)
     return arh
 
 

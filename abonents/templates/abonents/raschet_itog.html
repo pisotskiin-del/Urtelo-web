@@ -6,7 +6,9 @@
 {% if info %}<p>Расчет {{ info.time }}: рассчитано абонентов {{ info.potreb }}.
   {% if info.otkluchen %}Без заключённого договора (не рассчитывались): {{ info.otkluchen|length }}.{% endif %}
   {% if info.created_poteri %}Созданы записи потерь по участкам для л/№ {{ info.created_poteri|join:", " }}.{% endif %}</p>
-  {% if info.zero_division %}<p class="msg warning">Деление на ноль (начислено 0, проверьте данные):
+  {% if info.perepolnenie %}<p class="msg error">Переполнение данных: число не помещается в поле, поле оставлено пустым — проверьте данные:
+    {% for pid, pole, zn in info.perepolnenie %}<a href="{% url 'abonents:karta' pid %}">л/№ {{ pid }}</a> — {{ pole }} = {{ zn }}{% if not forloop.last %}; {% endif %}{% endfor %}</p>{% endif %}
+  {% if info.zero_division %}<p class="msg warning">Деление на ноль (в старой программе здесь ошибка «переполнение данных»; начислено 0, проверьте данные):
     {% for pid, what in info.zero_division %}<a href="{% url 'abonents:karta' pid %}">л/№ {{ pid }}</a> — {{ what }}{% if not forloop.last %}; {% endif %}{% endfor %}</p>{% endif %}
 {% endif %}
 <div class="scroll">

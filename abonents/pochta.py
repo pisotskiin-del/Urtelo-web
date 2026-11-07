@@ -44,15 +44,38 @@ def gotovo():
     return ""
 
 
+def ssl_kontekst():
+    """Проверка сертификата почтового сервера: корневые сертификаты Windows
+    плюс набор certifi. На Windows Server 2016 без обновлений в хранилище
+    Windows может не быть нужного корневого сертификата (ошибка
+    CERTIFICATE_VERIFY_FAILED), а в certifi он есть."""
+    import ssl as _ssl
+    ctx = _ssl.create_default_context()
+    try:
+        import certifi
+        ctx.load_verify_locations(certifi.where())
+    except (ImportError, OSError):
+        pass
+    # Свой корневой сертификат организации или почтового сервера (файл .crt/.pem),
+    # если почтовый сервер подписан им: TEPLO_SMTP_CA=D:\teplo-web\smtp.crt в .env.
+    ca = getattr(settings, "TEPLO_SMTP_CA", "")
+    if ca:
+        ctx.load_verify_locations(ca)
+    return ctx
+
+
 def connection():
     s = nastrojki()
     port = s.port or 25
     ssl = bool(s.puses) and port == 465
-    return get_connection(
+    conn = get_connection(
         host=(s.smtp or "").strip(), port=port,
         username=(s.senduserna or "").strip() or None if s.paunt else None,
         password=(settings.TEPLO_SMTP_PASSWORD or (s.password or "").strip()) if s.paunt else None,
         use_ssl=ssl, use_tls=bool(s.puses) and not ssl, timeout=s.timeout or 30, fail_silently=False)
+    if hasattr(type(conn), "ssl_context"):   # только SMTP (в тестах — почта в памяти)
+        conn.ssl_context = ssl_kontekst()
+    return conn
 
 
 def poluchatel(dok):
@@ -75,10 +98,10 @@ def otpravit(dok, vid, context, user="", conn=None):
     """Отправить один документ по договору. Возвращает запись реестра."""
     p = poluchatel(dok) or dok.glav
     to = adresa(p.mail)
-    nomer = Pismo.sleduyushchij_nomer()
-    pismo = Pismo(nomer=nomer, user=user, cod_gor=dok.gorod.cod_gorod, nom_dog=dok.nom_dog, potreb_id=p.potreb_id,
+    pismo = Pismo.zarezervirovat(user=user, cod_gor=dok.gorod.cod_gorod, nom_dog=dok.nom_dog, potreb_id=p.potreb_id,
                   name_potre=(p.name_potre or "").strip()[:120], email=", ".join(to), vid=vid,
                   nom_mes=dok.mes, god=dok.god, status=Pismo.OSHIBKA)
+    nomer = pismo.nomer
     if not to:
         pismo.oshibka = "Нет адреса электронной почты в карте абонента"
         pismo.save()
@@ -97,6 +120,7 @@ def otpravit(dok, vid, context, user="", conn=None):
         pismo.save()
         return pismo
     pismo.status = Pismo.OK
+    pismo.oshibka = ""
     pismo.save()
     Potreb.objects.filter(cod_gor=dok.gorod.cod_gorod, nom_dog=dok.nom_dog).update(dataotpr=timezone.now())
     return pismo
