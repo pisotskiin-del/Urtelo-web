@@ -1727,5 +1727,78 @@ class ProsmotrTests(KartaBase):
             self.assertEqual(response.status_code, 200, url)
             self.assertContains(response, "только просмотр")
         self.assertContains(self.client.get("/abonents/raschet/itog/rasshifr/?gorod=1&pole=nac_vsego"), "за Октябрь 2026")
-        self.assertContains(self.client.get("/abonents/otchety/ot_kateg/"), "строится по текущим данным")
+        # Есть полная копия месяца — отчет строится по ней, предупреждения нет.
+        self.assertNotContains(self.client.get("/abonents/otchety/ot_kateg/"), "строится по текущим данным")
         self.assertNotContains(self.client.get("/abonents/raschet/dannye/"), "Сохранить")
+
+
+class KopiyaMesyacaTests(KartaBase):
+    """Полная копия данных месяца: прошлый месяц показывается ровно таким, каким
+    был до перехода, со всеми справочниками и дополнительными таблицами."""
+
+    def setUp(self):
+        super().setUp()
+        from abonents import nov_mes
+        Danrasch.objects.update(nom_mes=10, name_mes="Октябрь", god=2026)
+        Potreb.objects.filter(potreb_id__in=[5, 7, 9]).update(d_stat=60)
+        SpTeplpoteri.objects.create(ln=5, diametr1=Decimal("57"), dlina1=Decimal("12"))
+        nov_mes.run("тест")                       # закрыт октябрь, теперь ноябрь
+        # После перехода меняются справочники и дополнительные таблицы.
+        Kategorpot.objects.filter(id_kotegor=1).update(name_kateg="Категория в ноябре")
+        GvsKot.objects.filter(id_kot=16).update(name_kot="Котельная в ноябре")
+        SpTeplpoteri.objects.filter(ln=5).update(dlina1=Decimal("99"))
+        self.login("Администратор")
+        self.client.get("/abonents/mesyac/", {"mes": "2026-10"})
+
+    def test_copy_file_created_and_removed_on_undo(self):
+        from abonents import kopiya, nov_mes
+        self.assertTrue(kopiya.est(10, 2026))
+        nov_mes.undo()
+        self.assertFalse(kopiya.est(10, 2026))
+
+    def test_catalogs_as_before_transition(self):
+        response = self.client.get("/abonents/5/")
+        self.assertContains(response, "Хозрасчет")
+        self.assertNotContains(response, "Категория в ноябре")
+        self.assertContains(response, "(Р) Котельная №2")
+        self.assertNotContains(response, "Котельная в ноябре")
+        self.assertContains(response, "Октябрь 2026")   # расчетный месяц в карточке
+        response = self.client.get("/abonents/5/poteri/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "12")
+        self.assertNotContains(response, 'value="99')
+        # Вернулись в текущий месяц — всё новое.
+        self.client.get("/abonents/mesyac/", {"mes": ""})
+        self.assertContains(self.client.get("/abonents/5/"), "Категория в ноябре")
+
+    def test_copy_is_read_only(self):
+        self.client.post("/abonents/5/poteri/", {"dlina1": "1"})
+        self.assertEqual(SpTeplpoteri.objects.get(ln=5).dlina1, Decimal("99"))
+        from abonents import kopiya
+        alias = kopiya.otkryt(10, 2026)
+        try:
+            from django.db import DatabaseError
+            with self.assertRaises(DatabaseError):
+                Kategorpot.objects.using(alias).update(name_kateg="x")
+        finally:
+            kopiya.zakryt(alias)
+
+    def test_without_copy_falls_back_to_archive(self):
+        from abonents import kopiya
+        kopiya.udalit(10, 2026)
+        response = self.client.get("/abonents/5/")
+        self.assertContains(response, "только просмотр")
+        self.assertContains(response, "Крипс")
+        self.assertContains(self.client.get("/abonents/otchety/ot_kateg/"), "строится по текущим данным")
+
+    def test_old_copy_gets_new_columns(self):
+        import sqlite3
+        from abonents import kopiya
+        path = kopiya.put(10, 2026)
+        con = sqlite3.connect(path)
+        con.execute("ALTER TABLE %s DROP COLUMN name_kateg" % Kategorpot._meta.db_table)
+        con.commit()
+        con.close()
+        response = self.client.get("/abonents/5/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Крипс")

@@ -72,6 +72,9 @@ try:
 except ImportError:
     pass
 
+# Просмотр закрытого месяца: чтения идут из полной копии данных месяца.
+DATABASE_ROUTERS = ["abonents.kopiya.ArhivRouter"]
+
 ROOT_URLCONF = "teplo.urls"
 
 TEMPLATES = [
@@ -191,3 +194,10 @@ TEPLO_KREDO_OTPRAVITEL = {
     2: {"org": env("TEPLO_KREDO_ORG_OUT_DUB", ""), "pid": env("TEPLO_KREDO_PID_OUT_DUB", "")},
     3: {"org": env("TEPLO_KREDO_ORG_OUT_KAM", ""), "pid": env("TEPLO_KREDO_PID_OUT_KAM", "")},
 }
+
+# Папка полных копий закрытых месяцев (ГГГГ-ММ.sqlite3), по умолчанию arhiv_mesyacev
+# рядом с manage.py. Её нужно включать в резервные копии.
+TEPLO_ARHIV_DIR = env("TEPLO_ARHIV_DIR", "")
+if len(sys.argv) > 1 and sys.argv[1] == "test":
+    import tempfile
+    TEPLO_ARHIV_DIR = tempfile.mkdtemp(prefix="teplo_arhiv_")

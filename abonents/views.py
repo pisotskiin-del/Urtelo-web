@@ -301,6 +301,7 @@ def _sposob(p, groups):
 
 
 def _card_context(request, p, tab_key, form=None, m=None):
+    ro = prosmotr.vybran(request) is not None   # закрытый месяц: только просмотр
     related = related_values(p, m.gorod(p.cod_gor_id) if m is not None else None)
     lookups = _lookups()
     _, title, groups = layout.tab(tab_key)
@@ -336,10 +337,10 @@ def _card_context(request, p, tab_key, form=None, m=None):
         "sposob": _sposob(p, groups),
         "rasot_label": dict(layout.TIP_RASOT).get(p.tip_rasot, ""),
         "hero": _hero(p, related),
-        "can_change": m is None and request.user.has_perm("catalogs.change_potreb"),
-        "can_delete": m is None and request.user.has_perm("catalogs.delete_potreb"),
+        "can_change": not ro and request.user.has_perm("catalogs.change_potreb"),
+        "can_delete": not ro and request.user.has_perm("catalogs.delete_potreb"),
         "pokazaniya": POKAZANIYA,
-        "mes_q": f"&mes={prosmotr.kod(m)}" if m is not None else "",
+        "mes_q": f"&mes={prosmotr.kod(prosmotr.vybran(request))}" if ro else "",
         "pokaz_vydel": ("pok_new", "pok_old", "pok_newg", "pok_oldg"),
         # Кнопка «информация о приборе учёта» у показаний предыдущих, как в старой программе.
         "pribor_info": m is None and form is None and tab_key == "otop" and request.user.has_perm("catalogs.view_spteplosch"),
@@ -369,7 +370,13 @@ def karta(request, potreb_id):
             messages.warning(request, f"Абонента с лицевым № {potreb_id} в архиве за {m.nazvanie} нет")
             return redirect("abonents:index")
     else:
-        p = get_object_or_404(Potreb.objects.select_related("cod_gor", "cod_minist"), potreb_id=potreb_id)
+        p = Potreb.objects.select_related("cod_gor", "cod_minist").filter(potreb_id=potreb_id).first()
+        vybran = prosmotr.vybran(request)
+        if p is None and vybran is not None:
+            messages.warning(request, f"Абонента с лицевым № {potreb_id} в архиве за {vybran.nazvanie} нет")
+            return redirect("abonents:index")
+        if p is None:
+            raise Http404
     if p.cod_gor_id:
         request.session["kod_gorod"] = p.cod_gor_id
     return render(request, "abonents/karta.html", _card_context(request, p, _tab_key(request, shema=True), m=m))
@@ -514,8 +521,8 @@ def _sub_record(model, p, **defaults):
 def poteri_view(request, potreb_id):
     p = get_object_or_404(Potreb, potreb_id=potreb_id)
     sp = _sub_record(SpTeplpoteri, p)
-    can_change = request.user.has_perm("catalogs.change_spteplpoteri") and request.user.has_perm(
-        "catalogs.change_potreb")
+    can_change = prosmotr.vybran(request) is None and request.user.has_perm(
+        "catalogs.change_spteplpoteri") and request.user.has_perm("catalogs.change_potreb")
     form = PoteriForm(request.POST or None, instance=sp)
     if request.method == "POST":
         if not can_change:
@@ -542,7 +549,7 @@ def poteri_view(request, potreb_id):
 def teplosch_view(request, potreb_id):
     p = get_object_or_404(Potreb, potreb_id=potreb_id)
     obj = _sub_record(SpTeplosch, p, name_obek=p.name_potre or "", adres_obek=p.adres_sd or "")
-    can_change = request.user.has_perm("catalogs.change_spteplosch")
+    can_change = prosmotr.vybran(request) is None and request.user.has_perm("catalogs.change_spteplosch")
     form = TeploschForm(request.POST or None, instance=obj)
     if request.method == "POST":
         if not can_change:
@@ -565,7 +572,7 @@ def dan_rasch(request):
     m = prosmotr.get(request)
     if m is not None:
         d = m.gorod(city) or d
-    can_change = m is None and request.user.has_perm("catalogs.change_danrasch") and request.user.has_perm(
+    can_change = prosmotr.vybran(request) is None and request.user.has_perm("catalogs.change_danrasch") and request.user.has_perm(
         "catalogs.change_potreb")
     form = DanRaschForm(request.POST or None, instance=d)
     if request.method == "POST":
@@ -613,7 +620,7 @@ ITOG_FIELDS = [
 def raschet_view(request):
     """Расчет начислений по всем абонентам (кнопка «Расчет» карты)."""
     m = prosmotr.get(request)
-    can_run = m is None and request.user.has_perm("catalogs.change_potreb")
+    can_run = prosmotr.vybran(request) is None and request.user.has_perm("catalogs.change_potreb")
     if request.method == "POST":
         if not can_run:
             raise PermissionDenied
@@ -790,7 +797,7 @@ def nov_mes_view(request):
     """Переход на новый месяц (форма nov_mes): архив месяца, накопления с начала
     года и сезона, обнуление начислений, следующий месяц во всех городах.
     Выполняет только Администратор; последний переход можно отменить."""
-    can_run = prosmotr.get(request) is None and request.user.has_perm("catalogs.delete_danrasch")
+    can_run = prosmotr.vybran(request) is None and request.user.has_perm("catalogs.delete_danrasch")
     if request.method == "POST":
         if not can_run:
             raise PermissionDenied
@@ -887,11 +894,12 @@ def otchet(request, key):
         raise Http404
     params = request.GET
     m = prosmotr.get(request)
+    vybran = prosmotr.vybran(request)
     month_opts = [name for name, _, choices in rdef.options if choices == reports.MONTH]
-    if m is not None and any(name not in params for name in month_opts):
+    if vybran is not None and any(name not in params for name in month_opts):
         params = params.copy()
         for name in month_opts:
-            params.setdefault(name, prosmotr.kod(m))
+            params.setdefault(name, prosmotr.kod(vybran))
     report, opts = reports.build(rdef, city, params)
     if request.GET.get("xlsx"):
         import io

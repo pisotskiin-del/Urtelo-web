@@ -9,10 +9,10 @@ def raschet_mes(request):
         return {}
     from . import arhiv, prosmotr
     out = {"mesyacy_arhiv": arhiv.vybor()}
-    m = prosmotr.get(request)
+    m = prosmotr.vybran(request)
     if m is not None:
         out.update(prosmotr=m, prosmotr_mes=prosmotr.kod(m))
-    cities = list(Danrasch.objects.exclude(cod_gorod=None).order_by("cod_gorod"))
+    cities = list(Danrasch.objects.using("default").exclude(cod_gorod=None).order_by("cod_gorod"))
     code = request.session.get("kod_gorod")
     city = next((c for c in cities if c.cod_gorod == code), cities[0] if cities else None)
     if city is None or not city.name_mes:

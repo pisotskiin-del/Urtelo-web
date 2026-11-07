@@ -29,6 +29,8 @@ if errorlevel 1 (
   if /i not "%~1"=="/auto" pause
   exit /b 1
 )
+rem Full copies of closed months (arhiv_mesyacev\YYYY-MM.sqlite3): copied once, never deleted here.
+if exist arhiv_mesyacev robocopy arhiv_mesyacev "%BACKUP_DIR%\arhiv_mesyacev" *.sqlite3 /E /XO /NFL /NDL /NJH /NJS /NP >nul
 echo %date% %time% OK %FILE%>> "%BACKUP_DIR%\backup.log"
 forfiles /p "%BACKUP_DIR%" /m teplo_*.dump /d -%KEEP_DAYS% /c "cmd /c del @path" 2>nul
 echo Backup OK: %FILE%

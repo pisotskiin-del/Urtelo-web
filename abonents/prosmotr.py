@@ -19,6 +19,8 @@ from django.contrib import messages
 from django.shortcuts import redirect
 from django.urls import resolve, Resolver404, reverse
 
+from . import kopiya
+
 KEY = "prosmotr_mes"  # "ГГГГ-ММ" в сеансе
 
 # Страницы, где можно только менять данные: в просмотре — переход на карточку
@@ -63,7 +65,7 @@ def najti(raw):
     return _mesyac(a) if a else None
 
 
-def get(request):
+def vybran(request):
     """Просматриваемый закрытый месяц (arhiv.Mesyac) или None — текущий месяц."""
     if hasattr(request, "_prosmotr"):
         return request._prosmotr
@@ -78,12 +80,23 @@ def get(request):
     return m
 
 
+def get(request):
+    """Закрытый месяц, который показывается по архиву MesArhiv (только
+    абоненты и города), или None. Если у месяца есть полная копия данных
+    (kopiya), все страницы и так читают из неё, и тогда здесь None."""
+    m = vybran(request)
+    if m is None or kopiya.est(m.mes, m.god):
+        return None
+    return m
+
+
 def kod(m):
     return f"{m.god}-{m.mes:02d}" if m else ""
 
 
 class ProsmotrMiddleware:
-    """В просмотре закрытого месяца данные не меняются."""
+    """В просмотре закрытого месяца данные не меняются, а если есть полная копия
+    месяца, все страницы читают данные из неё."""
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -92,7 +105,7 @@ class ProsmotrMiddleware:
         user = getattr(request, "user", None)
         if user is None or not user.is_authenticated or not request.session.get(KEY):
             return self.get_response(request)
-        m = get(request)
+        m = vybran(request)
         if m is None:
             return self.get_response(request)
         try:
@@ -100,14 +113,24 @@ class ProsmotrMiddleware:
         except Resolver404:
             return self.get_response(request)
         name = match.url_name
-        pravka = match.app_name == "abonents" and name in PRAVKA
+        est_kopiya = kopiya.est(m.mes, m.god)
+        # С полной копией месяца потери и теплосчётчик можно посмотреть (без правки).
+        pravka = match.app_name == "abonents" and name in PRAVKA and not (
+            est_kopiya and name in ("poteri", "teplosch"))
         if request.method == "POST" and name not in RAZRESHENO_POST:
             messages.error(request, f"Открыт закрытый месяц {m.nazvanie} — только просмотр. "
                                     "Чтобы что-то изменить, вернитесь в текущий месяц.")
         elif pravka:
             messages.warning(request, f"Открыт закрытый месяц {m.nazvanie} — только просмотр.")
         else:
-            return self.get_response(request)
+            alias = kopiya.otkryt(m.mes, m.god)
+            if alias is None:
+                return self.get_response(request)
+            try:
+                with kopiya.Vklyuchit(alias):
+                    return self.get_response(request)
+            finally:
+                kopiya.zakryt(alias)
         if pravka:
             potreb_id = match.kwargs.get("potreb_id")
             return redirect(reverse("abonents:karta", args=[potreb_id]) if potreb_id else reverse("abonents:index"))
