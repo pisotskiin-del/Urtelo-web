@@ -195,12 +195,31 @@ form.inline { display:inline; margin:0; }
 
 /* ===== Тема: тёмно-синяя шапка и боковое меню, белые карточки (по образцу Николая) ===== */
 :root { --navy:#13284b; --navy-2:#1b3866; --navy-3:#24467d; --side:224px; --side-mini:64px;
-        --accent:#2f7de1; --accent-weak:#e8f1fd; --accent-text:#1f63bd; --bg:#f2f5f9; --topbar:64px; }
+        --accent:#2f7de1; --accent-weak:#e8f1fd; --accent-text:#1f63bd; --bg:#f2f5f9; --topbar:64px;
+        --side-end:#102243; --act-1:#2c6fd0; --act-2:#3b82e6; --act-glow:rgba(47,125,225,.35); --accent-hover:#236bc7; }
+
+/* Цветовые стили (кнопка-палитра в шапке, запоминается в браузере). Меняют шапку,
+   боковое меню и акцентный цвет; «Синий» — стиль по умолчанию, без атрибута. */
+html[data-palette="green"] { --navy:#0f3b2e; --navy-2:#15513f; --navy-3:#1d6650; --side-end:#0b3026;
+  --accent:#16875c; --accent-weak:#e3f4ec; --accent-text:#0e6b4a; --accent-hover:#10734e;
+  --act-1:#13875c; --act-2:#22a874; --act-glow:rgba(22,135,92,.35); --bg:#f2f6f4; }
+html[data-palette="teal"] { --navy:#0d3640; --navy-2:#124b58; --navy-3:#176070; --side-end:#0a2b33;
+  --accent:#0f8597; --accent-weak:#e2f3f6; --accent-text:#0c6c7b; --accent-hover:#0c7180;
+  --act-1:#0f8597; --act-2:#1aa5b8; --act-glow:rgba(15,133,151,.35); --bg:#f1f6f7; }
+html[data-palette="violet"] { --navy:#2a1c4f; --navy-2:#3a2768; --navy-3:#4a3382; --side-end:#22163f;
+  --accent:#6a48d6; --accent-weak:#efeafd; --accent-text:#5434b6; --accent-hover:#5a3cc0;
+  --act-1:#6440d0; --act-2:#7c5ce6; --act-glow:rgba(106,72,214,.35); --bg:#f5f4fa; }
+html[data-palette="wine"] { --navy:#4a1424; --navy-2:#621b31; --navy-3:#7a2540; --side-end:#3b0f1c;
+  --accent:#b3305a; --accent-weak:#fbe9ef; --accent-text:#952446; --accent-hover:#9a294d;
+  --act-1:#a82a50; --act-2:#c9406a; --act-glow:rgba(179,48,90,.35); --bg:#f7f3f4; }
+html[data-palette="graphite"] { --navy:#23272e; --navy-2:#2f343c; --navy-3:#3b414b; --side-end:#1c1f25;
+  --accent:#c4590f; --accent-weak:#fdf0e6; --accent-text:#a3490c; --accent-hover:#a94d0e;
+  --act-1:#c4590f; --act-2:#e07a2e; --act-glow:rgba(196,89,15,.35); --bg:#f3f4f6; }
 body { background:var(--bg); }
 svg.i { width:16px; height:16px; flex:none; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; vertical-align:-3px; }
 button svg.i, .button svg.i { margin:0 -1px; }
 .primary { background:var(--accent); border-color:var(--accent); }
-.primary:hover { background:#236bc7; }
+.primary:hover { background:var(--accent-hover); }
 
 /* Шапка */
 .topbar { height:var(--topbar); gap:20px; padding:0 20px 0 12px; border:0; color:#fff;
@@ -232,12 +251,12 @@ button svg.i, .button svg.i { margin:0 -1px; }
 
 /* Боковое меню */
 .layout { display:flex; min-height:calc(100vh - var(--topbar)); }
-.sidebar { width:var(--side); flex:none; background:linear-gradient(180deg, var(--navy) 0%, #102243 100%); color:#d6e2f3;
+.sidebar { width:var(--side); flex:none; background:linear-gradient(180deg, var(--navy) 0%, var(--side-end) 100%); color:#d6e2f3;
   display:flex; flex-direction:column; padding:14px 8px; position:sticky; top:var(--topbar); height:calc(100vh - var(--topbar)); transition:width .15s; }
 .sidebar a, .sidebar button.collapse { display:flex; align-items:center; gap:14px; padding:12px 14px; margin-bottom:4px; border-radius:8px;
   color:#d6e2f3; font-weight:500; font-size:14.5px; white-space:nowrap; overflow:hidden; }
 .sidebar a:hover, .sidebar button.collapse:hover { background:rgba(255,255,255,.07); color:#fff; text-decoration:none; }
-.sidebar a.active { background:linear-gradient(90deg, #2c6fd0, #3b82e6); color:#fff; box-shadow:0 4px 12px rgba(47,125,225,.35); }
+.sidebar a.active { background:linear-gradient(90deg, var(--act-1), var(--act-2)); color:#fff; box-shadow:0 4px 12px var(--act-glow); }
 .sidebar .i { width:22px; height:22px; flex:none; }
 .sidebar .sp { flex:1; }
 .sidebar button.collapse { background:none; border:0; min-height:0; width:100%; cursor:pointer; }
@@ -521,6 +540,28 @@ form.otozvat .button { height:26px; padding:0 10px; font-size:12px; }
 .user button.tema .t-light, html[data-theme="dark"] .user button.tema .t-dark { display:none; }
 html[data-theme="dark"] .user button.tema .t-light { display:inline; }
 
+/* Выбор оформления: всплывающее окно у кнопки-палитры */
+.oform { position:relative; }
+.oform > summary { list-style:none; cursor:pointer; padding:7px; border-radius:8px; color:#dbe7f7; display:flex; }
+.oform > summary::-webkit-details-marker { display:none; }
+.oform > summary:hover, .oform[open] > summary { background:rgba(255,255,255,.1); color:#fff; }
+.oform > summary .i { width:20px; height:20px; }
+.oform .pop { position:absolute; right:0; top:calc(100% + 8px); z-index:40; width:290px; padding:12px; border-radius:12px;
+  background:var(--card); color:var(--text); border:1px solid var(--line); box-shadow:0 10px 30px rgba(10,25,50,.25); font-weight:400; }
+.oform .pop h4 { margin:0 0 8px; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+.oform .pop h4 + .rezh { margin-bottom:12px; }
+.oform .rezh { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.oform .rezh button { display:flex; gap:6px; align-items:center; justify-content:center; height:34px; min-height:0; font-weight:500; }
+.oform .rezh button.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+.oform .palitry { display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; }
+.oform .palitry button { display:flex; flex-direction:column; align-items:center; gap:5px; padding:8px 4px 6px; min-height:0; height:auto;
+  font-size:12px; font-weight:500; background:none; border:1px solid var(--line); border-radius:8px; color:var(--text); }
+.oform .palitry button:hover { border-color:var(--line-strong); }
+.oform .palitry button.on { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+.oform .palitry .obr { width:40px; height:22px; border-radius:6px; overflow:hidden; display:flex; box-shadow:inset 0 0 0 1px rgba(0,0,0,.08); }
+.oform .palitry .obr i { flex:2; } .oform .palitry .obr i + i { flex:1; }
+@media print { .oform { display:none; } }
+
 /* Тёмная тема (кнопка-луна в шапке; запоминается в браузере). Только на экране:
    печать и PDF остаются светлыми. Бланки документов (.dok) — белые, как бумага. */
 @media screen {
@@ -530,8 +571,23 @@ html[data-theme="dark"] {
   --accent:#4d94ee; --accent-weak:#1a2c47; --accent-text:#8bbaf5;
   --danger:#f0716c; --danger-weak:#3a1d1f; --ok:#4cc38a; --ok-weak:#16302a;
   --warn:#e9a84a; --warn-weak:#352a17; --off:#7c8698; --off-weak:#1f2836;
-  --navy:#0c1a30; --navy-2:#11264a; --navy-3:#173160;
+  --navy:#0c1a30; --navy-2:#11264a; --navy-3:#173160; --side-end:#0a1628; --accent-hover:#3a82dd;
 }
+html[data-theme="dark"][data-palette="green"] { --navy:#0b221b; --navy-2:#0f3027; --navy-3:#143d32; --side-end:#081a14;
+  --accent:#3fbf88; --accent-weak:#15302a; --accent-text:#7fd9b0; --accent-hover:#34ab78;
+  --act-1:#1f7d56; --act-2:#2a9d6c; --act-glow:rgba(63,191,136,.25); }
+html[data-theme="dark"][data-palette="teal"] { --navy:#08222a; --navy-2:#0c2f38; --navy-3:#103c47; --side-end:#061a20;
+  --accent:#36b6c8; --accent-weak:#12303a; --accent-text:#86d8e4; --accent-hover:#2aa4b6;
+  --act-1:#137d8c; --act-2:#1a9fb1; --act-glow:rgba(54,182,200,.25); }
+html[data-theme="dark"][data-palette="violet"] { --navy:#160f2b; --navy-2:#1f163d; --navy-3:#291d4f; --side-end:#110b22;
+  --accent:#9a7ff0; --accent-weak:#261e45; --accent-text:#c3b2f7; --accent-hover:#8a6ce8;
+  --act-1:#5f42c4; --act-2:#7c5ce6; --act-glow:rgba(154,127,240,.25); }
+html[data-theme="dark"][data-palette="wine"] { --navy:#26101a; --navy-2:#341521; --navy-3:#431b2b; --side-end:#1e0c14;
+  --accent:#e0688c; --accent-weak:#3a1a25; --accent-text:#f0a2b9; --accent-hover:#cf5a7e;
+  --act-1:#a12f53; --act-2:#c9406a; --act-glow:rgba(224,104,140,.25); }
+html[data-theme="dark"][data-palette="graphite"] { --navy:#15181d; --navy-2:#1c2026; --navy-3:#23282f; --side-end:#101216;
+  --accent:#ec8a45; --accent-weak:#362516; --accent-text:#f5b585; --accent-hover:#dc7a36;
+  --act-1:#a95820; --act-2:#d0702c; --act-glow:rgba(236,138,69,.25); }
 html[data-theme="dark"] input, html[data-theme="dark"] select, html[data-theme="dark"] textarea,
 html[data-theme="dark"] button:not(.link):not(.burger):not(.collapse):not(.tema), html[data-theme="dark"] .button, html[data-theme="dark"] kbd, html[data-theme="dark"] .pager a,
 html[data-theme="dark"] .navbtns, html[data-theme="dark"] .danger, html[data-theme="dark"] .chip,
@@ -542,10 +598,10 @@ html[data-theme="dark"] .seg button:hover { background:#233149; }
 html[data-theme="dark"] .button.off:hover { background:#1b2638; }
 html[data-theme="dark"] .primary, html[data-theme="dark"] .tabs.karta-tabs a.active,
 html[data-theme="dark"] .toolbar .tabs a.active { background:var(--accent); border-color:var(--accent); color:#fff !important; }
-html[data-theme="dark"] .primary:hover { background:#3a82dd; }
+html[data-theme="dark"] .primary:hover { background:var(--accent-hover); }
 html[data-theme="dark"] .danger { border-color:#5a2a2a; color:var(--danger) !important; }
 html[data-theme="dark"] .seg button { border-color:#34425a; }
-html[data-theme="dark"] .seg button.on { background:linear-gradient(#3f7fcc, #2a5fa3); color:#fff; }
+html[data-theme="dark"] .seg button.on { background:var(--accent); border-color:var(--accent); color:#fff; }
 html[data-theme="dark"] .actions.sticky { background:rgba(15,22,34,.92); }
 html[data-theme="dark"] .msg { color:#bfe8d2; border-color:#245040; }
 html[data-theme="dark"] .msg.error, html[data-theme="dark"] .msg.warning { color:#f6c4c1; border-color:#5a2a2a; }
@@ -868,3 +924,10 @@ html[data-theme="dark"] .rep-podpis small, html[data-theme="dark"] .rep-podpis .
 .prosmotr-bar svg { width:18px; height:18px; flex:none; }
 .prosmotr-bar span { flex:1; min-width:200px; }
 html[data-theme="dark"] .prosmotr-bar { background:#3a2e10; border-color:#6b5420; color:#ffe2a0; }
+
+/* Кнопки окна оформления в тёмном режиме (общие правила тёмных кнопок сильнее). */
+@media screen {
+html[data-theme="dark"] .oform .rezh button.on { background:var(--accent) !important; border-color:var(--accent); color:#fff; }
+html[data-theme="dark"] .oform .palitry button { background:transparent !important; border-color:var(--line); }
+html[data-theme="dark"] .oform .palitry button.on { border-color:var(--accent); }
+}
