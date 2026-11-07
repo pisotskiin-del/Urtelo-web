@@ -12,12 +12,15 @@
 </head>
 <body>
 {% include "_icons.html" %}
-<script>try { if (localStorage.getItem("side-mini") === "1") document.documentElement.classList.add("side-mini"); if (localStorage.getItem("tema") === "dark") document.documentElement.setAttribute("data-theme", "dark"); } catch (e) {}</script>
-<script>/* Печать всегда в светлой теме: тёмная остаётся только на экране. */
+<script>try { if (localStorage.getItem("side-mini") === "1") document.documentElement.classList.add("side-mini"); if (localStorage.getItem("tema") === "dark") document.documentElement.setAttribute("data-theme", "dark"); var p = localStorage.getItem("palitra"); if (p && p !== "blue") document.documentElement.setAttribute("data-palette", p); } catch (e) {}</script>
+<script>/* Печать всегда в светлой синей теме: тёмная и цветовые стили остаются только на экране. */
 (function () {
-  var h = document.documentElement, byla = null;
-  window.addEventListener("beforeprint", function () { byla = h.getAttribute("data-theme"); if (byla) h.removeAttribute("data-theme"); });
-  window.addEventListener("afterprint", function () { if (byla) h.setAttribute("data-theme", byla); byla = null; });
+  var h = document.documentElement, byla = null, pal = null;
+  window.addEventListener("beforeprint", function () {
+    byla = h.getAttribute("data-theme"); pal = h.getAttribute("data-palette");
+    if (byla) h.removeAttribute("data-theme"); if (pal) h.removeAttribute("data-palette"); });
+  window.addEventListener("afterprint", function () {
+    if (byla) h.setAttribute("data-theme", byla); if (pal) h.setAttribute("data-palette", pal); byla = pal = null; });
 })();</script>
 <header class="topbar">
   {% if user.is_authenticated %}<button class="burger" type="button" onclick="toggleSide()" title="Свернуть / развернуть меню">{% icon "menu" %}</button>{% endif %}
@@ -36,6 +39,25 @@
   </div>
   <div class="user">
     <button class="tema" type="button" onclick="toggleTema()" title="Тёмная / светлая тема"><span class="t-dark">{% icon "moon" %}</span><span class="t-light">{% icon "sun" %}</span></button>
+    <details class="oform" id="oform">
+      <summary title="Цветовой стиль оформления">{% icon "palette" %}</summary>
+      <div class="pop">
+        <h4>Режим</h4>
+        <div class="rezh">
+          <button type="button" data-tema="light" onclick="setTema('light')">{% icon "sun" %} Светлый</button>
+          <button type="button" data-tema="dark" onclick="setTema('dark')">{% icon "moon" %} Тёмный</button>
+        </div>
+        <h4>Цветовой стиль</h4>
+        <div class="palitry">
+          <button type="button" data-pal="blue" onclick="setPalitra('blue')"><span class="obr"><i style="background:#13284b"></i><i style="background:#2f7de1"></i></span>Синий</button>
+          <button type="button" data-pal="green" onclick="setPalitra('green')"><span class="obr"><i style="background:#0f3b2e"></i><i style="background:#16875c"></i></span>Зелёный</button>
+          <button type="button" data-pal="teal" onclick="setPalitra('teal')"><span class="obr"><i style="background:#0d3640"></i><i style="background:#0f8597"></i></span>Бирюзовый</button>
+          <button type="button" data-pal="violet" onclick="setPalitra('violet')"><span class="obr"><i style="background:#2a1c4f"></i><i style="background:#6a48d6"></i></span>Фиолетовый</button>
+          <button type="button" data-pal="wine" onclick="setPalitra('wine')"><span class="obr"><i style="background:#4a1424"></i><i style="background:#b3305a"></i></span>Бордовый</button>
+          <button type="button" data-pal="graphite" onclick="setPalitra('graphite')"><span class="obr"><i style="background:#23272e"></i><i style="background:#c4590f"></i></span>Графит</button>
+        </div>
+      </div>
+    </details>
     <span class="ava">{% icon "user" %}</span>
     <span class="who">{{ user.get_full_name|default:user.username }}{% if user_roles %}<small>{{ user_roles|join:", " }}</small>{% endif %}</span>
     <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="link">{% icon "logout" %} Выход</button></form>
@@ -75,12 +97,31 @@
 </main>
 </div>
 <script>
-function toggleTema() {
-  var dark = document.documentElement.getAttribute("data-theme") !== "dark";
-  if (dark) document.documentElement.setAttribute("data-theme", "dark");
-  else document.documentElement.removeAttribute("data-theme");
-  try { localStorage.setItem("tema", dark ? "dark" : "light"); } catch (e) {}
+// Оформление: режим (светлый / тёмный) и цветовой стиль; оба запоминаются в браузере.
+function oformOtmetit() {
+  var h = document.documentElement, t = h.getAttribute("data-theme") || "light", p = h.getAttribute("data-palette") || "blue";
+  document.querySelectorAll("#oform [data-tema]").forEach(function (b) { b.classList.toggle("on", b.dataset.tema === t); });
+  document.querySelectorAll("#oform [data-pal]").forEach(function (b) { b.classList.toggle("on", b.dataset.pal === p); });
+  var m = document.querySelector('meta[name="theme-color"]');
+  if (m) m.content = getComputedStyle(h).getPropertyValue("--navy").trim() || "#13284b";
 }
+function setTema(t) {
+  if (t === "dark") document.documentElement.setAttribute("data-theme", "dark");
+  else document.documentElement.removeAttribute("data-theme");
+  try { localStorage.setItem("tema", t); } catch (e) {}
+  oformOtmetit();
+}
+function toggleTema() { setTema(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark"); }
+function setPalitra(p) {
+  if (p && p !== "blue") document.documentElement.setAttribute("data-palette", p);
+  else document.documentElement.removeAttribute("data-palette");
+  try { localStorage.setItem("palitra", p || "blue"); } catch (e) {}
+  oformOtmetit();
+}
+document.addEventListener("DOMContentLoaded", oformOtmetit);
+// Окно оформления закрывается щелчком мимо него и клавишей Esc.
+document.addEventListener("click", function (e) { var d = document.getElementById("oform"); if (d && d.open && !d.contains(e.target)) d.open = false; });
+document.addEventListener("keydown", function (e) { var d = document.getElementById("oform"); if (e.key === "Escape" && d && d.open) d.open = false; });
 function toggleSide() {
   var on = document.documentElement.classList.toggle("side-mini");
   try { localStorage.setItem("side-mini", on ? "1" : "0"); } catch (e) {}
