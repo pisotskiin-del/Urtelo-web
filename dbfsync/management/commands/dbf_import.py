@@ -21,6 +21,8 @@ class Command(BaseCommand):
         parser.add_argument("--fixes", default="", help="JSON с исправлениями данных (для catalogs по умолчанию ur_teplo_fixes.json)")
 
     def handle(self, *args, **opts):
+        # Итог по таблицам и ошибки — для страницы «Обновить из DBF» (catalogs.views.dbf_update).
+        self.rows, self.errors = [], []
         targets = dbf_models(opts["app"])
         if opts["only"]:
             wanted = {n.lower() for n in opts["only"]}
@@ -46,19 +48,28 @@ class Command(BaseCommand):
                 source, loaded, bad, fixed = import_table(model, opts["dir"], opts["encoding"], truncate=False, fixes=fixes)
             except DuplicateKeyError as exc:
                 failed = True
+                self.errors.append(str(exc))
                 self.stderr.write(self.style.ERROR(str(exc)))
                 continue
             except FileNotFoundError as exc:
                 failed = True
+                self.errors.append(f"{model.__name__}: {exc}")
                 self.stderr.write(self.style.ERROR(f"{model.__name__}: {exc}"))
                 continue
             ok = opts["append"] or source == loaded
             failed |= not ok
             style = self.style.SUCCESS if ok else self.style.ERROR
             self.stdout.write(style(f"{model.dbf_source:<20} DBF: {source:>7}  БД: {loaded:>7}  {'OK' if ok else 'РАСХОЖДЕНИЕ'}"))
+            notes = []
             for column, count in sorted(bad.items()):
-                self.stdout.write(self.style.WARNING(f"    {column}: нечитаемых значений {count}, записаны пустыми"))
+                notes.append(f"{column}: нечитаемых значений {count}, записаны пустыми")
+                self.stdout.write(self.style.WARNING(f"    {notes[-1]}"))
             for column, count in sorted(fixed.items()):
                 if count:
-                    self.stdout.write(f"    {column}: исправлено значений {count} (см. {Path(fixes_path).name})")
+                    notes.append(f"{column}: исправлено значений {count} (см. {Path(fixes_path).name})")
+                    self.stdout.write(f"    {notes[-1]}")
+            self.rows.append({
+                "model": model.__name__, "title": model._meta.verbose_name_plural, "source": model.dbf_source,
+                "dbf": source, "db": loaded, "ok": ok, "notes": notes,
+            })
         return failed
