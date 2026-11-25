@@ -1,0 +1,63 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Обновить данные из DBF{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{% url 'catalogs:index' %}">Справочники</a><span class="sep">›</span>Обновить из DBF</p>
+<div class="page-head"><h1>Обновить данные из DBF старой программы</h1></div>
+
+{% if result %}
+<section class="card kgroup" style="margin-bottom:14px"><h2>{% icon "list" %} {% if result.ok %}Данные обновлены{% else %}Обновление не выполнено, база не изменена{% endif %}</h2>
+  <p style="padding:0 16px">{% if result.files %}Скопировано файлов: {{ result.files }} ({{ result.size_mb }} МБ), заняло {{ result.seconds }} с.{% endif %}
+    {% if result.ok %}Загружено таблиц: {{ result.rows|length }}, записей: {{ result.total }}. Число записей совпало с DBF во всех таблицах.{% endif %}</p>
+  {% for e in result.errors %}<pre class="msg error" style="margin:0 16px 10px;white-space:pre-wrap">{{ e }}</pre>{% endfor %}
+  {% if result.bad %}<p class="msg error" style="margin:0 16px 10px">Число записей не совпало с DBF: {% for r in result.bad %}{{ r.source }} (DBF {{ r.dbf }}, база {{ r.db }}){% if not forloop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
+  {% if result.rows %}<details style="padding:0 16px 12px"><summary>Таблицы ({{ result.rows|length }})</summary>
+  <div class="scroll" style="border:0;box-shadow:none"><table class="grid">
+    <thead><tr><th>Справочник</th><th>Файл DBF</th><th class="num">В DBF</th><th class="num">В базе</th><th>Сверка</th><th>Замечания</th></tr></thead>
+    <tbody>{% for r in result.rows %}<tr><td>{{ r.title }}</td><td class="muted">{{ r.source }}</td><td class="num">{{ r.dbf }}</td><td class="num">{{ r.db }}</td>
+      <td>{% if r.ok %}OK{% else %}<b class="error">расхождение</b>{% endif %}</td><td class="muted">{{ r.notes|join:"; " }}</td></tr>{% endfor %}</tbody>
+  </table></div></details>{% endif %}
+</section>
+{% endif %}
+
+<section class="card kgroup" style="margin-bottom:14px"><h2>{% icon "list" %} Что произойдёт</h2>
+  <ul class="nm-list">
+    <li>Файлы {{ tables }} таблиц DBF скопируются из указанной папки во временную, чтобы не читать их в момент, когда старая программа в них пишет. Сама папка не меняется.</li>
+    <li>Справочники приложения (абоненты, тарифы, исходные данные и остальные таблицы из DBF) очистятся и загрузятся заново из копии.</li>
+    <li>Число записей сверится с DBF. Если хоть одна таблица не загрузится или не сойдётся, всё отменится и база останется как была.</li>
+    <li><b>Всё, что изменено в справочниках через веб-программу (правки карт абонентов, расчет, новые абоненты), заменится данными старой программы.</b> Закрытые месяцы, письма, подписанты, настройки и пользователи не затрагиваются.</li>
+    <li>Обновление может занять несколько минут. Попросите других операторов не менять данные в это время.</li>
+  </ul>
+</section>
+
+<form method="post" class="card nm-run" id="dbf-form" style="padding:14px 16px">{% csrf_token %}
+  <p><label for="folder">Папка с таблицами DBF</label><br>
+    <input id="folder" name="folder" value="{{ folder }}" size="50" required></p>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <label class="check"><input type="checkbox" name="confirm" value="1" required> Понимаю, что данные справочников будут заменены данными из DBF</label>
+  <div class="actions">
+    <button class="primary" type="submit">{% icon "open" %} Обновить из DBF</button>
+    <a href="{% url 'catalogs:index' %}">К справочникам</a>
+  </div>
+  <p class="muted" id="dbf-wait" hidden>Идёт обновление, не закрывайте окно…</p>
+</form>
+<dialog class="confirm" id="dbf-confirm"><form method="dialog">
+  <h3>{% icon "open" %} Обновить из DBF</h3>
+  <p>Вы уверены? Справочники будут загружены заново из DBF, изменения, сделанные в веб-программе, заменятся.</p>
+  <div class="buttons"><button value="yes" class="primary">Да</button><button value="no">Нет</button></div>
+</form></dialog>
+<script>
+(function () {
+  var form = document.getElementById("dbf-form"), dlg = document.getElementById("dbf-confirm"), ok = false;
+  form.addEventListener("submit", function (e) {
+    if (ok) return;
+    e.preventDefault(); dlg.returnValue = ""; dlg.showModal(); dlg.querySelector("button[value=no]").focus();
+  });
+  dlg.addEventListener("close", function () {
+    if (dlg.returnValue === "yes") {
+      ok = true; form.querySelector("button[type=submit]").disabled = true;
+      document.getElementById("dbf-wait").hidden = false; form.submit();
+    }
+  });
+})();
+</script>
+{% endblock %}

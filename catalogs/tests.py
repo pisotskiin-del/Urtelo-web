@@ -81,3 +81,63 @@ class PravaTests(TestCase):
         self.client.login(username="nab", password="x")
         r = self.client.get(reverse("catalogs:edit", args=["nastroika", Nastroika.objects.get().pk]))
         self.assertContains(r, "Недостаточно прав", status_code=403)
+
+
+class DbfUpdateTests(TestCase):
+    """Кнопка «Обновить из DBF» на тестовых таблицах dbfsync."""
+
+    def setUp(self):
+        from pathlib import Path
+        from unittest import mock
+
+        from dbfsync.testapp.models import Org
+
+        call_command("init_roles", stdout=open("/dev/null", "w"))
+        self.demo = str(Path(__file__).resolve().parents[1] / "dbfsync" / "tests" / "fixtures")
+        patcher = mock.patch("catalogs.views.DBF_APP", "dbfsync_testapp")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.Org = Org
+
+    def login(self, role):
+        user = get_user_model().objects.create_user(role, password="x")
+        user.groups.add(Group.objects.get(name=role))
+        self.client.force_login(user)
+
+    def test_only_admin_sees_button_and_page(self):
+        self.login("Оператор")
+        self.assertNotContains(self.client.get("/catalogs/"), "Обновить из DBF")
+        self.assertEqual(self.client.get("/catalogs/obnovit-iz-dbf/").status_code, 403)
+        self.assertEqual(self.client.post("/catalogs/obnovit-iz-dbf/", {"folder": self.demo, "confirm": "1"}).status_code, 403)
+        self.assertEqual(self.Org.objects.count(), 0)
+
+    def test_admin_updates_from_copy(self):
+        self.login("Администратор")
+        self.assertContains(self.client.get("/catalogs/"), "Обновить из DBF")
+        self.Org.objects.create(kod=99, naim="Лишняя запись")
+        response = self.client.post("/catalogs/obnovit-iz-dbf/", {"folder": self.demo, "confirm": "1"})
+        self.assertContains(response, "Данные обновлены")
+        self.assertEqual(self.Org.objects.count(), 3)
+        self.assertFalse(self.Org.objects.filter(kod=99).exists())
+        self.assertTrue(all(r["ok"] for r in response.context["result"]["rows"]))
+
+    def test_without_confirmation_nothing_changes(self):
+        self.login("Администратор")
+        response = self.client.post("/catalogs/obnovit-iz-dbf/", {"folder": self.demo})
+        self.assertContains(response, "Отметьте флажок")
+        self.assertEqual(self.Org.objects.count(), 0)
+
+    def test_missing_table_rolls_back(self):
+        import shutil
+        import tempfile
+        from pathlib import Path
+
+        self.login("Администратор")
+        self.Org.objects.create(kod=99, naim="Было до обновления")
+        with tempfile.TemporaryDirectory() as folder:
+            for name in ("org.dbf", "org.fpt"):  # objekt.dbf и tarif.dbf нет
+                shutil.copy(Path(self.demo) / name, folder)
+            response = self.client.post("/catalogs/obnovit-iz-dbf/", {"folder": folder, "confirm": "1"})
+        self.assertContains(response, "база не изменена")
+        self.assertContains(response, "нет таблиц (2 из 3): objekt.dbf, tarif.dbf")
+        self.assertEqual(list(self.Org.objects.values_list("kod", flat=True)), [99])

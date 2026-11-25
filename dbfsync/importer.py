@@ -1,6 +1,7 @@
 """Загрузка записей из DBF в модели приложения catalogs."""
 
 import datetime
+import shutil
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
@@ -164,6 +165,38 @@ def import_table(model, directory, encoding=None, truncate=True, fixes=None):
         if batch:
             model.objects.bulk_create(batch)
     return source_count, model.objects.count(), dict(table.parse_errors), fixed
+
+
+MEMO_SUFFIXES = (".fpt", ".dbt")
+
+
+def copy_sources(models_list, directory, target):
+    """Скопировать в каталог target файлы DBF моделей (и их memo-файлы .fpt/.dbt)
+    с тем же относительным путём. Копия нужна, чтобы не читать таблицы в момент,
+    когда старая программа в них пишет. Таблицу, которой нет, пропускает: об этом
+    скажет загрузка. Возвращает (число файлов, байт, [ненайденные файлы DBF])."""
+    directory, target = Path(directory), Path(target)
+    files = bytes_ = 0
+    missing = []
+    for model in models_list:
+        try:
+            path = _find_file(directory, model.dbf_source)
+        except FileNotFoundError:
+            missing.append(model.dbf_source)
+            continue
+        siblings = [path] + [
+            p for p in path.parent.iterdir()
+            if p.stem.lower() == path.stem.lower() and p.suffix.lower() in MEMO_SUFFIXES
+        ]
+        for p in siblings:
+            dest = target / p.relative_to(directory)
+            if dest.exists():
+                continue
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(p, dest)
+            files += 1
+            bytes_ += dest.stat().st_size
+    return files, bytes_, missing
 
 
 def _find_file(directory, name):

@@ -24,3 +24,8 @@ def user_roles(user):
     if user.is_superuser and ADMIN not in names:
         names.insert(0, ADMIN)
     return names
+
+
+def is_admin(user):
+    """Администратор: суперпользователь или член группы «Администратор»."""
+    return user.is_authenticated and (user.is_superuser or user.groups.filter(name=ADMIN).exists())

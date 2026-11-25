@@ -1,12 +1,21 @@
+import io
+import tempfile
+import time
+from pathlib import Path
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.core.management import CommandError, call_command
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.forms import Textarea, modelform_factory
 from django.shortcuts import get_object_or_404, redirect, render
 
+from accounts.roles import is_admin
+from dbfsync.importer import copy_sources, dbf_models
+from dbfsync.management.commands.dbf_import import Command as DbfImport
 from teplo.sqlite_unicode import UnicodeLower
 
 from .registry import catalog_models, data_fields, get_model, list_fields, search_fields
@@ -35,7 +44,63 @@ def index(request):
          "source": getattr(m, "dbf_source", "веб-программа"), "count": m.objects.count()}
         for m in catalog_models() if _perm(request.user, m, "view")
     ]
-    return render(request, "catalogs/index.html", {"items": items})
+    return render(request, "catalogs/index.html", {"items": items, "can_update": is_admin(request.user)})
+
+
+DBF_APP = "catalogs"  # приложение с моделями DBF; в тестах — dbfsync_testapp
+
+
+@login_required
+def dbf_update(request):
+    """Обновить справочники из DBF старой программы (то же, что manage.py dbf_import):
+    таблицы копируются во временную папку, очищаются и загружаются заново, число
+    записей сверяется с DBF. При любой ошибке база остаётся как была."""
+    if not is_admin(request.user):
+        raise PermissionDenied
+    targets = dbf_models(DBF_APP)
+    folder = (request.POST.get("folder") or settings.DBF_SOURCE_DIR).strip()
+    ctx = {"folder": folder, "tables": len(targets), "result": None}
+    if request.method == "POST":
+        if not request.POST.get("confirm"):
+            ctx["error"] = "Отметьте флажок, что вы понимаете: данные справочников будут заменены."
+        elif not Path(folder).is_dir():
+            ctx["error"] = f"Папка {folder} не найдена."
+        else:
+            ctx["result"] = _run_dbf_import(targets, folder)
+            if ctx["result"]["ok"]:
+                messages.success(request, f"Данные обновлены из {folder}: загружено таблиц "
+                                          f"{len(ctx['result']['rows'])}, записей {ctx['result']['total']}.")
+            else:
+                messages.error(request, "Обновление не выполнено, данные в базе не изменены. Причины ниже.")
+    return render(request, "catalogs/dbf_update.html", ctx)
+
+
+def _run_dbf_import(targets, folder):
+    started = time.monotonic()
+    log = io.StringIO()
+    command = DbfImport(stdout=log, stderr=log, no_color=True)
+    command.rows, command.errors = [], []
+    ok = False
+    with tempfile.TemporaryDirectory(prefix="teplo_dbf_") as copy:
+        files, size, missing = copy_sources(targets, folder, copy)
+        if missing:  # не загружаем вовсе, иначе пришлось бы откатывать
+            command.errors.append(f"В папке {folder} нет таблиц ({len(missing)} из {len(targets)}): "
+                                  + ", ".join(missing))
+        else:
+            try:
+                call_command(command, dir=copy, app=DBF_APP)
+                ok = True
+            except CommandError as exc:
+                if not command.errors and all(r["ok"] for r in command.rows):
+                    command.errors.append(str(exc))
+            command.errors = [e.replace(copy, folder) for e in command.errors]
+    rows = command.rows
+    return {
+        "ok": ok, "rows": rows, "errors": command.errors,
+        "bad": [r for r in rows if not r["ok"]],
+        "total": sum(r["db"] for r in rows), "files": files, "size_mb": round(size / 2**20, 1),
+        "seconds": round(time.monotonic() - started),
+    }
 
 
 @login_required

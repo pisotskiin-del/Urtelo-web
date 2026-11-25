@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Справочники{% endblock %}
 {% block content %}
-<h1>Справочники</h1>
+<div class="page-head"><h1>Справочники</h1>{% if can_update %}<a class="button primary" href="{% url 'catalogs:dbf_update' %}">Обновить из DBF</a>{% endif %}</div>
 {% if items %}
 <table class="grid">
   <thead><tr><th>Справочник</th><th>Файл DBF</th><th class="num">Записей</th></tr></thead>
