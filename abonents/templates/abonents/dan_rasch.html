@@ -2,7 +2,10 @@
 {% block title %}Исходные данные для расчета{% endblock %}
 {% block content %}
 <p class="crumbs"><a href="{% url 'abonents:index' %}">Абоненты</a> / <a href="{% url 'abonents:raschet' %}">Расчет</a> /</p>
-<h1>Исходные данные для расчета</h1>
+<div class="page-head">
+  <h1>Исходные данные для расчета</h1>
+  <div class="actions"><a class="button" href="{% url 'abonents:shema' %}?gorod={{ city }}" title="Как считаются начисления и перерасчеты, с числами текущего месяца">{% icon "list" %} Блок-схема расчета</a></div>
+</div>
 <nav class="tabs">
   {% for c in cities %}<a href="?gorod={{ c.cod_gorod }}" {% if c.cod_gorod == city %}class="active"{% endif %}>{{ c.name_gorod }}</a>{% endfor %}
 </nav>
@@ -19,6 +22,7 @@
   <div class="actions">
     {% if can_change %}<button class="primary">{% icon "save" %} Сохранить</button>{% endif %}
     <a href="{% url 'abonents:raschet' %}">К расчету</a>
+    <a href="{% url 'abonents:shema' %}?gorod={{ city }}">Блок-схема расчета</a>
   </div>
 </form>
 {% endblock %}

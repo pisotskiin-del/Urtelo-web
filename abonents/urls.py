@@ -11,6 +11,7 @@ urlpatterns = [
     path("raschet/itog/", views.raschet_itog, name="raschet_itog"),
     path("raschet/itog/rasshifr/", views.raschet_rasshifr, name="raschet_rasshifr"),
     path("raschet/dannye/", views.dan_rasch, name="dan_rasch"),
+    path("raschet/shema/", views.shema_view, name="shema"),
     path("nov-mes/", views.nov_mes_view, name="nov_mes"),
     path("nov-mes/<int:pk>/1c/", views.abot_1c, name="abot_1c"),
     path("otchety/", views.otchety, name="otchety"),

@@ -510,3 +510,57 @@ table.dok-signs td { width:50%; vertical-align:top; padding:0 12px 0 0; }
 /* Реестр писем: кнопка «Отозвать» под статусом КРЭДО */
 form.otozvat { margin-top:4px; }
 form.otozvat .button { height:26px; padding:0 10px; font-size:12px; }
+
+/* ===== Блок-схема расчета ===== */
+.fc-pick { display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:12px 16px; margin:0 0 12px; }
+.fc-pick input[name=ls] { width:180px; }
+.fc-head { margin:6px 0 2px; }
+.fc-hint { margin:0 0 12px; font-size:13px; }
+.fc-tabs .i { margin-right:4px; }
+.fc-scroll { overflow-x:auto; padding:8px 4px 24px; background:var(--card); border:1px solid var(--line); border-radius:var(--radius); }
+.fc-flow { display:flex; flex-direction:column; align-items:center; }
+.fc-root { min-width:max-content; margin:0 auto; padding:0 12px; }
+.fc-item { display:flex; flex-direction:column; align-items:center; position:relative; padding-top:18px; }
+.fc-item::before { content:""; position:absolute; top:0; left:50%; height:18px; border-left:2px solid var(--line-strong); }
+.fc-flow > .fc-item:first-child::before { display:none; }
+.fc-flow > .fc-item:first-child { padding-top:0; }
+.fc-root > .fc-item:first-child { padding-top:8px; }
+.fc-box { display:flex; flex-direction:column; gap:3px; min-width:170px; max-width:300px; padding:8px 12px; text-align:center;
+          background:#fff; border:1.5px solid var(--line-strong); border-radius:8px; font-size:13px; line-height:1.35; }
+.fc-box b { font-weight:600; }
+.fc-f { color:var(--muted); font-size:12px; }
+.fc-s { font-family:Consolas, "Cascadia Mono", monospace; font-size:12px; color:var(--text); background:var(--off-weak); border-radius:4px; padding:1px 5px; }
+.fc-v { font-weight:700; font-size:14px; color:var(--accent-text); }
+.fc-st { font-size:11.5px; color:var(--warn); background:var(--warn-weak); border-radius:4px; padding:1px 5px; }
+.fc-n { font-size:12px; color:var(--muted); font-style:italic; }
+.fc-cnt { font-size:11.5px; color:var(--muted); }
+.fc-start { background:var(--navy); color:#fff; border-color:var(--navy); border-radius:20px; font-weight:600; flex-direction:row; justify-content:center; align-items:center; gap:6px; }
+.fc-step.on { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-weak); }
+.fc-end { border-radius:20px; }
+.fc-end.on { background:var(--ok-weak); border-color:var(--ok); }
+.fc-end.on .fc-v { color:var(--ok); }
+.fc-info { background:var(--off-weak); border-style:dashed; }
+.fc-city { border-style:double; border-width:3px; }
+.fc-q { background:var(--warn-weak); border-color:#e7b866; border-radius:14px; position:relative; }
+.fc-q::before { content:"?"; position:absolute; left:-11px; top:50%; transform:translateY(-50%); width:20px; height:20px; border-radius:50%;
+                background:#e7b866; color:#fff; font-weight:700; font-size:13px; line-height:20px; }
+.fc-branches { display:flex; align-items:flex-start; gap:0; padding-top:18px; position:relative; }
+.fc-branches::before { content:""; position:absolute; top:0; left:50%; height:18px; border-left:2px solid var(--line-strong); }
+.fc-br { display:flex; flex-direction:column; align-items:center; position:relative; padding:18px 10px 0; }
+.fc-br::before { content:""; position:absolute; top:0; left:0; right:0; border-top:2px solid var(--line-strong); }
+.fc-br:first-child::before { left:50%; }
+.fc-br:last-child::before { right:50%; }
+.fc-br:only-child::before { display:none; }
+.fc-br::after { content:""; position:absolute; top:0; left:50%; height:18px; border-left:2px solid var(--line-strong); }
+.fc-lbl { position:relative; z-index:1; font-size:12px; font-weight:600; padding:2px 10px; border-radius:12px; background:var(--off-weak);
+          color:var(--muted); white-space:nowrap; margin-bottom:0; }
+.fc-br.on > .fc-lbl { background:var(--accent); color:#fff; }
+.fc-br.on::after { border-color:var(--accent); }
+.fc-br > .fc-flow > .fc-item:first-child { padding-top:18px; }
+.fc-br > .fc-flow > .fc-item:first-child::before { display:block; }
+.fc-box.off { opacity:.5; }
+.fc-br.off .fc-box { max-width:210px; min-width:140px; font-size:12px; }
+.fc-br.off .fc-f { font-size:11px; }
+.fc-dec.off > .fc-box { opacity:.5; }
+.fc-box.off { box-shadow:none; border-style:dashed; }
+@media print { .fc-pick, .fc-tabs, .fc-hint { display:none; } .fc-pane[hidden] { display:block !important; } .fc-scroll { overflow:visible; border:0; } }

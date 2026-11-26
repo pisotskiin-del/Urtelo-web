@@ -72,3 +72,11 @@ def rcells(row, cols, links=None, index=None):
 def withcols(row, cols):
     """Пары (значение, колонка) строки отчета."""
     return list(zip(row, cols))
+
+
+@register.filter
+def chislo(value):
+    """Число по-русски для блок-схемы расчета: 1 234,5."""
+    from abonents.shema import fmt
+
+    return fmt(value)

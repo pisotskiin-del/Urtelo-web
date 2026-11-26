@@ -1,0 +1,51 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Блок-схема расчета{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{% url 'abonents:raschet' %}">Расчет</a><span class="sep">›</span><a href="{% url 'abonents:dan_rasch' %}?gorod={{ city }}">Исходные данные</a><span class="sep">›</span>Блок-схема</p>
+<div class="page-head">
+  <h1>Блок-схема расчета</h1>
+  <div class="actions">
+    {% if p %}<a class="button" href="{% url 'abonents:karta' p.potreb_id %}">{% icon "user" %} Карточка абонента</a>{% endif %}
+    <a class="button" href="{% url 'abonents:dan_rasch' %}?gorod={{ city }}">{% icon "sliders" %} Исходные данные</a>
+  </div>
+</div>
+<nav class="tabs">
+  {% for c in cities %}<a href="?gorod={{ c.cod_gorod }}&vid={{ vid }}" {% if c.cod_gorod == city and not p %}class="active"{% endif %}>{{ c.name_gorod }}</a>{% endfor %}
+</nav>
+<form method="get" class="fc-pick card">
+  <input type="hidden" name="vid" value="{{ vid }}" class="fc-vid">
+  <label for="fc-ls">Абонент, л/№</label>
+  <input id="fc-ls" name="ls" value="{{ ls|default_if_none:'' }}" list="fc-abon" inputmode="numeric" autocomplete="off" placeholder="весь город">
+  <datalist id="fc-abon">{% for id, name in abonenty %}<option value="{{ id }}">{{ name }}</option>{% endfor %}</datalist>
+  <button class="primary">{% icon "search" %} Показать</button>
+  {% if p %}<a href="?gorod={{ city }}&vid={{ vid }}">Весь город</a>{% endif %}
+</form>
+<p class="fc-head">
+  {% if p %}<b>Л/№ {{ p.potreb_id }}</b> — {{ p.name_potre|default:"" }}{% if p.glav_potre %}, {{ p.glav_potre }}{% endif %}.
+  {% else %}<b>{{ d.name_gorod }}</b>: все абоненты города ({{ total }}). У каждого шага — сколько абонентов по нему прошло и сумма по ним.{% endif %}
+  Расчетный месяц {{ d.name_mes|default:"" }} {{ d.god|default_if_none:"" }}; t коэффициент {{ d.tkoef|chislo|default:"0" }}, дни отопления {{ d.dnotop|chislo|default:"0" }}, Q факт {{ d.qpfakt|chislo|default:"0" }} Гкал.
+</p>
+<p class="muted fc-hint">Схема считается по текущим данным, как кнопка «Расчет», но ничего не записывает. Сработавшие шаги и ветки выделены, остальные — бледные.</p>
+<nav class="tabs fc-tabs">
+  {% for key, title, ic, nodes in tabs %}<a href="?{% if p %}ls={{ p.potreb_id }}{% else %}gorod={{ city }}{% endif %}&vid={{ key }}" data-vid="{{ key }}" {% if key == vid %}class="active"{% endif %}>{% icon ic %} {{ title }}</a>{% endfor %}
+</nav>
+{% for key, title, ic, nodes in tabs %}<section class="fc-pane" data-vid="{{ key }}" {% if key != vid %}hidden{% endif %}>
+  <div class="fc-scroll"><div class="fc-flow fc-root">
+    <div class="fc-item"><div class="fc-box fc-start">{% icon ic %} {{ title }}</div></div>
+    {% include "abonents/_shema_nodes.html" with nodes=nodes %}
+  </div></div>
+</section>{% endfor %}
+<script>
+document.querySelectorAll(".fc-tabs a").forEach(function (a) {
+  a.addEventListener("click", function (e) {
+    e.preventDefault();
+    var vid = a.dataset.vid;
+    document.querySelectorAll(".fc-tabs a").forEach(function (x) { x.classList.toggle("active", x === a); });
+    document.querySelectorAll(".fc-pane").forEach(function (s) { s.hidden = s.dataset.vid !== vid; });
+    document.querySelectorAll(".fc-vid").forEach(function (i) { i.value = vid; });
+    document.querySelectorAll(".tabs:not(.fc-tabs) a").forEach(function (x) { x.href = x.href.replace(/vid=[a-z_]+/, "vid=" + vid); });
+    try { history.replaceState(null, "", a.href); } catch (err) {}
+  });
+});
+</script>
+{% endblock %}

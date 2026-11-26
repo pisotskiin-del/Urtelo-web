@@ -24,7 +24,7 @@ from django.db import transaction
 from catalogs.models import Akcept, Bank, Danrasch, GvsKot, Kategorpot, Limit, Potreb, SpTeplosch, SpTeplpoteri
 from teplo.sqlite_unicode import UnicodeLower
 
-from . import documents, layout, nov_mes, poteri, raschet, reports
+from . import documents, layout, nov_mes, poteri, raschet, reports, shema
 from .forms import DanRaschForm, NovAbonentForm, PoteriForm, TeploschForm, karta_form
 
 view_required = permission_required("catalogs.view_potreb", raise_exception=True)
@@ -461,6 +461,34 @@ def dan_rasch(request):
             return redirect("abonents:dan_rasch")
     return render(request, "abonents/dan_rasch.html", {
         "cities": cities, "city": city, "d": d, "form": form, "can_change": can_change,
+    })
+
+
+@login_required
+@permission_required("catalogs.view_potreb", raise_exception=True)
+def shema_view(request):
+    """Блок-схема расчета по текущим данным: по городу (сколько абонентов
+    прошло по каждой ветке) или по одному абоненту (его числа)."""
+    cities = _cities()
+    p = None
+    ls = (request.GET.get("ls") or "").strip()
+    if ls:
+        if ls.isdigit():
+            p = Potreb.objects.filter(potreb_id=int(ls)).select_related("cod_gor").first()
+        if p is None:
+            messages.error(request, f"Абонент л/№ {ls} не найден")
+        elif p.cod_gor_id:
+            request.session["kod_gorod"] = p.cod_gor_id
+    city = p.cod_gor_id if p is not None and p.cod_gor_id else _current_city(request, cities)
+    vid = request.GET.get("vid") if request.GET.get("vid") in dict((k, t) for k, t, _ in shema.VIDY) else "otop"
+    data = shema.Data()
+    trees = shema.abonent(data, next(r for r in data.recs if r.pk == p.pk)) if p is not None else shema.gorod(data, city)
+    d = next((c for c in cities if c.cod_gorod == city), None)
+    return render(request, "abonents/shema.html", {
+        "cities": cities, "city": city, "d": d, "p": p, "vid": vid, "ls": ls if p is None else p.potreb_id,
+        "tabs": [(key, title, icon, trees.get(key, [])) for key, title, icon in shema.VIDY],
+        "total": len(data.city_recs(city)), "tot": data.totals.get(city),
+        "abonenty": Potreb.objects.filter(cod_gor=city).order_by("potreb_id").values_list("potreb_id", "name_potre"),
     })
 
 

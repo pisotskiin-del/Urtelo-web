@@ -1,0 +1,17 @@
+{% load ui %}{% for node in nodes %}{% if node.kind == "decision" %}<div class="fc-item fc-dec{% if not node.active %} off{% endif %}">
+  <div class="fc-box fc-q"><b>{{ node.title }}</b><span>{{ node.question }}</span>{% if node.subst and not node.total %}<span class="fc-s">{{ node.subst }}</span>{% endif %}{% if node.total %}<small class="fc-cnt">{{ node.count }} из {{ node.total }}</small>{% endif %}</div>
+  <div class="fc-branches">{% for b in node.branches %}<div class="fc-br{% if b.active %} on{% else %} off{% endif %}">
+    <span class="fc-lbl">{% if b.active %}✓ {% endif %}{{ b.label }}{% if node.total %} · {{ b.count }}{% endif %}</span>
+    <div class="fc-flow">{% include "abonents/_shema_nodes.html" with nodes=b.nodes %}</div>
+  </div>{% endfor %}</div>
+</div>{% else %}<div class="fc-item">
+  <div class="fc-box fc-{{ node.kind }}{% if node.active %} on{% else %} off{% endif %}{% if node.city %} fc-city{% endif %}">
+    <b>{{ node.title }}</b>
+    {% if node.formula %}<span class="fc-f">{{ node.formula }}</span>{% endif %}
+    {% if node.subst and node.active %}<span class="fc-s">{{ node.subst }}</span>{% endif %}
+    {% if node.value is not None and node.kind != "info" %}{% if node.active or node.city %}<span class="fc-v">{% if node.total and not node.city %}Σ {% endif %}{{ node.value|chislo }}{% if node.unit %} {{ node.unit }}{% endif %}</span>{% endif %}{% endif %}
+    {% if node.stored is not None and node.active %}<span class="fc-st" title="Значение, записанное последним расчетом">в базе: {{ node.stored|chislo }} — нажмите «Расчет», чтобы обновить</span>{% endif %}
+    {% if node.note %}<span class="fc-n">{{ node.note }}</span>{% endif %}
+    {% if node.total and node.kind != "info" and not node.city %}<small class="fc-cnt">{{ node.count }} из {{ node.total }} аб.</small>{% endif %}
+  </div>
+</div>{% endif %}{% endfor %}

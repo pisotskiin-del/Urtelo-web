@@ -349,6 +349,68 @@ class RaschetTests(TestCase):
         self.assertEqual(set(Potreb.objects.filter(cod_gor=2).values_list("dnotop", flat=True)), {Decimal("30.0")})
 
 
+class ShemaTests(RaschetTests):
+    """Блок-схема расчета: значения и сработавшие ветки по текущим данным."""
+
+    def test_raschet(self):
+        pass
+
+    @staticmethod
+    def find(nodes, title):
+        from abonents.shema import _walk
+        return [x for x in _walk(nodes) if x.get("title") == title or x.get("label") == title]
+
+    def test_abonent(self):
+        self.login("Оператор")
+        self.assertContains(self.client.get("/abonents/raschet/dannye/?gorod=1"), "Блок-схема расчета")
+        self.assertContains(self.client.get(f"/abonents/{self.b.potreb_id}/"), "Блок-схема")
+        page = self.client.get("/abonents/raschet/shema/?ls=2")
+        self.assertEqual(page.status_code, 200)
+        tabs = {key: nodes for key, _, _, nodes in page.context["tabs"]}
+        self.assertEqual(set(tabs), {"otop", "gvs", "perer_otop", "perer_gvs"})
+        otop = tabs["otop"]
+        po_nag, = [b for b in self.find(otop, "3 — по нагрузке")]
+        self.assertTrue(po_nag["active"])
+        self.assertFalse(self.find(otop, "1 — по прибору")[0]["active"])
+        # 0,1 × 24 × 30 × 0,5 = 36; по факту 25 / 54 × 36 = 16,667.
+        nag = [x for x in self.find(otop, "Начислено по расчету (по нагрузке)") if x["active"]]
+        self.assertEqual(nag[0]["value"], Decimal("36.000"))
+        fakt = [x for x in self.find(otop, "Начислено по факту") if x["active"]]
+        self.assertEqual(fakt[0]["value"], Decimal("16.667"))
+        self.assertEqual(self.find(otop, "Остаток фактического отпуска города")[0]["value"], Decimal("25"))
+        # Ничего не записано: в базе еще нет расчета, это показано.
+        self.assertIsNone(Potreb.objects.get(pk=self.b.pk).nach_otnag)
+        self.assertContains(page, "в базе:")
+
+    def test_gvs_and_status(self):
+        self.login("Оператор")
+        tabs = {k: v for k, _, _, v in self.client.get("/abonents/raschet/shema/?ls=7").context["tabs"]}
+        gvs = [x for x in self.find(tabs["gvs"], "ГВС, фактическое потребление") if x["active"]]
+        self.assertEqual(gvs[0]["value"], Decimal("5.330"))
+        tabs = {k: v for k, _, _, v in self.client.get("/abonents/raschet/shema/?ls=6").context["tabs"]}
+        self.assertTrue(self.find(tabs["otop"], "нет — не рассчитывается")[0]["active"])
+        self.assertFalse(self.find(tabs["otop"], "Тепловые потери в сетях")[0]["active"])
+
+    def test_perer_otop(self):
+        Potreb.objects.filter(pk=self.b.pk).update(dn_pereras=2, tkf_perer=Decimal("0.5"))
+        self.login("Оператор")
+        tabs = {k: v for k, _, _, v in self.client.get("/abonents/raschet/shema/?ls=2").context["tabs"]}
+        perer = [x for x in self.find(tabs["perer_otop"], "Перерасчет т/э") if x.get("active") and "value" in x]
+        self.assertEqual(perer[0]["value"], Decimal("2.400"))  # 0,1 × 24 × 2 × 0,5
+
+    def test_gorod(self):
+        self.login("Оператор")
+        page = self.client.get("/abonents/raschet/shema/?gorod=1&vid=gvs")
+        self.assertEqual(page.context["vid"], "gvs")
+        otop = {k: v for k, _, _, v in page.context["tabs"]}["otop"]
+        # В Рыбнице 4 абонента: по одному на каждый способ и один расторгнутый (способ 3).
+        self.assertEqual(self.find(otop, "3 — по нагрузке")[0]["count"], 1)
+        self.assertEqual(self.find(otop, "нет — не рассчитывается")[0]["count"], 1)
+        nag = self.find(otop, "Начислено по расчету (по нагрузке)")
+        self.assertEqual(sum(x["value"] for x in nag), Decimal("54.000"))  # 36 + 18
+        self.assertContains(self.client.get("/abonents/raschet/shema/?ls=999"), "не найден")
+
+
 class StatusTests(KartaBase):
     def test_status_change_and_gray_rows(self):
         self.login("Оператор")
